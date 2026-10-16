@@ -9,6 +9,10 @@
 class ControlPushButton;
 class Library;
 
+namespace mixxx::overviewlayout {
+struct HoverReadoutSettings;
+}
+
 class DlgPrefWaveform : public DlgPreferencePage, public Ui::DlgPrefWaveformDlg {
     Q_OBJECT
   public:
@@ -51,6 +55,7 @@ class DlgPrefWaveform : public DlgPreferencePage, public Ui::DlgPrefWaveformDlg 
 
   private:
     void initWaveformControl();
+    void showHoverReadoutControls(const mixxx::overviewlayout::HoverReadoutSettings& settings);
     void calculateCachedWaveformDiskUsage();
     void notifyRebootNecessary();
     void updateEnableUntilMark();

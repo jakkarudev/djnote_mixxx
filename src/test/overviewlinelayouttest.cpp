@@ -139,8 +139,8 @@ TEST(OverviewLineLayoutTest, TempoChangeFollowsTheGrid) {
     const double marker2 = marker1 + 16 * 48000;
     const std::vector<double> phrases = {
             px(400),
-            px(marker1 + 8 * 48000), // idx 16
-            px(marker2 + 8 * 24000), // idx 32
+            px(marker1 + 8 * 48000),  // idx 16
+            px(marker2 + 8 * 24000),  // idx 32
             px(marker2 + 24 * 24000), // idx 48
             px(marker2 + 40 * 24000), // idx 64
             px(marker2 + 56 * 24000), // idx 80

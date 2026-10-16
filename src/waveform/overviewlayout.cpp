@@ -7,33 +7,46 @@
 
 #include "engine/engine.h"
 #include "util/duration.h"
+#include "waveform/overviewlinelayout.h"
 
 namespace mixxx {
 namespace overviewlayout {
 
 namespace {
 
-// Provides tr() for the beat label unit words (translation context
-// "OverviewBeatLabel").
-class OverviewBeatLabel {
-    Q_DECLARE_TR_FUNCTIONS(OverviewBeatLabel)
+// Provides tr() for the hover readout unit words (translation context
+// "OverviewHoverReadout").
+//
+// Every message is a numerus message: `count` selects the plural form of
+// translations that have several. The source text is the English form, so
+// without a translation the English wording is right too. English needs
+// distinct singular and plural source texts because Mixxx loads no English
+// translation, which would be needed to turn a "%n bar(s)" source into
+// "bar" or "bars" (the fallback only substitutes %n).
+class OverviewHoverReadout {
+    Q_DECLARE_TR_FUNCTIONS(OverviewHoverReadout)
   public:
-    // Number is already signed, e.g. "+4" or "0".
-    static QString rightOfLine(const QString& number, BeatLabelUnit unit, bool singular) {
-        if (unit == BeatLabelUnit::Bars) {
-            return singular ? tr("%1 bar").arg(number) : tr("%1 bars").arg(number);
+    // number is already signed, e.g. "+4" or "0".
+    static QString rightOfLine(const QString& number, BeatDistanceUnit unit, int count) {
+        const bool singular = count == 1;
+        if (unit == BeatDistanceUnit::Bars) {
+            return singular ? tr("%1 bar", "", count).arg(number)
+                            : tr("%1 bars", "", count).arg(number);
         }
-        return singular ? tr("%1 beat").arg(number) : tr("%1 beats").arg(number);
+        return singular ? tr("%1 beat", "", count).arg(number)
+                        : tr("%1 beats", "", count).arg(number);
     }
-    static QString leftOfLine(const QString& number, BeatLabelUnit unit, bool singular) {
-        if (unit == BeatLabelUnit::Bars) {
-            return singular ? tr("bar %1").arg(number) : tr("bars %1").arg(number);
+    static QString leftOfLine(const QString& number, BeatDistanceUnit unit, int count) {
+        const bool singular = count == 1;
+        if (unit == BeatDistanceUnit::Bars) {
+            return singular ? tr("bar %1", "", count).arg(number)
+                            : tr("bars %1", "", count).arg(number);
         }
-        return singular ? tr("beat %1").arg(number) : tr("beats %1").arg(number);
+        return singular ? tr("beat %1", "", count).arg(number)
+                        : tr("beats %1", "", count).arg(number);
     }
 };
 
-constexpr double kBeatsPerBar = 4.0;
 // The label switches sides when the pointer passes this fraction of the
 // overview length.
 constexpr double kAutoSideSwitchFraction = 0.75;
@@ -53,11 +66,11 @@ double fractionalBeatIndex(const Beats& beats, audio::FramePos position) {
 QString formatBeatDistance(double beatDistance,
         const HoverReadoutSettings& settings,
         LabelSide side) {
-    const double value = settings.unit == BeatLabelUnit::Bars
+    const double value = settings.unit == BeatDistanceUnit::Bars
             ? beatDistance / kBeatsPerBar
             : beatDistance;
-    const bool fractional = settings.precision == BeatLabelPrecision::Fractional;
-    const int decimals = !fractional ? 0 : (settings.unit == BeatLabelUnit::Bars ? 2 : 1);
+    const bool fractional = settings.precision == BeatDistancePrecision::Fractional;
+    const int decimals = !fractional ? 0 : (settings.unit == BeatDistanceUnit::Bars ? 2 : 1);
     const double scale = std::pow(10.0, decimals);
     // Round first, so that values that display as zero get no sign.
     const double scaled = std::round(value * scale);
@@ -69,10 +82,12 @@ QString formatBeatDistance(double beatDistance,
     } else if (scaled < 0) {
         number.prepend('-');
     }
-    const bool singular = !fractional && std::fabs(scaled) == 1.0;
+    // The count selects the plural form. Fractional values (e.g. "1.25
+    // bars") are never singular, so they use 2, a plural in every language.
+    const int count = fractional ? 2 : static_cast<int>(std::fabs(scaled));
     return side == LabelSide::Right
-            ? OverviewBeatLabel::rightOfLine(number, settings.unit, singular)
-            : OverviewBeatLabel::leftOfLine(number, settings.unit, singular);
+            ? OverviewHoverReadout::rightOfLine(number, settings.unit, count)
+            : OverviewHoverReadout::leftOfLine(number, settings.unit, count);
 }
 
 double samplesToSeconds(const Input& input, double samples) {
@@ -111,8 +126,8 @@ TimeRulerLayout layoutTimeRuler(const Input& input) {
     return layout;
 }
 
-BeatLabelLayout layoutBeatLabel(const Input& input) {
-    BeatLabelLayout layout;
+HoverReadoutLayout layoutHoverReadout(const Input& input) {
+    HoverReadoutLayout layout;
     const bool rulerActive = input.timeRulerState != TimeRulerState::Inactive;
     const HoverReadoutSettings& settings = input.hoverReadout;
     const bool plainHoverLabel = !rulerActive && input.pointerPresent &&
@@ -144,13 +159,13 @@ BeatLabelLayout layoutBeatLabel(const Input& input) {
         layout.side = LabelSide::Right;
     } else {
         switch (input.hoverReadout.position) {
-        case BeatLabelPosition::AlwaysRight:
+        case HoverReadoutPosition::AlwaysRight:
             layout.side = LabelSide::Right;
             break;
-        case BeatLabelPosition::AlwaysLeft:
+        case HoverReadoutPosition::AlwaysLeft:
             layout.side = LabelSide::Left;
             break;
-        case BeatLabelPosition::Auto:
+        case HoverReadoutPosition::Auto:
             layout.side = pointerFraction > kAutoSideSwitchFraction
                     ? LabelSide::Left
                     : LabelSide::Right;
@@ -165,8 +180,8 @@ BeatLabelLayout layoutBeatLabel(const Input& input) {
     return layout;
 }
 
-HoverReadoutLayout layoutHoverReadout(const Input& input) {
-    HoverReadoutLayout layout;
+HoverLineLayout layoutHoverLine(const Input& input) {
+    HoverLineLayout layout;
     if (input.timeRulerState != TimeRulerState::Inactive ||
             !input.pointerPresent ||
             !input.hoverReadout.showHoverReadout ||

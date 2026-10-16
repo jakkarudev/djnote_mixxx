@@ -21,9 +21,9 @@
 #include "util/math.h"
 #include "util/painterscope.h"
 #include "util/timer.h"
-#include "waveform/waveform.h"
 #include "waveform/overviewlayout.h"
 #include "waveform/overviewlinelayout.h"
+#include "waveform/waveform.h"
 #include "waveform/waveformwidgetfactory.h"
 #include "widget/controlwidgetconnection.h"
 #include "wskincolor.h"
@@ -32,6 +32,8 @@ namespace {
 // Horizontal and vertical margin around the widget where we accept play pos dragging.
 constexpr int kDragOutsideLimitX = 100;
 constexpr int kDragOutsideLimitY = 50;
+// Spacing between a hover/time ruler line and its labels.
+constexpr qreal kLineLabelPadding = 1.0;
 } // anonymous namespace
 
 WOverview::WOverview(
@@ -767,7 +769,7 @@ void WOverview::drawBarAndPhraseLines(QPainter* pPainter) {
             widgetFactory->getOverviewLineSettings());
 
     PainterScope painterScope(pPainter);
-    pPainter->setOpacity(widgetFactory->getOverviewLineOpacity() / 100.0);
+    pPainter->setOpacity(widgetFactory->getOverviewLineSettings().opacity.fraction());
     const auto drawLines = [&](const std::vector<double>& positions,
                                    const QColor& color,
                                    double lineWidth) {
@@ -1206,7 +1208,6 @@ void WOverview::drawTimeRuler(QPainter* pPainter) {
     shadowFont.setWeight(QFont::Black);
 #endif
     shadowFont.setPixelSize(static_cast<int>(m_iLabelFontSize * m_scaleFactor));
-    QPen shadowPen(Qt::black, 2.5 * m_scaleFactor);
 
     using namespace mixxx::overviewlayout;
     Input input;
@@ -1233,7 +1234,7 @@ void WOverview::drawTimeRuler(QPainter* pPainter) {
     }
     const TimeRulerLayout layout = layoutTimeRuler(input);
 
-    // Beat distance label
+    // Hover readout (beat distance)
     mixxx::BeatsPointer pBeats;
     if ((m_bTimeRulerActive || m_bPointerInside) && m_pCurrentTrack) {
         pBeats = m_pCurrentTrack->getBeats();
@@ -1242,60 +1243,20 @@ void WOverview::drawTimeRuler(QPainter* pPainter) {
     input.hoverReadout = WaveformWidgetFactory::instance()->getOverviewHoverReadoutSettings();
     input.labelHeight = fontMetrics.height();
     input.overviewBreadth = breadth();
-    const BeatLabelLayout beatLayout = layoutBeatLabel(input);
-    const bool beatLabelJoined = beatLayout.shown &&
-            beatLayout.slot == LabelSlot::JoinedToDistanceLabel;
-    const HoverReadoutLayout hoverLayout = layoutHoverReadout(input);
-    constexpr qreal padding = 1.0; // spacing between line and text
-
-    // Draws the beat label (own row) next to the line at `anchor`.
-    const auto drawBeatLabel = [&](const QPointF& anchor) {
-        // At the bottom end of the line, on the side chosen by the layout.
-        // Vertical overviews: below (right) or above (left) the line,
-        // at the far end of the line.
-        const qreal textWidth =
-                fontMetrics.boundingRect(beatLayout.text).width() + 4.0;
-        const bool right = beatLayout.side == LabelSide::Right;
-        QPointF textPointBeats;
-        if (m_orientation == Qt::Horizontal) {
-            textPointBeats = QPointF(right ? anchor.x() + padding
-                                           : anchor.x() - padding - textWidth,
-                    height());
-        } else {
-            textPointBeats = QPointF(width(),
-                    right ? anchor.y() + padding + fontMetrics.height()
-                          : anchor.y() - padding);
-        }
-        m_timeRulerBeatLabel.prerender(textPointBeats,
-                QPixmap(),
-                beatLayout.text,
-                markerFont,
-                m_labelTextColor,
-                m_labelBackgroundColor,
-                width(),
-                devicePixelRatioF());
-        m_timeRulerBeatLabel.draw(pPainter);
-    };
-
+    const HoverReadoutLayout readoutLayout = layoutHoverReadout(input);
+    const bool readoutJoined = readoutLayout.shown &&
+            readoutLayout.slot == LabelSlot::JoinedToDistanceLabel;
+    const HoverLineLayout hoverLayout = layoutHoverLine(input);
     if (layout.labelsShown) {
         if (layout.lineShown) {
-            QLineF line;
-            if (m_orientation == Qt::Horizontal) {
-                line.setLine(layout.linePos, 0.0, layout.linePos, height());
-            } else {
-                line.setLine(0.0, layout.linePos, width(), layout.linePos);
-            }
-            pPainter->setPen(shadowPen);
-            pPainter->drawLine(line);
-
-            pPainter->setPen(QPen(m_playPosColor, m_scaleFactor));
-            pPainter->drawLine(line);
+            drawHoverLine(pPainter, layout.linePos);
         }
 
         QPointF textPoint = m_timeRulerPos;
-        QPointF textPointDistance = m_timeRulerPos;        if (m_orientation == Qt::Horizontal) {
-            textPoint = QPointF(textPoint.x() + padding, fontMetrics.height());
-            textPointDistance = QPointF(textPointDistance.x() + padding,
+        QPointF textPointDistance = m_timeRulerPos;
+        if (m_orientation == Qt::Horizontal) {
+            textPoint = QPointF(textPoint.x() + kLineLabelPadding, fontMetrics.height());
+            textPointDistance = QPointF(textPointDistance.x() + kLineLabelPadding,
                     (fontMetrics.height() + height()) / 2);
         } else {
             textPoint.setX(0);
@@ -1314,8 +1275,8 @@ void WOverview::drawTimeRuler(QPainter* pPainter) {
 
         m_timeRulerDistanceLabel.prerender(textPointDistance,
                 QPixmap(),
-                beatLabelJoined ? beatLayout.joinedDistanceLabelText
-                                : layout.distanceLabelText,
+                readoutJoined ? readoutLayout.joinedDistanceLabelText
+                              : layout.distanceLabelText,
                 markerFont,
                 m_labelTextColor,
                 m_labelBackgroundColor,
@@ -1323,37 +1284,83 @@ void WOverview::drawTimeRuler(QPainter* pPainter) {
                 devicePixelRatioF());
         m_timeRulerDistanceLabel.draw(pPainter);
 
-        if (beatLayout.shown && !beatLabelJoined) {
-            drawBeatLabel(m_timeRulerPos);
+        if (readoutLayout.shown && !readoutJoined) {
+            drawHoverReadout(pPainter, readoutLayout, m_timeRulerPos, markerFont);
         } else {
-            m_timeRulerBeatLabel.clear();
+            m_hoverReadoutLabel.clear();
         }
     } else {
-        // Plain hover: hover line and beat label, no time labels.
         m_timeRulerPositionLabel.clear();
         m_timeRulerDistanceLabel.clear();
-        if (hoverLayout.lineShown) {
-            QLineF line;
-            if (m_orientation == Qt::Horizontal) {
-                line.setLine(hoverLayout.linePos, 0.0, hoverLayout.linePos, height());
-            } else {
-                line.setLine(0.0, hoverLayout.linePos, width(), hoverLayout.linePos);
-            }
-            pPainter->setPen(shadowPen);
-            pPainter->drawLine(line);
-
-            pPainter->setPen(QPen(m_playPosColor, m_scaleFactor));
-            pPainter->drawLine(line);
-        }
-        if (beatLayout.shown) {
-            QPointF anchor = m_hoverPos;
-            anchor.setX(math_clamp(anchor.x(), 0.0, static_cast<double>(width())));
-            anchor.setY(math_clamp(anchor.y(), 0.0, static_cast<double>(height())));
-            drawBeatLabel(anchor);
-        } else {
-            m_timeRulerBeatLabel.clear();
-        }
+        drawPlainHover(pPainter, hoverLayout, readoutLayout, markerFont);
     }
+}
+
+void WOverview::drawHoverLine(QPainter* pPainter, double linePos) {
+    QLineF line;
+    if (m_orientation == Qt::Horizontal) {
+        line.setLine(linePos, 0.0, linePos, height());
+    } else {
+        line.setLine(0.0, linePos, width(), linePos);
+    }
+    pPainter->setPen(QPen(Qt::black, 2.5 * m_scaleFactor)); // shadow
+    pPainter->drawLine(line);
+
+    pPainter->setPen(QPen(m_playPosColor, m_scaleFactor));
+    pPainter->drawLine(line);
+}
+
+// Plain hover (no time ruler): hover line and hover readout, no time labels.
+void WOverview::drawPlainHover(QPainter* pPainter,
+        const mixxx::overviewlayout::HoverLineLayout& lineLayout,
+        const mixxx::overviewlayout::HoverReadoutLayout& readoutLayout,
+        const QFont& markerFont) {
+    if (lineLayout.lineShown) {
+        drawHoverLine(pPainter, lineLayout.linePos);
+    }
+    if (readoutLayout.shown) {
+        QPointF anchor = m_hoverPos;
+        anchor.setX(math_clamp(anchor.x(), 0.0, static_cast<double>(width())));
+        anchor.setY(math_clamp(anchor.y(), 0.0, static_cast<double>(height())));
+        drawHoverReadout(pPainter, readoutLayout, anchor, markerFont);
+    } else {
+        m_hoverReadoutLabel.clear();
+    }
+}
+
+// Draws the hover readout (own row) next to the line at `anchor`, at the
+// bottom end of the line, on the side chosen by the layout. Vertical
+// overviews: below (right) or above (left) the line, at the far end of the
+// line. The label is kept within the overview.
+void WOverview::drawHoverReadout(QPainter* pPainter,
+        const mixxx::overviewlayout::HoverReadoutLayout& readoutLayout,
+        const QPointF& anchor,
+        const QFont& markerFont) {
+    using mixxx::overviewlayout::LabelSide;
+    const QFontMetricsF fontMetrics(markerFont);
+    const qreal textWidth = math_min<qreal>(
+            fontMetrics.boundingRect(readoutLayout.text).width() + 4.0, width());
+    const qreal textHeight = fontMetrics.height();
+    const bool right = readoutLayout.side == LabelSide::Right;
+    QPointF bottomLeft;
+    if (m_orientation == Qt::Horizontal) {
+        const qreal x = right ? anchor.x() + kLineLabelPadding
+                              : anchor.x() - kLineLabelPadding - textWidth;
+        bottomLeft = QPointF(math_clamp<qreal>(x, 0.0, width() - textWidth), height());
+    } else {
+        const qreal y = right ? anchor.y() + kLineLabelPadding + textHeight
+                              : anchor.y() - kLineLabelPadding;
+        bottomLeft = QPointF(width(), math_clamp<qreal>(y, textHeight, height()));
+    }
+    m_hoverReadoutLabel.prerender(bottomLeft,
+            QPixmap(),
+            readoutLayout.text,
+            markerFont,
+            m_labelTextColor,
+            m_labelBackgroundColor,
+            width(),
+            devicePixelRatioF());
+    m_hoverReadoutLabel.draw(pPainter);
 }
 
 void WOverview::drawMarkLabels(QPainter* pPainter, const float offset, const float gain) {
@@ -1375,7 +1382,7 @@ void WOverview::drawMarkLabels(QPainter* pPainter, const float offset, const flo
         if (pMark->m_label.intersects(m_timeRulerPositionLabel) || pMark->m_label.intersects(m_timeRulerDistanceLabel)) {
             continue;
         }
-        if (pMark->m_label.intersects(m_timeRulerBeatLabel)) {
+        if (pMark->m_label.intersects(m_hoverReadoutLabel)) {
             continue;
         }
 
@@ -1425,7 +1432,7 @@ void WOverview::drawMarkLabels(QPainter* pPainter, const float offset, const flo
                     width(),
                     devicePixelRatioF());
 
-            if (!(markRange.m_durationLabel.intersects(m_cuePositionLabel) || markRange.m_durationLabel.intersects(m_cueTimeDistanceLabel) || markRange.m_durationLabel.intersects(m_timeRulerPositionLabel) || markRange.m_durationLabel.intersects(m_timeRulerDistanceLabel) || markRange.m_durationLabel.intersects(m_timeRulerBeatLabel))) {
+            if (!(markRange.m_durationLabel.intersects(m_cuePositionLabel) || markRange.m_durationLabel.intersects(m_cueTimeDistanceLabel) || markRange.m_durationLabel.intersects(m_timeRulerPositionLabel) || markRange.m_durationLabel.intersects(m_timeRulerDistanceLabel) || markRange.m_durationLabel.intersects(m_hoverReadoutLabel))) {
                 markRange.m_durationLabel.draw(pPainter);
             }
         }

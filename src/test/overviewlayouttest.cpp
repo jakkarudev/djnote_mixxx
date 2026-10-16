@@ -95,7 +95,7 @@ TEST(OverviewLayoutTimeRulerTest, OrientationOnlyChangesLength) {
 }
 
 // ---------------------------------------------------------------------------
-// Beat label
+// Hover readout (beat distance)
 // ---------------------------------------------------------------------------
 
 namespace {
@@ -124,7 +124,7 @@ const auto kNonConstTempoBeats = Beats(
 constexpr double kTrackFrames = 100.0 * 48000;
 constexpr double kOverviewLength = 1000.0;
 
-struct BeatLabelCase {
+struct HoverReadoutCase {
     const Beats* pBeats = &kConstTempoBeats;
     // On beat 100, so that there is room before and after.
     double playFrame = 400 + 100 * 24000.0;
@@ -149,20 +149,20 @@ struct BeatLabelCase {
         in.overviewBreadth = breadth;
         return in;
     }
-    BeatLabelLayout layout() const {
-        return layoutBeatLabel(input());
+    HoverReadoutLayout layout() const {
+        return layoutHoverReadout(input());
     }
     // Pointer `beats` beats after the play position on the constant grid.
-    BeatLabelCase& beatsAway(double beats) {
+    HoverReadoutCase& beatsAway(double beats) {
         pointerFrame = playFrame + beats * 24000.0;
         return *this;
     }
 };
 
 QString textFor(double beats,
-        BeatLabelUnit unit = BeatLabelUnit::Bars,
-        BeatLabelPrecision precision = BeatLabelPrecision::Whole) {
-    BeatLabelCase c;
+        BeatDistanceUnit unit = BeatDistanceUnit::Bars,
+        BeatDistancePrecision precision = BeatDistancePrecision::Whole) {
+    HoverReadoutCase c;
     c.settings.unit = unit;
     c.settings.precision = precision;
     c.beatsAway(beats);
@@ -171,8 +171,8 @@ QString textFor(double beats,
 
 } // namespace
 
-TEST(OverviewLayoutBeatLabelTest, FourBarsAheadOnConstantGrid) {
-    BeatLabelCase c;
+TEST(OverviewLayoutBeatDistanceTest, FourBarsAheadOnConstantGrid) {
+    HoverReadoutCase c;
     c.beatsAway(16);
     const auto layout = c.layout();
     EXPECT_TRUE(layout.shown);
@@ -181,44 +181,72 @@ TEST(OverviewLayoutBeatLabelTest, FourBarsAheadOnConstantGrid) {
     EXPECT_EQ(LabelSlot::OwnBottomRow, layout.slot);
 }
 
-TEST(OverviewLayoutBeatLabelTest, NegativeDistance) {
+TEST(OverviewLayoutBeatDistanceTest, NegativeDistance) {
     EXPECT_EQ("-4 bars", textFor(-16));
 }
 
-TEST(OverviewLayoutBeatLabelTest, ZeroHasNoSign) {
+TEST(OverviewLayoutBeatDistanceTest, ZeroHasNoSign) {
     EXPECT_EQ("0 bars", textFor(0));
     // Rounds to zero from either side: never "-0" or "+0".
     EXPECT_EQ("0 bars", textFor(-0.4));
     EXPECT_EQ("0 bars", textFor(0.4));
-    EXPECT_EQ("0 beats", textFor(-0.3, BeatLabelUnit::Beats));
+    EXPECT_EQ("0 beats", textFor(-0.3, BeatDistanceUnit::Beats));
     EXPECT_EQ("0.00 bars",
-            textFor(-0.001, BeatLabelUnit::Bars, BeatLabelPrecision::Fractional));
+            textFor(-0.001, BeatDistanceUnit::Bars, BeatDistancePrecision::Fractional));
     EXPECT_EQ("0.0 beats",
-            textFor(-0.01, BeatLabelUnit::Beats, BeatLabelPrecision::Fractional));
+            textFor(-0.01, BeatDistanceUnit::Beats, BeatDistancePrecision::Fractional));
 }
 
-TEST(OverviewLayoutBeatLabelTest, PluralsUseSingularOnlyForOne) {
+TEST(OverviewLayoutBeatDistanceTest, PluralsUseSingularOnlyForOne) {
     EXPECT_EQ("+1 bar", textFor(4));
     EXPECT_EQ("-1 bar", textFor(-4));
     EXPECT_EQ("+2 bars", textFor(8));
     EXPECT_EQ("0 bars", textFor(0));
-    EXPECT_EQ("+1 beat", textFor(1, BeatLabelUnit::Beats));
-    EXPECT_EQ("+2 beats", textFor(2, BeatLabelUnit::Beats));
-    EXPECT_EQ("0 beats", textFor(0, BeatLabelUnit::Beats));
+    EXPECT_EQ("+1 beat", textFor(1, BeatDistanceUnit::Beats));
+    EXPECT_EQ("+2 beats", textFor(2, BeatDistanceUnit::Beats));
+    EXPECT_EQ("0 beats", textFor(0, BeatDistanceUnit::Beats));
 }
 
-TEST(OverviewLayoutBeatLabelTest, WholePrecisionRoundsToNearest) {
+TEST(OverviewLayoutBeatDistanceTest, FractionalValuesAreNeverSingular) {
+    using P = BeatDistancePrecision;
+    EXPECT_EQ("+1.00 bars", textFor(4, BeatDistanceUnit::Bars, P::Fractional));
+    EXPECT_EQ("+1.25 bars", textFor(5, BeatDistanceUnit::Bars, P::Fractional));
+    EXPECT_EQ("+1.0 beats", textFor(1, BeatDistanceUnit::Beats, P::Fractional));
+}
+
+// Beat distance is counted along the beat grid: the playback rate (and with
+// it sync and loops, which only change the rate or the play position) does not
+// change it.
+TEST(OverviewLayoutBeatDistanceTest, UnaffectedByRateRatio) {
+    for (const auto unit : {BeatDistanceUnit::Bars, BeatDistanceUnit::Beats}) {
+        for (const auto side : {HoverReadoutPosition::AlwaysRight,
+                     HoverReadoutPosition::AlwaysLeft}) {
+            HoverReadoutCase c;
+            c.settings.unit = unit;
+            c.settings.position = side;
+            c.beatsAway(12);
+            const QString expected = c.layout().text;
+            for (const double rateRatio : {0.5, 0.92, 1.08, 1.5, 2.0}) {
+                Input in = c.input();
+                in.rateRatio = rateRatio;
+                EXPECT_EQ(expected, layoutHoverReadout(in).text) << rateRatio;
+            }
+        }
+    }
+}
+
+TEST(OverviewLayoutBeatDistanceTest, WholePrecisionRoundsToNearest) {
     // 5 beats = 1.25 bars, 7 beats = 1.75 bars
     EXPECT_EQ("+1 bar", textFor(5));
     EXPECT_EQ("+2 bars", textFor(7));
     EXPECT_EQ("-2 bars", textFor(-7));
-    EXPECT_EQ("+5 beats", textFor(5.4, BeatLabelUnit::Beats));
-    EXPECT_EQ("+6 beats", textFor(5.6, BeatLabelUnit::Beats));
+    EXPECT_EQ("+5 beats", textFor(5.4, BeatDistanceUnit::Beats));
+    EXPECT_EQ("+6 beats", textFor(5.6, BeatDistanceUnit::Beats));
 }
 
-TEST(OverviewLayoutBeatLabelTest, FractionalPrecisionDecimals) {
-    using U = BeatLabelUnit;
-    using P = BeatLabelPrecision;
+TEST(OverviewLayoutBeatDistanceTest, FractionalPrecisionDecimals) {
+    using U = BeatDistanceUnit;
+    using P = BeatDistancePrecision;
     EXPECT_EQ("+1.25 bars", textFor(5, U::Bars, P::Fractional));
     EXPECT_EQ("-1.25 bars", textFor(-5, U::Bars, P::Fractional));
     EXPECT_EQ("+4.00 bars", textFor(16, U::Bars, P::Fractional));
@@ -226,10 +254,10 @@ TEST(OverviewLayoutBeatLabelTest, FractionalPrecisionDecimals) {
     EXPECT_EQ("+5.0 beats", textFor(5, U::Beats, P::Fractional));
 }
 
-TEST(OverviewLayoutBeatLabelTest, FractionalPositionInsideBeat) {
-    BeatLabelCase c;
-    c.settings.unit = BeatLabelUnit::Beats;
-    c.settings.precision = BeatLabelPrecision::Fractional;
+TEST(OverviewLayoutBeatDistanceTest, FractionalPositionInsideBeat) {
+    HoverReadoutCase c;
+    c.settings.unit = BeatDistanceUnit::Beats;
+    c.settings.precision = BeatDistancePrecision::Fractional;
     c.playFrame = 400 + 3 * 24000.0;
     c.beatsAway(1.3);
     EXPECT_EQ("+1.3 beats", c.layout().text);
@@ -237,53 +265,53 @@ TEST(OverviewLayoutBeatLabelTest, FractionalPositionInsideBeat) {
     EXPECT_EQ("+0.1 beats", c.layout().text);
 }
 
-TEST(OverviewLayoutBeatLabelTest, PlayPositionInsideBeatIsMeasuredFromThere) {
-    BeatLabelCase c;
-    c.settings.unit = BeatLabelUnit::Beats;
-    c.settings.precision = BeatLabelPrecision::Fractional;
+TEST(OverviewLayoutBeatDistanceTest, PlayPositionInsideBeatIsMeasuredFromThere) {
+    HoverReadoutCase c;
+    c.settings.unit = BeatDistanceUnit::Beats;
+    c.settings.precision = BeatDistancePrecision::Fractional;
     c.playFrame = 400 + 12000.0; // half a beat after the first beat
     c.beatsAway(2);
     EXPECT_EQ("+2.0 beats", c.layout().text);
 }
 
-TEST(OverviewLayoutBeatLabelTest, PointerBeforeFirstBeat) {
+TEST(OverviewLayoutBeatDistanceTest, PointerBeforeFirstBeat) {
     // Frame 0 is 1/60 beat before the first beat, 100 beats before the play
     // position at 50 %.
-    BeatLabelCase c;
+    HoverReadoutCase c;
     c.playFrame = kTrackFrames / 2;
     c.pointerFrame = 0;
     EXPECT_EQ("-25 bars", c.layout().text);
 }
 
-TEST(OverviewLayoutBeatLabelTest, PointerAfterLastBeat) {
+TEST(OverviewLayoutBeatDistanceTest, PointerAfterLastBeat) {
     // The constant grid extrapolates after its last marker.
-    BeatLabelCase c;
+    HoverReadoutCase c;
     c.playFrame = kTrackFrames / 2;
     c.pointerFrame = kTrackFrames;
-    c.settings.position = BeatLabelPosition::AlwaysRight;
+    c.settings.position = HoverReadoutPosition::AlwaysRight;
     EXPECT_EQ("+25 bars", c.layout().text);
 }
 
-TEST(OverviewLayoutBeatLabelTest, PlayPositionBeforeFirstBeat) {
-    BeatLabelCase c;
+TEST(OverviewLayoutBeatDistanceTest, PlayPositionBeforeFirstBeat) {
+    HoverReadoutCase c;
     c.playFrame = 0;
     c.pointerFrame = 400 + 8 * 24000.0;
     // (8 + 1/60) beats after frame 0, rounds to 2 bars
     EXPECT_EQ("+2 bars", c.layout().text);
 }
 
-TEST(OverviewLayoutBeatLabelTest, TempoChangeIsCountedAlongBeats) {
+TEST(OverviewLayoutBeatDistanceTest, TempoChangeIsCountedAlongBeats) {
     // Beat 4 (120 BPM section) to beat 10 (two beats into the 60 BPM
     // section): 6 beats, although it spans more than 6 * 24000 frames.
-    BeatLabelCase c;
+    HoverReadoutCase c;
     c.pBeats = &kNonConstTempoBeats;
-    c.settings.unit = BeatLabelUnit::Beats;
+    c.settings.unit = BeatDistanceUnit::Beats;
     c.playFrame = 400 + 4 * 24000.0;
     c.pointerFrame = 400 + 8 * 24000.0 + 2 * 48000.0;
     EXPECT_EQ("+6 beats", c.layout().text);
     // Half a beat further inside the slow section.
     c.pointerFrame += 24000.0;
-    c.settings.precision = BeatLabelPrecision::Fractional;
+    c.settings.precision = BeatDistancePrecision::Fractional;
     EXPECT_EQ("+6.5 beats", c.layout().text);
     // And backwards, from the slow section into the fast one.
     c.playFrame = 400 + 8 * 24000.0 + 4 * 48000.0; // beat 12
@@ -291,17 +319,17 @@ TEST(OverviewLayoutBeatLabelTest, TempoChangeIsCountedAlongBeats) {
     EXPECT_EQ("-10.0 beats", c.layout().text);
 }
 
-TEST(OverviewLayoutBeatLabelTest, BarsAreAQuarterOfBeats) {
+TEST(OverviewLayoutBeatDistanceTest, BarsAreAQuarterOfBeats) {
     EXPECT_EQ("+2 bars", textFor(8));
-    EXPECT_EQ("+8 beats", textFor(8, BeatLabelUnit::Beats));
+    EXPECT_EQ("+8 beats", textFor(8, BeatDistanceUnit::Beats));
 }
 
-TEST(OverviewLayoutBeatLabelTest, TextOrderPerSide) {
-    BeatLabelCase c;
+TEST(OverviewLayoutBeatDistanceTest, TextOrderPerSide) {
+    HoverReadoutCase c;
     c.beatsAway(16);
-    c.settings.position = BeatLabelPosition::AlwaysRight;
+    c.settings.position = HoverReadoutPosition::AlwaysRight;
     EXPECT_EQ("+4 bars", c.layout().text);
-    c.settings.position = BeatLabelPosition::AlwaysLeft;
+    c.settings.position = HoverReadoutPosition::AlwaysLeft;
     const auto layout = c.layout();
     EXPECT_EQ(LabelSide::Left, layout.side);
     EXPECT_EQ("bars +4", layout.text);
@@ -311,13 +339,13 @@ TEST(OverviewLayoutBeatLabelTest, TextOrderPerSide) {
     EXPECT_EQ("bars 0", c.layout().text);
     c.beatsAway(-8);
     EXPECT_EQ("bars -2", c.layout().text);
-    c.settings.unit = BeatLabelUnit::Beats;
+    c.settings.unit = BeatDistanceUnit::Beats;
     EXPECT_EQ("beats -8", c.layout().text);
 }
 
-TEST(OverviewLayoutBeatLabelTest, AutoSideSwitchesPastThreeQuarters) {
-    BeatLabelCase c;
-    c.settings.position = BeatLabelPosition::Auto;
+TEST(OverviewLayoutBeatDistanceTest, AutoSideSwitchesPastThreeQuarters) {
+    HoverReadoutCase c;
+    c.settings.position = HoverReadoutPosition::Auto;
     c.pointerFrame = kTrackFrames * 0.7499;
     EXPECT_EQ(LabelSide::Right, c.layout().side);
     c.pointerFrame = kTrackFrames * 0.75;
@@ -330,9 +358,9 @@ TEST(OverviewLayoutBeatLabelTest, AutoSideSwitchesPastThreeQuarters) {
     EXPECT_EQ(LabelSide::Right, c.layout().side);
 }
 
-TEST(OverviewLayoutBeatLabelTest, AutoSideUsesFractionOfOverviewLength) {
+TEST(OverviewLayoutBeatDistanceTest, AutoSideUsesFractionOfOverviewLength) {
     // Vertical overview of 500 px: same fractions.
-    BeatLabelCase c;
+    HoverReadoutCase c;
     c.length = 500.0;
     c.pointerFrame = kTrackFrames * 0.74;
     EXPECT_EQ(LabelSide::Right, c.layout().side);
@@ -340,18 +368,18 @@ TEST(OverviewLayoutBeatLabelTest, AutoSideUsesFractionOfOverviewLength) {
     EXPECT_EQ(LabelSide::Left, c.layout().side);
 }
 
-TEST(OverviewLayoutBeatLabelTest, AlwaysRightAndAlwaysLeftOverrideAuto) {
-    BeatLabelCase c;
+TEST(OverviewLayoutBeatDistanceTest, AlwaysRightAndAlwaysLeftOverrideAuto) {
+    HoverReadoutCase c;
     c.pointerFrame = kTrackFrames * 0.9;
-    c.settings.position = BeatLabelPosition::AlwaysRight;
+    c.settings.position = HoverReadoutPosition::AlwaysRight;
     EXPECT_EQ(LabelSide::Right, c.layout().side);
     c.pointerFrame = kTrackFrames * 0.1;
-    c.settings.position = BeatLabelPosition::AlwaysLeft;
+    c.settings.position = HoverReadoutPosition::AlwaysLeft;
     EXPECT_EQ(LabelSide::Left, c.layout().side);
 }
 
-TEST(OverviewLayoutBeatLabelTest, ThreeRowsFitGivesOwnRow) {
-    BeatLabelCase c;
+TEST(OverviewLayoutBeatDistanceTest, ThreeRowsFitGivesOwnRow) {
+    HoverReadoutCase c;
     c.labelHeight = 15.0;
     c.breadth = 45.0; // exactly three rows
     c.beatsAway(16);
@@ -360,8 +388,8 @@ TEST(OverviewLayoutBeatLabelTest, ThreeRowsFitGivesOwnRow) {
     EXPECT_TRUE(layout.joinedDistanceLabelText.isEmpty());
 }
 
-TEST(OverviewLayoutBeatLabelTest, ShortOverviewJoinsTimeDistanceLabel) {
-    BeatLabelCase c;
+TEST(OverviewLayoutBeatDistanceTest, ShortOverviewJoinsTimeDistanceLabel) {
+    HoverReadoutCase c;
     c.labelHeight = 15.0;
     c.breadth = 44.9;
     c.beatsAway(17); // 8.5 s at 120 BPM
@@ -375,18 +403,18 @@ TEST(OverviewLayoutBeatLabelTest, ShortOverviewJoinsTimeDistanceLabel) {
     EXPECT_EQ("-0:08  -4 bars", c.layout().joinedDistanceLabelText);
 }
 
-TEST(OverviewLayoutBeatLabelTest, JoinedLabelStaysOnTheRightOfTheLine) {
-    BeatLabelCase c;
+TEST(OverviewLayoutBeatDistanceTest, JoinedLabelStaysOnTheRightOfTheLine) {
+    HoverReadoutCase c;
     c.breadth = 10.0;
-    c.settings.position = BeatLabelPosition::AlwaysLeft;
+    c.settings.position = HoverReadoutPosition::AlwaysLeft;
     c.beatsAway(17);
     const auto layout = c.layout();
     EXPECT_EQ(LabelSide::Right, layout.side);
     EXPECT_EQ("0:08  +4 bars", layout.joinedDistanceLabelText);
 }
 
-TEST(OverviewLayoutBeatLabelTest, NoBeatGridNoLabel) {
-    BeatLabelCase c;
+TEST(OverviewLayoutBeatDistanceTest, NoBeatGridNoLabel) {
+    HoverReadoutCase c;
     c.pBeats = nullptr;
     c.beatsAway(17);
     const auto layout = c.layout();
@@ -396,37 +424,37 @@ TEST(OverviewLayoutBeatLabelTest, NoBeatGridNoLabel) {
     EXPECT_EQ("0:08", layoutTimeRuler(c.input()).distanceLabelText);
 }
 
-TEST(OverviewLayoutBeatLabelTest, InactiveTimeRulerShowsNoLabel) {
-    BeatLabelCase c;
+TEST(OverviewLayoutBeatDistanceTest, InactiveTimeRulerShowsNoLabel) {
+    HoverReadoutCase c;
     c.state = TimeRulerState::Inactive;
     c.beatsAway(16);
     EXPECT_FALSE(c.layout().shown);
 }
 
-TEST(OverviewLayoutBeatLabelTest, LeftDragAlsoShowsLabel) {
-    BeatLabelCase c;
+TEST(OverviewLayoutBeatDistanceTest, LeftDragAlsoShowsLabel) {
+    HoverReadoutCase c;
     c.state = TimeRulerState::LeftDrag;
     c.beatsAway(16);
     EXPECT_TRUE(c.layout().shown);
     EXPECT_EQ("+4 bars", c.layout().text);
 }
 
-TEST(OverviewLayoutBeatLabelTest, PointerIsClampedToOverview) {
-    BeatLabelCase c;
+TEST(OverviewLayoutBeatDistanceTest, PointerIsClampedToOverview) {
+    HoverReadoutCase c;
     c.playFrame = kTrackFrames / 2;
     c.pointerFrame = kTrackFrames * 2; // beyond the end
-    c.settings.position = BeatLabelPosition::AlwaysRight;
+    c.settings.position = HoverReadoutPosition::AlwaysRight;
     EXPECT_EQ("+25 bars", c.layout().text);
 }
 
-TEST(OverviewLayoutBeatLabelTest, UnloadedTrackShowsNoLabel) {
-    BeatLabelCase c;
+TEST(OverviewLayoutBeatDistanceTest, UnloadedTrackShowsNoLabel) {
+    HoverReadoutCase c;
     auto input = c.input();
     input.trackSamples = 0.0;
-    EXPECT_FALSE(layoutBeatLabel(input).shown);
+    EXPECT_FALSE(layoutHoverReadout(input).shown);
     input = c.input();
     input.overviewLength = 0.0;
-    EXPECT_FALSE(layoutBeatLabel(input).shown);
+    EXPECT_FALSE(layoutHoverReadout(input).shown);
 }
 
 // ---------------------------------------------------------------------------
@@ -435,14 +463,14 @@ TEST(OverviewLayoutBeatLabelTest, UnloadedTrackShowsNoLabel) {
 
 namespace {
 
-BeatLabelCase plainHover() {
-    BeatLabelCase c;
+HoverReadoutCase plainHover() {
+    HoverReadoutCase c;
     c.state = TimeRulerState::Inactive;
     c.beatsAway(16);
     return c;
 }
 
-Input hoverInput(const BeatLabelCase& c, bool pointerPresent = true) {
+Input hoverInput(const HoverReadoutCase& c, bool pointerPresent = true) {
     Input in = c.input();
     in.pointerPresent = pointerPresent;
     return in;
@@ -453,17 +481,17 @@ Input hoverInput(const BeatLabelCase& c, bool pointerPresent = true) {
 TEST(OverviewLayoutHoverReadoutTest, PointerAbsentShowsNothing) {
     const auto c = plainHover();
     const auto in = hoverInput(c, false);
-    EXPECT_FALSE(layoutHoverReadout(in).lineShown);
-    EXPECT_FALSE(layoutBeatLabel(in).shown);
+    EXPECT_FALSE(layoutHoverLine(in).lineShown);
+    EXPECT_FALSE(layoutHoverReadout(in).shown);
 }
 
 TEST(OverviewLayoutHoverReadoutTest, LineAndLabelByDefault) {
     const auto c = plainHover();
     const auto in = hoverInput(c);
-    const auto readout = layoutHoverReadout(in);
+    const auto readout = layoutHoverLine(in);
     EXPECT_TRUE(readout.lineShown);
     EXPECT_DOUBLE_EQ(in.pointerPos, readout.linePos);
-    const auto label = layoutBeatLabel(in);
+    const auto label = layoutHoverReadout(in);
     EXPECT_TRUE(label.shown);
     EXPECT_EQ("+4 bars", label.text);
     EXPECT_EQ(LabelSlot::OwnBottomRow, label.slot);
@@ -473,33 +501,33 @@ TEST(OverviewLayoutHoverReadoutTest, LineOnlyDisplay) {
     auto c = plainHover();
     c.settings.display = HoverDisplay::LineOnly;
     const auto in = hoverInput(c);
-    EXPECT_TRUE(layoutHoverReadout(in).lineShown);
-    EXPECT_FALSE(layoutBeatLabel(in).shown);
+    EXPECT_TRUE(layoutHoverLine(in).lineShown);
+    EXPECT_FALSE(layoutHoverReadout(in).shown);
 }
 
 TEST(OverviewLayoutHoverReadoutTest, LabelOnlyDisplay) {
     auto c = plainHover();
     c.settings.display = HoverDisplay::LabelOnly;
     const auto in = hoverInput(c);
-    EXPECT_FALSE(layoutHoverReadout(in).lineShown);
-    EXPECT_TRUE(layoutBeatLabel(in).shown);
+    EXPECT_FALSE(layoutHoverLine(in).lineShown);
+    EXPECT_TRUE(layoutHoverReadout(in).shown);
 }
 
 TEST(OverviewLayoutHoverReadoutTest, ShowHoverReadoutOffShowsNothingOnPlainHover) {
     auto c = plainHover();
     c.settings.showHoverReadout = false;
     const auto in = hoverInput(c);
-    EXPECT_FALSE(layoutHoverReadout(in).lineShown);
-    EXPECT_FALSE(layoutBeatLabel(in).shown);
+    EXPECT_FALSE(layoutHoverLine(in).lineShown);
+    EXPECT_FALSE(layoutHoverReadout(in).shown);
 }
 
-TEST(OverviewLayoutHoverReadoutTest, ShowHoverReadoutOffHidesBeatLabelOnTimeRuler) {
+TEST(OverviewLayoutHoverReadoutTest, ShowHoverReadoutOffHidesReadoutOnTimeRuler) {
     for (auto state : {TimeRulerState::RightClickHold, TimeRulerState::LeftDrag}) {
         auto c = plainHover();
         c.state = state;
         c.settings.showHoverReadout = false;
         const auto in = hoverInput(c);
-        EXPECT_FALSE(layoutBeatLabel(in).shown);
+        EXPECT_FALSE(layoutHoverReadout(in).shown);
         // The time ruler itself is unchanged.
         EXPECT_TRUE(layoutTimeRuler(in).labelsShown);
         EXPECT_EQ(state == TimeRulerState::RightClickHold, layoutTimeRuler(in).lineShown);
@@ -510,28 +538,28 @@ TEST(OverviewLayoutHoverReadoutTest, DisplayDoesNotAffectTimeRuler) {
     auto c = plainHover();
     c.state = TimeRulerState::RightClickHold;
     c.settings.display = HoverDisplay::LineOnly;
-    EXPECT_TRUE(layoutBeatLabel(hoverInput(c)).shown);
+    EXPECT_TRUE(layoutHoverReadout(hoverInput(c)).shown);
 }
 
 TEST(OverviewLayoutHoverReadoutTest, NoBeatGridShowsLineOnly) {
     auto c = plainHover();
     c.pBeats = nullptr;
     const auto in = hoverInput(c);
-    EXPECT_TRUE(layoutHoverReadout(in).lineShown);
-    EXPECT_FALSE(layoutBeatLabel(in).shown);
+    EXPECT_TRUE(layoutHoverLine(in).lineShown);
+    EXPECT_FALSE(layoutHoverReadout(in).shown);
 }
 
 TEST(OverviewLayoutHoverReadoutTest, PlainHoverNeverShowsTimeLabels) {
     const auto c = plainHover();
     const auto in = hoverInput(c);
     EXPECT_FALSE(layoutTimeRuler(in).labelsShown);
-    EXPECT_TRUE(layoutBeatLabel(in).joinedDistanceLabelText.isEmpty());
+    EXPECT_TRUE(layoutHoverReadout(in).joinedDistanceLabelText.isEmpty());
 }
 
 TEST(OverviewLayoutHoverReadoutTest, ShortOverviewKeepsOwnRowOnPlainHover) {
     auto c = plainHover();
     c.breadth = 30.0; // less than three label rows
-    const auto label = layoutBeatLabel(hoverInput(c));
+    const auto label = layoutHoverReadout(hoverInput(c));
     EXPECT_EQ(LabelSlot::OwnBottomRow, label.slot);
     EXPECT_TRUE(label.joinedDistanceLabelText.isEmpty());
 }
@@ -539,7 +567,7 @@ TEST(OverviewLayoutHoverReadoutTest, ShortOverviewKeepsOwnRowOnPlainHover) {
 TEST(OverviewLayoutHoverReadoutTest, TimeRulerStatesDoNotUseHoverLine) {
     auto c = plainHover();
     c.state = TimeRulerState::LeftDrag;
-    EXPECT_FALSE(layoutHoverReadout(hoverInput(c)).lineShown);
+    EXPECT_FALSE(layoutHoverLine(hoverInput(c)).lineShown);
 }
 
 // Hover mode: Extend time ruler (default) vs Separate hover line.
@@ -548,7 +576,7 @@ namespace {
 const TimeRulerState kActiveStates[] = {
         TimeRulerState::RightClickHold, TimeRulerState::LeftDrag};
 
-BeatLabelCase hoverModeCase(HoverMode mode, TimeRulerState state) {
+HoverReadoutCase hoverModeCase(HoverMode mode, TimeRulerState state) {
     auto c = plainHover();
     c.state = state;
     c.settings.hoverMode = mode;
@@ -561,51 +589,51 @@ TEST(OverviewLayoutHoverModeTest, DefaultIsExtendTimeRuler) {
     EXPECT_EQ(HoverMode::ExtendTimeRuler, HoverReadoutSettings().hoverMode);
 }
 
-TEST(OverviewLayoutHoverModeTest, ExtendShowsBeatLabelOnTimeRuler) {
+TEST(OverviewLayoutHoverModeTest, ExtendShowsReadoutOnTimeRuler) {
     for (auto state : kActiveStates) {
         const auto in = hoverInput(hoverModeCase(HoverMode::ExtendTimeRuler, state));
-        EXPECT_TRUE(layoutBeatLabel(in).shown);
-        EXPECT_FALSE(layoutHoverReadout(in).lineShown);
+        EXPECT_TRUE(layoutHoverReadout(in).shown);
+        EXPECT_FALSE(layoutHoverLine(in).lineShown);
     }
 }
 
 TEST(OverviewLayoutHoverModeTest, ExtendPlainHoverUnchanged) {
     const auto in = hoverInput(hoverModeCase(HoverMode::ExtendTimeRuler, TimeRulerState::Inactive));
-    EXPECT_TRUE(layoutBeatLabel(in).shown);
-    EXPECT_TRUE(layoutHoverReadout(in).lineShown);
+    EXPECT_TRUE(layoutHoverReadout(in).shown);
+    EXPECT_TRUE(layoutHoverLine(in).lineShown);
 }
 
 TEST(OverviewLayoutHoverModeTest, SeparatePlainHoverShowsLineAndLabel) {
     const auto in = hoverInput(
             hoverModeCase(HoverMode::SeparateHoverLine, TimeRulerState::Inactive));
-    EXPECT_TRUE(layoutBeatLabel(in).shown);
-    EXPECT_TRUE(layoutHoverReadout(in).lineShown);
+    EXPECT_TRUE(layoutHoverReadout(in).shown);
+    EXPECT_TRUE(layoutHoverLine(in).lineShown);
 }
 
 TEST(OverviewLayoutHoverModeTest, SeparatePlainHoverRespectsDisplay) {
     auto c = hoverModeCase(HoverMode::SeparateHoverLine, TimeRulerState::Inactive);
     c.settings.display = HoverDisplay::LineOnly;
-    EXPECT_FALSE(layoutBeatLabel(hoverInput(c)).shown);
-    EXPECT_TRUE(layoutHoverReadout(hoverInput(c)).lineShown);
+    EXPECT_FALSE(layoutHoverReadout(hoverInput(c)).shown);
+    EXPECT_TRUE(layoutHoverLine(hoverInput(c)).lineShown);
     c.settings.display = HoverDisplay::LabelOnly;
-    EXPECT_TRUE(layoutBeatLabel(hoverInput(c)).shown);
-    EXPECT_FALSE(layoutHoverReadout(hoverInput(c)).lineShown);
+    EXPECT_TRUE(layoutHoverReadout(hoverInput(c)).shown);
+    EXPECT_FALSE(layoutHoverLine(hoverInput(c)).lineShown);
 }
 
 TEST(OverviewLayoutHoverModeTest, SeparateHidesHoverReadoutWhileTimeRulerActive) {
     for (auto state : kActiveStates) {
         const auto in = hoverInput(hoverModeCase(HoverMode::SeparateHoverLine, state));
-        EXPECT_FALSE(layoutBeatLabel(in).shown);
-        EXPECT_FALSE(layoutHoverReadout(in).lineShown);
+        EXPECT_FALSE(layoutHoverReadout(in).shown);
+        EXPECT_FALSE(layoutHoverLine(in).lineShown);
     }
 }
 
-TEST(OverviewLayoutHoverModeTest, SeparateTimeRulerHasNoBeatLabelEvenOnShortOverview) {
+TEST(OverviewLayoutHoverModeTest, SeparateTimeRulerHasNoReadoutEvenOnShortOverview) {
     for (auto state : kActiveStates) {
         auto c = hoverModeCase(HoverMode::SeparateHoverLine, state);
         c.breadth = 30.0;
         const auto in = hoverInput(c);
-        const auto label = layoutBeatLabel(in);
+        const auto label = layoutHoverReadout(in);
         EXPECT_FALSE(label.shown);
         EXPECT_TRUE(label.joinedDistanceLabelText.isEmpty());
         EXPECT_TRUE(layoutTimeRuler(in).labelsShown);
@@ -628,13 +656,13 @@ TEST(OverviewLayoutHoverModeTest, SeparateTimeRulerIsUnchanged) {
 
 TEST(OverviewLayoutHoverModeTest, SeparateHoverReadoutReturnsAfterTimeRulerEnds) {
     auto c = hoverModeCase(HoverMode::SeparateHoverLine, TimeRulerState::LeftDrag);
-    EXPECT_FALSE(layoutHoverReadout(hoverInput(c)).lineShown);
+    EXPECT_FALSE(layoutHoverLine(hoverInput(c)).lineShown);
     c.state = TimeRulerState::Inactive;
-    EXPECT_TRUE(layoutHoverReadout(hoverInput(c)).lineShown);
-    EXPECT_TRUE(layoutBeatLabel(hoverInput(c)).shown);
+    EXPECT_TRUE(layoutHoverLine(hoverInput(c)).lineShown);
+    EXPECT_TRUE(layoutHoverReadout(hoverInput(c)).shown);
     // Pointer left the overview meanwhile: nothing comes back.
-    EXPECT_FALSE(layoutHoverReadout(hoverInput(c, false)).lineShown);
-    EXPECT_FALSE(layoutBeatLabel(hoverInput(c, false)).shown);
+    EXPECT_FALSE(layoutHoverLine(hoverInput(c, false)).lineShown);
+    EXPECT_FALSE(layoutHoverReadout(hoverInput(c, false)).shown);
 }
 
 TEST(OverviewLayoutHoverModeTest, ShowHoverReadoutOffShowsNothingInBothModes) {
@@ -645,8 +673,8 @@ TEST(OverviewLayoutHoverModeTest, ShowHoverReadoutOffShowsNothingInBothModes) {
             auto c = hoverModeCase(mode, state);
             c.settings.showHoverReadout = false;
             const auto in = hoverInput(c);
-            EXPECT_FALSE(layoutBeatLabel(in).shown);
-            EXPECT_FALSE(layoutHoverReadout(in).lineShown);
+            EXPECT_FALSE(layoutHoverReadout(in).shown);
+            EXPECT_FALSE(layoutHoverLine(in).lineShown);
         }
     }
 }

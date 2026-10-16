@@ -135,7 +135,6 @@ WaveformWidgetFactory::WaveformWidgetFactory()
           m_defaultZoom(WaveformWidgetRenderer::s_waveformDefaultZoom),
           m_zoomSync(true),
           m_overviewNormalized(false),
-          m_overviewLineOpacity(80),
           m_untilMarkShowBeats(false),
           m_untilMarkShowTime(false),
           m_untilMarkAlign(Qt::AlignVCenter),
@@ -429,22 +428,7 @@ bool WaveformWidgetFactory::setConfig(UserSettingsPointer config) {
         m_config->set(ConfigKey("[Waveform]","OverviewNormalized"), ConfigValue(m_overviewNormalized));
     }
 
-    // Overview bar and phrase lines
-    {
-        const int linesMode = m_config->getValue(
-                ConfigKey("[Waveform]", "overviewLinesMode"),
-                static_cast<int>(m_overviewLineSettings.mode));
-        if (linesMode >= static_cast<int>(mixxx::overviewlayout::LinesMode::Off) &&
-                linesMode <= static_cast<int>(mixxx::overviewlayout::LinesMode::BarsAndPhrases)) {
-            setOverviewLinesMode(static_cast<mixxx::overviewlayout::LinesMode>(linesMode));
-        }
-        setOverviewPhraseBars(m_config->getValue(
-                ConfigKey("[Waveform]", "overviewPhraseBars"),
-                m_overviewLineSettings.phraseBars));
-        setOverviewLineOpacity(m_config->getValue(
-                ConfigKey("[Waveform]", "overviewLineOpacity"),
-                m_overviewLineOpacity));
-    }
+    m_overviewLineSettings = mixxx::overviewlayout::loadLineSettings(m_config);
 
     m_playMarkerPosition = m_config->getValue(ConfigKey("[Waveform]","PlayMarkerPosition"),
             WaveformWidgetRenderer::s_defaultPlayMarkerPosition);
@@ -481,50 +465,7 @@ bool WaveformWidgetFactory::setConfig(UserSettingsPointer config) {
             m_config->getValue(ConfigKey("[Waveform]", "UntilMarkTextHeightLimit"),
                     toUntilMarkTextHeightLimitIndex(m_untilMarkTextHeightLimit))));
 
-    // Overview hover readout. Out-of-range values fall back to the defaults.
-    {
-        using namespace mixxx::overviewlayout;
-        HoverReadoutSettings hoverSettings;
-        const int unit = m_config->getValue(
-                ConfigKey("[Waveform]", "overviewHoverUnit"),
-                static_cast<int>(hoverSettings.unit));
-        if (unit >= static_cast<int>(BeatLabelUnit::Bars) &&
-                unit <= static_cast<int>(BeatLabelUnit::Beats)) {
-            hoverSettings.unit = static_cast<BeatLabelUnit>(unit);
-        }
-        const int precision = m_config->getValue(
-                ConfigKey("[Waveform]", "overviewHoverPrecision"),
-                static_cast<int>(hoverSettings.precision));
-        if (precision >= static_cast<int>(BeatLabelPrecision::Whole) &&
-                precision <= static_cast<int>(BeatLabelPrecision::Fractional)) {
-            hoverSettings.precision = static_cast<BeatLabelPrecision>(precision);
-        }
-        const int position = m_config->getValue(
-                ConfigKey("[Waveform]", "overviewHoverLabelPosition"),
-                static_cast<int>(hoverSettings.position));
-        if (position >= static_cast<int>(BeatLabelPosition::Auto) &&
-                position <= static_cast<int>(BeatLabelPosition::AlwaysLeft)) {
-            hoverSettings.position = static_cast<BeatLabelPosition>(position);
-        }
-        hoverSettings.showHoverReadout = m_config->getValue(
-                ConfigKey("[Waveform]", "overviewHoverShow"),
-                hoverSettings.showHoverReadout);
-        const int display = m_config->getValue(
-                ConfigKey("[Waveform]", "overviewHoverDisplay"),
-                static_cast<int>(hoverSettings.display));
-        if (display >= static_cast<int>(HoverDisplay::LineAndLabel) &&
-                display <= static_cast<int>(HoverDisplay::LabelOnly)) {
-            hoverSettings.display = static_cast<HoverDisplay>(display);
-        }
-        const int hoverMode = m_config->getValue(
-                ConfigKey("[Waveform]", "overviewHoverMode"),
-                static_cast<int>(hoverSettings.hoverMode));
-        if (hoverMode >= static_cast<int>(HoverMode::ExtendTimeRuler) &&
-                hoverMode <= static_cast<int>(HoverMode::SeparateHoverLine)) {
-            hoverSettings.hoverMode = static_cast<HoverMode>(hoverMode);
-        }
-        m_overviewHoverReadoutSettings = hoverSettings;
-    }
+    m_overviewHoverReadoutSettings = mixxx::overviewlayout::loadHoverReadoutSettings(m_config);
 
     return true;
 }
@@ -804,29 +745,22 @@ void WaveformWidgetFactory::setOverviewNormalized(bool normalize) {
 
 void WaveformWidgetFactory::setOverviewLinesMode(mixxx::overviewlayout::LinesMode mode) {
     m_overviewLineSettings.mode = mode;
-    if (m_config) {
-        m_config->setValue(ConfigKey("[Waveform]", "overviewLinesMode"), static_cast<int>(mode));
-    }
-    emit overviewLinesChanged();
+    saveOverviewLineSettings();
 }
 
 void WaveformWidgetFactory::setOverviewPhraseBars(int bars) {
-    // Only 4, 8, 16 and 32 bars are offered; fall back to the default for
-    // anything else in the config.
-    if (bars != 4 && bars != 8 && bars != 16 && bars != 32) {
-        bars = mixxx::overviewlayout::LineSettings().phraseBars;
-    }
-    m_overviewLineSettings.phraseBars = bars;
-    if (m_config) {
-        m_config->setValue(ConfigKey("[Waveform]", "overviewPhraseBars"), bars);
-    }
-    emit overviewLinesChanged();
+    m_overviewLineSettings.phraseBars = mixxx::overviewlayout::validPhraseBarsOrDefault(bars);
+    saveOverviewLineSettings();
 }
 
 void WaveformWidgetFactory::setOverviewLineOpacity(int percent) {
-    m_overviewLineOpacity = std::clamp(percent, 0, 100);
+    m_overviewLineSettings.opacity = mixxx::overviewlayout::OpacityPercent(percent);
+    saveOverviewLineSettings();
+}
+
+void WaveformWidgetFactory::saveOverviewLineSettings() {
     if (m_config) {
-        m_config->setValue(ConfigKey("[Waveform]", "overviewLineOpacity"), m_overviewLineOpacity);
+        mixxx::overviewlayout::saveLineSettings(m_config, m_overviewLineSettings);
     }
     emit overviewLinesChanged();
 }
@@ -1518,18 +1452,7 @@ void WaveformWidgetFactory::setOverviewHoverReadoutSettings(
         const mixxx::overviewlayout::HoverReadoutSettings& settings) {
     m_overviewHoverReadoutSettings = settings;
     if (m_config) {
-        m_config->setValue(ConfigKey("[Waveform]", "overviewHoverUnit"),
-                static_cast<int>(settings.unit));
-        m_config->setValue(ConfigKey("[Waveform]", "overviewHoverPrecision"),
-                static_cast<int>(settings.precision));
-        m_config->setValue(ConfigKey("[Waveform]", "overviewHoverLabelPosition"),
-                static_cast<int>(settings.position));
-        m_config->setValue(ConfigKey("[Waveform]", "overviewHoverShow"),
-                settings.showHoverReadout);
-        m_config->setValue(ConfigKey("[Waveform]", "overviewHoverDisplay"),
-                static_cast<int>(settings.display));
-        m_config->setValue(ConfigKey("[Waveform]", "overviewHoverMode"),
-                static_cast<int>(settings.hoverMode));
+        mixxx::overviewlayout::saveHoverReadoutSettings(m_config, settings);
     }
     emit overviewHoverReadoutSettingsChanged();
 }

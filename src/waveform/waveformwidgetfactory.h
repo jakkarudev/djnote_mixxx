@@ -9,8 +9,7 @@
 #include "skin/legacy/skincontext.h"
 #include "util/performancetimer.h"
 #include "util/singleton.h"
-#include "waveform/overviewlinelayout.h"
-#include "waveform/overviewlayout.h"
+#include "waveform/overviewsettings.h"
 #include "waveform/widgets/waveformwidgettype.h"
 
 class WVuMeterLegacy;
@@ -157,9 +156,6 @@ class WaveformWidgetFactory : public QObject, public Singleton<WaveformWidgetFac
     mixxx::overviewlayout::LineSettings getOverviewLineSettings() const {
         return m_overviewLineSettings;
     }
-    int getOverviewLineOpacity() const {
-        return m_overviewLineOpacity;
-    }
 
     const QVector<WaveformWidgetAbstractHandle>& getAvailableTypes() const {
         return m_waveformWidgetHandles;
@@ -250,7 +246,7 @@ class WaveformWidgetFactory : public QObject, public Singleton<WaveformWidgetFac
     double m_visualGain[FilterCount];
     bool m_overviewNormalized;
     mixxx::overviewlayout::LineSettings m_overviewLineSettings;
-    int m_overviewLineOpacity;
+    void saveOverviewLineSettings();
 
     bool m_untilMarkShowBeats;
     bool m_untilMarkShowTime;

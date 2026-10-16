@@ -17,17 +17,17 @@ enum class TimeRulerState {
     LeftDrag,
 };
 
-enum class BeatLabelUnit {
+enum class BeatDistanceUnit {
     Bars,
     Beats,
 };
 
-enum class BeatLabelPrecision {
+enum class BeatDistancePrecision {
     Whole,
     Fractional,
 };
 
-enum class BeatLabelPosition {
+enum class HoverReadoutPosition {
     Auto,
     AlwaysRight,
     AlwaysLeft,
@@ -43,10 +43,10 @@ enum class HoverDisplay {
 // How the hover readout relates to the time ruler.
 enum class HoverMode {
     // The hover line is the time ruler's line; the time ruler also shows the
-    // beat label.
+    // hover readout.
     ExtendTimeRuler,
     // Plain hover has its own line and label; both are hidden while the time
-    // ruler is active, which then has no beat label.
+    // ruler is active, which then has no hover readout.
     SeparateHoverLine,
 };
 
@@ -55,9 +55,9 @@ enum class HoverMode {
 struct HoverReadoutSettings {
     bool showHoverReadout = true;
     HoverDisplay display = HoverDisplay::LineAndLabel;
-    BeatLabelUnit unit = BeatLabelUnit::Bars;
-    BeatLabelPrecision precision = BeatLabelPrecision::Whole;
-    BeatLabelPosition position = BeatLabelPosition::Auto;
+    BeatDistanceUnit unit = BeatDistanceUnit::Bars;
+    BeatDistancePrecision precision = BeatDistancePrecision::Whole;
+    HoverReadoutPosition position = HoverReadoutPosition::Auto;
     HoverMode hoverMode = HoverMode::ExtendTimeRuler;
 };
 
@@ -78,7 +78,7 @@ struct Input {
     // inactive time ruler) uses pointerPos as well.
     bool pointerPresent = false;
 
-    // Hover readout / beat label inputs (see layoutBeatLabel()).
+    // Hover readout inputs (see layoutHoverReadout()).
     // The track's beat grid, or nullptr if there is none. Not owned.
     const mixxx::Beats* pBeats = nullptr;
     HoverReadoutSettings hoverReadout;
@@ -103,7 +103,7 @@ struct TimeRulerLayout {
 
 TimeRulerLayout layoutTimeRuler(const Input& input);
 
-// Which side of the line the beat label sits on.
+// Which side of the hover line the hover readout sits on.
 enum class LabelSide {
     Right, // "+4 bars"; below the line on vertical overviews
     Left,  // "bars +4"; above the line on vertical overviews
@@ -117,9 +117,9 @@ enum class LabelSlot {
     JoinedToDistanceLabel,
 };
 
-struct BeatLabelLayout {
+struct HoverReadoutLayout {
     bool shown = false;
-    // The beat distance label, e.g. "+4 bars" (side Right) or "bars +4"
+    // The hover readout text (the beat distance), e.g. "+4 bars" (side Right) or "bars +4"
     // (side Left).
     QString text;
     LabelSide side = LabelSide::Right;
@@ -129,21 +129,21 @@ struct BeatLabelLayout {
     QString joinedDistanceLabelText;
 };
 
-// The beat distance label. Shown iff "Show hover readout" is on, the track has
+// The hover readout. Shown iff "Show hover readout" is on, the track has
 // a beat grid, and either the time ruler is active or (plain hover) the pointer
 // is present and Display includes the label. Plain hover always uses the own
 // row slot.
-BeatLabelLayout layoutBeatLabel(const Input& input);
+HoverReadoutLayout layoutHoverReadout(const Input& input);
 
 // The hover line of plain hover (no time ruler). While the time ruler is
 // active its own line is used instead (layoutTimeRuler()).
-struct HoverReadoutLayout {
+struct HoverLineLayout {
     bool lineShown = false;
     // Pointer position along the track axis, clamped to [0, overviewLength].
     double linePos = 0.0;
 };
 
-HoverReadoutLayout layoutHoverReadout(const Input& input);
+HoverLineLayout layoutHoverLine(const Input& input);
 
 } // namespace overviewlayout
 } // namespace mixxx

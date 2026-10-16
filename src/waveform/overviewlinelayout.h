@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+#include <array>
 #include <vector>
 
 #include "track/beats.h"
@@ -18,10 +20,46 @@ enum class LinesMode {
 
 constexpr int kBeatsPerBar = 4;
 
+// The phrase lengths (in bars) offered in the preferences.
+constexpr std::array<int, 4> kPhraseBarsChoices = {4, 8, 16, 32};
+constexpr int kDefaultPhraseBars = 8;
+
+// Returns bars if it is one of kPhraseBarsChoices, else the default.
+constexpr int validPhraseBarsOrDefault(int bars) {
+    for (const int choice : kPhraseBarsChoices) {
+        if (choice == bars) {
+            return bars;
+        }
+    }
+    return kDefaultPhraseBars;
+}
+
+// Opacity of the bar and phrase lines, as a percentage. Always within 0..100:
+// out-of-range values are clamped on construction.
+class OpacityPercent {
+  public:
+    static constexpr int kDefault = 80;
+
+    constexpr explicit OpacityPercent(int percent = kDefault)
+            : m_percent(std::clamp(percent, 0, 100)) {
+    }
+    constexpr int percent() const {
+        return m_percent;
+    }
+    // For QPainter::setOpacity().
+    constexpr double fraction() const {
+        return m_percent / 100.0;
+    }
+
+  private:
+    int m_percent;
+};
+
 struct LineSettings {
     LinesMode mode = LinesMode::PhrasesOnly;
-    // Phrase length in bars (4, 8, 16 or 32).
-    int phraseBars = 8;
+    // Phrase length in bars, one of kPhraseBarsChoices.
+    int phraseBars = kDefaultPhraseBars;
+    OpacityPercent opacity;
 };
 
 struct LinePositions {

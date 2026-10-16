@@ -85,8 +85,9 @@ DlgPrefWaveform::DlgPrefWaveform(
             static_cast<int>(mixxx::overviewlayout::LinesMode::PhrasesOnly));
     overviewLinesComboBox->addItem(tr("Off"),
             static_cast<int>(mixxx::overviewlayout::LinesMode::Off));
-    for (const int bars : {4, 8, 16, 32}) {
-        overviewPhraseBarsComboBox->addItem(tr("%1 bars").arg(bars), bars);
+    for (const int bars : mixxx::overviewlayout::kPhraseBarsChoices) {
+        // All choices are plural; the count selects the plural form.
+        overviewPhraseBarsComboBox->addItem(tr("%1 bars", "", bars).arg(bars), bars);
     }
 
     // Populate hover readout options
@@ -102,18 +103,18 @@ DlgPrefWaveform::DlgPrefWaveform(
                 QVariant(static_cast<int>(HoverMode::ExtendTimeRuler)));
         hoverModeComboBox->addItem(tr("Separate hover line"),
                 QVariant(static_cast<int>(HoverMode::SeparateHoverLine)));
-        hoverUnitComboBox->addItem(tr("Bars"), QVariant(static_cast<int>(BeatLabelUnit::Bars)));
-        hoverUnitComboBox->addItem(tr("Beats"), QVariant(static_cast<int>(BeatLabelUnit::Beats)));
+        hoverUnitComboBox->addItem(tr("Bars"), QVariant(static_cast<int>(BeatDistanceUnit::Bars)));
+        hoverUnitComboBox->addItem(tr("Beats"), QVariant(static_cast<int>(BeatDistanceUnit::Beats)));
         hoverPrecisionComboBox->addItem(tr("Whole (rounded)"),
-                QVariant(static_cast<int>(BeatLabelPrecision::Whole)));
+                QVariant(static_cast<int>(BeatDistancePrecision::Whole)));
         hoverPrecisionComboBox->addItem(tr("Fractional"),
-                QVariant(static_cast<int>(BeatLabelPrecision::Fractional)));
+                QVariant(static_cast<int>(BeatDistancePrecision::Fractional)));
         hoverLabelPositionComboBox->addItem(
-                tr("Auto"), QVariant(static_cast<int>(BeatLabelPosition::Auto)));
+                tr("Auto"), QVariant(static_cast<int>(HoverReadoutPosition::Auto)));
         hoverLabelPositionComboBox->addItem(tr("Always right"),
-                QVariant(static_cast<int>(BeatLabelPosition::AlwaysRight)));
+                QVariant(static_cast<int>(HoverReadoutPosition::AlwaysRight)));
         hoverLabelPositionComboBox->addItem(tr("Always left"),
-                QVariant(static_cast<int>(BeatLabelPosition::AlwaysLeft)));
+                QVariant(static_cast<int>(HoverReadoutPosition::AlwaysLeft)));
     }
 
     // The GUI is not fully setup so connecting signals before calling
@@ -309,8 +310,8 @@ void DlgPrefWaveform::slotUpdate() {
             static_cast<int>(factory->getOverviewLineSettings().mode)));
     overviewPhraseBarsComboBox->setCurrentIndex(overviewPhraseBarsComboBox->findData(
             factory->getOverviewLineSettings().phraseBars));
-    overviewLineOpacitySpinBox->setValue(factory->getOverviewLineOpacity());
-    overviewLineOpacitySlider->setValue(factory->getOverviewLineOpacity());
+    overviewLineOpacitySpinBox->setValue(factory->getOverviewLineSettings().opacity.percent());
+    overviewLineOpacitySlider->setValue(factory->getOverviewLineSettings().opacity.percent());
     // Round zoom to int to get a default zoom index.
     defaultZoomComboBox->setCurrentIndex(static_cast<int>(factory->getDefaultZoom()) - 1);
     playMarkerPositionSlider->setValue(static_cast<int>(factory->getPlayMarkerPosition() * 100));
@@ -327,20 +328,7 @@ void DlgPrefWaveform::slotUpdate() {
             WaveformWidgetFactory::toUntilMarkTextHeightLimitIndex(
                     factory->getUntilMarkTextHeightLimit()));
 
-    {
-        const auto& hoverSettings = factory->getOverviewHoverReadoutSettings();
-        showHoverReadoutCheckBox->setChecked(hoverSettings.showHoverReadout);
-        hoverDisplayComboBox->setCurrentIndex(
-                hoverDisplayComboBox->findData(static_cast<int>(hoverSettings.display)));
-        hoverModeComboBox->setCurrentIndex(
-                hoverModeComboBox->findData(static_cast<int>(hoverSettings.hoverMode)));
-        hoverUnitComboBox->setCurrentIndex(
-                hoverUnitComboBox->findData(static_cast<int>(hoverSettings.unit)));
-        hoverPrecisionComboBox->setCurrentIndex(
-                hoverPrecisionComboBox->findData(static_cast<int>(hoverSettings.precision)));
-        hoverLabelPositionComboBox->setCurrentIndex(
-                hoverLabelPositionComboBox->findData(static_cast<int>(hoverSettings.position)));
-    }
+    showHoverReadoutControls(factory->getOverviewHoverReadoutSettings());
 
     WOverview::Type cfgOverviewType =
             m_pConfig->getValue<WOverview::Type>(kOverviewTypeCfgKey, WOverview::Type::RGB);
@@ -393,14 +381,14 @@ void DlgPrefWaveform::slotResetToDefaults() {
     // Don't normalize overview.
     normalizeOverviewCheckBox->setChecked(false);
 
-    // Overview lines: phrases only, 8 bars, 80% opacity.
+    // Overview lines: the defaults of LineSettings.
     const mixxx::overviewlayout::LineSettings defaultLineSettings;
     overviewLinesComboBox->setCurrentIndex(
             overviewLinesComboBox->findData(static_cast<int>(defaultLineSettings.mode)));
     overviewPhraseBarsComboBox->setCurrentIndex(
             overviewPhraseBarsComboBox->findData(defaultLineSettings.phraseBars));
-    overviewLineOpacitySlider->setValue(80);
-    overviewLineOpacitySpinBox->setValue(80);
+    overviewLineOpacitySlider->setValue(defaultLineSettings.opacity.percent());
+    overviewLineOpacitySpinBox->setValue(defaultLineSettings.opacity.percent());
 
     // 60FPS is the default
     frameRateSlider->setValue(60);
@@ -417,14 +405,23 @@ void DlgPrefWaveform::slotResetToDefaults() {
     // 50 (center) is default
     playMarkerPositionSlider->setValue(50);
 
-    // Hover readout: shown, Line + label, Bars, Whole (rounded), Auto (each
-    // is the first entry).
-    showHoverReadoutCheckBox->setChecked(true);
-    hoverDisplayComboBox->setCurrentIndex(0);
-    hoverModeComboBox->setCurrentIndex(0);
-    hoverUnitComboBox->setCurrentIndex(0);
-    hoverPrecisionComboBox->setCurrentIndex(0);
-    hoverLabelPositionComboBox->setCurrentIndex(0);
+    // Hover readout: the defaults of HoverReadoutSettings.
+    showHoverReadoutControls(mixxx::overviewlayout::HoverReadoutSettings());
+}
+
+void DlgPrefWaveform::showHoverReadoutControls(
+        const mixxx::overviewlayout::HoverReadoutSettings& settings) {
+    showHoverReadoutCheckBox->setChecked(settings.showHoverReadout);
+    hoverDisplayComboBox->setCurrentIndex(
+            hoverDisplayComboBox->findData(static_cast<int>(settings.display)));
+    hoverModeComboBox->setCurrentIndex(
+            hoverModeComboBox->findData(static_cast<int>(settings.hoverMode)));
+    hoverUnitComboBox->setCurrentIndex(
+            hoverUnitComboBox->findData(static_cast<int>(settings.unit)));
+    hoverPrecisionComboBox->setCurrentIndex(
+            hoverPrecisionComboBox->findData(static_cast<int>(settings.precision)));
+    hoverLabelPositionComboBox->setCurrentIndex(
+            hoverLabelPositionComboBox->findData(static_cast<int>(settings.position)));
 }
 
 void DlgPrefWaveform::slotSetOverviewHoverReadout() {
@@ -433,11 +430,11 @@ void DlgPrefWaveform::slotSetOverviewHoverReadout() {
     settings.showHoverReadout = showHoverReadoutCheckBox->isChecked();
     settings.display = static_cast<HoverDisplay>(hoverDisplayComboBox->currentData().toInt());
     settings.hoverMode = static_cast<HoverMode>(hoverModeComboBox->currentData().toInt());
-    settings.unit = static_cast<BeatLabelUnit>(hoverUnitComboBox->currentData().toInt());
+    settings.unit = static_cast<BeatDistanceUnit>(hoverUnitComboBox->currentData().toInt());
     settings.precision =
-            static_cast<BeatLabelPrecision>(hoverPrecisionComboBox->currentData().toInt());
+            static_cast<BeatDistancePrecision>(hoverPrecisionComboBox->currentData().toInt());
     settings.position =
-            static_cast<BeatLabelPosition>(hoverLabelPositionComboBox->currentData().toInt());
+            static_cast<HoverReadoutPosition>(hoverLabelPositionComboBox->currentData().toInt());
     WaveformWidgetFactory::instance()->setOverviewHoverReadoutSettings(settings);
 }
 

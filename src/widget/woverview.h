@@ -20,6 +20,11 @@ class PlayerManager;
 class QDomNode;
 class SkinContext;
 
+namespace mixxx::overviewlayout {
+struct HoverLineLayout;
+struct HoverReadoutLayout;
+} // namespace mixxx::overviewlayout
+
 class WOverview : public WWidget, public TrackDropTarget {
     Q_OBJECT
   public:
@@ -103,6 +108,15 @@ class WOverview : public WWidget, public TrackDropTarget {
     void drawMarks(QPainter* pPainter, const float offset, const float gain);
     void drawPickupPosition(QPainter* pPainter);
     void drawTimeRuler(QPainter* pPainter);
+    void drawHoverLine(QPainter* pPainter, double linePos);
+    void drawPlainHover(QPainter* pPainter,
+            const mixxx::overviewlayout::HoverLineLayout& lineLayout,
+            const mixxx::overviewlayout::HoverReadoutLayout& readoutLayout,
+            const QFont& markerFont);
+    void drawHoverReadout(QPainter* pPainter,
+            const mixxx::overviewlayout::HoverReadoutLayout& readoutLayout,
+            const QPointF& anchor,
+            const QFont& markerFont);
     void drawMarkLabels(QPainter* pPainter, const float offset, const float gain);
     void drawPassthroughOverlay(QPainter* pPainter);
     void paintText(const QString& text, QPainter* pPainter);
@@ -209,9 +223,9 @@ class WOverview : public WWidget, public TrackDropTarget {
     QPointF m_timeRulerPos;
     WaveformMarkLabel m_timeRulerPositionLabel;
     WaveformMarkLabel m_timeRulerDistanceLabel;
-    // Beat distance label of the time ruler (own row; cleared if merged into
+    // Hover readout (own row; cleared if merged into
     // m_timeRulerDistanceLabel or if there is no beat grid).
-    WaveformMarkLabel m_timeRulerBeatLabel;
+    WaveformMarkLabel m_hoverReadoutLabel;
 
     QPixmap m_backgroundPixmap;
     QString m_backgroundPixmapPath;
