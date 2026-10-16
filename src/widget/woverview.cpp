@@ -22,6 +22,7 @@
 #include "util/painterscope.h"
 #include "util/timer.h"
 #include "waveform/waveform.h"
+#include "waveform/overviewlayout.h"
 #include "waveform/waveformwidgetfactory.h"
 #include "widget/controlwidgetconnection.h"
 #include "wskincolor.h"
@@ -1138,13 +1139,34 @@ void WOverview::drawTimeRuler(QPainter* pPainter) {
     shadowFont.setPixelSize(static_cast<int>(m_iLabelFontSize * m_scaleFactor));
     QPen shadowPen(Qt::black, 2.5 * m_scaleFactor);
 
-    if (m_bTimeRulerActive) {
-        if (!m_bLeftClickDragging) {
+    using namespace mixxx::overviewlayout;
+    Input input;
+    input.trackSamples = getTrackSamples();
+    input.sampleRate = m_trackSampleRateControl.get();
+    input.rateRatio = m_pRateRatioControl->get();
+    input.playPositionFraction = m_playpositionControl.get();
+    input.overviewLength = length();
+    if (m_orientation == Qt::Horizontal) {
+        input.pointerPos = m_timeRulerPos.x();
+    } else {
+        input.pointerPos = m_timeRulerPos.y();
+    }
+    if (!m_bTimeRulerActive) {
+        input.timeRulerState = TimeRulerState::Inactive;
+    } else if (m_bLeftClickDragging) {
+        input.timeRulerState = TimeRulerState::LeftDrag;
+    } else {
+        input.timeRulerState = TimeRulerState::RightClickHold;
+    }
+    const TimeRulerLayout layout = layoutTimeRuler(input);
+
+    if (layout.labelsShown) {
+        if (layout.lineShown) {
             QLineF line;
             if (m_orientation == Qt::Horizontal) {
-                line.setLine(m_timeRulerPos.x(), 0.0, m_timeRulerPos.x(), height());
+                line.setLine(layout.linePos, 0.0, layout.linePos, height());
             } else {
-                line.setLine(0.0, m_timeRulerPos.x(), width(), m_timeRulerPos.x());
+                line.setLine(0.0, layout.linePos, width(), layout.linePos);
             }
             pPainter->setPen(shadowPen);
             pPainter->drawLine(line);
@@ -1155,31 +1177,19 @@ void WOverview::drawTimeRuler(QPainter* pPainter) {
 
         QPointF textPoint = m_timeRulerPos;
         QPointF textPointDistance = m_timeRulerPos;
-        qreal widgetPositionFraction;
         qreal padding = 1.0; // spacing between line and text
         if (m_orientation == Qt::Horizontal) {
             textPoint = QPointF(textPoint.x() + padding, fontMetrics.height());
             textPointDistance = QPointF(textPointDistance.x() + padding,
                     (fontMetrics.height() + height()) / 2);
-            widgetPositionFraction = m_timeRulerPos.x() / width();
         } else {
             textPoint.setX(0);
             textPointDistance.setX(0);
-            widgetPositionFraction = m_timeRulerPos.y() / height();
         }
-        qreal trackSamples = getTrackSamples();
-        qreal timePosition = samplePositionToSeconds(
-                widgetPositionFraction * trackSamples);
-        qreal timePositionTillEnd = samplePositionToSeconds(
-                (1 - widgetPositionFraction) * trackSamples);
-        qreal timeDistance = samplePositionToSeconds(
-                (widgetPositionFraction - m_playpositionControl.get()) * trackSamples);
-
-        QString timeText = mixxx::Duration::formatTime(timePosition) + " -" + mixxx::Duration::formatTime(timePositionTillEnd);
 
         m_timeRulerPositionLabel.prerender(textPoint,
                 QPixmap(),
-                timeText,
+                layout.positionLabelText,
                 markerFont,
                 m_labelTextColor,
                 m_labelBackgroundColor,
@@ -1187,15 +1197,9 @@ void WOverview::drawTimeRuler(QPainter* pPainter) {
                 devicePixelRatioF());
         m_timeRulerPositionLabel.draw(pPainter);
 
-        QString timeDistanceText = mixxx::Duration::formatTime(fabs(timeDistance));
-        // Cast to int to avoid confusingly switching from -0:00 to 0:00 as
-        // the playhead passes the point
-        if (static_cast<int>(timeDistance) < 0) {
-            timeDistanceText = "-" + timeDistanceText;
-        }
         m_timeRulerDistanceLabel.prerender(textPointDistance,
                 QPixmap(),
-                timeDistanceText,
+                layout.distanceLabelText,
                 markerFont,
                 m_labelTextColor,
                 m_labelBackgroundColor,

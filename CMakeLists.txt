@@ -1272,6 +1272,7 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/waveform/vsyncthread.cpp
   src/waveform/waveform.cpp
   src/waveform/waveformfactory.cpp
+  src/waveform/overviewlayout.cpp
   src/waveform/waveformmarklabel.cpp
   src/waveform/waveformwidgetfactory.cpp
   src/waveform/widgets/emptywaveformwidget.cpp
@@ -2161,6 +2162,7 @@ if(BUILD_TESTING)
     src/test/directorydaotest.cpp
     src/test/duration_test.cpp
     src/test/durationutiltest.cpp
+    src/test/overviewlayouttest.cpp
     #TODO: write useful tests for refactored effects system
     #src/test/effectchainslottest.cpp
     src/test/enginebufferscalelineartest.cpp
