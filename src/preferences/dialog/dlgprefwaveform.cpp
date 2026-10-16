@@ -77,6 +77,23 @@ DlgPrefWaveform::DlgPrefWaveform(
     untilMarkTextHeightLimitComboBox->addItem(tr("1/3rd of waveform viewer"));
     untilMarkTextHeightLimitComboBox->addItem(tr("Full waveform viewer height"));
 
+    // Populate hover readout options
+    {
+        using namespace mixxx::overviewlayout;
+        hoverUnitComboBox->addItem(tr("Bars"), QVariant(static_cast<int>(BeatLabelUnit::Bars)));
+        hoverUnitComboBox->addItem(tr("Beats"), QVariant(static_cast<int>(BeatLabelUnit::Beats)));
+        hoverPrecisionComboBox->addItem(tr("Whole (rounded)"),
+                QVariant(static_cast<int>(BeatLabelPrecision::Whole)));
+        hoverPrecisionComboBox->addItem(tr("Fractional"),
+                QVariant(static_cast<int>(BeatLabelPrecision::Fractional)));
+        hoverLabelPositionComboBox->addItem(
+                tr("Auto"), QVariant(static_cast<int>(BeatLabelPosition::Auto)));
+        hoverLabelPositionComboBox->addItem(tr("Always right"),
+                QVariant(static_cast<int>(BeatLabelPosition::AlwaysRight)));
+        hoverLabelPositionComboBox->addItem(tr("Always left"),
+                QVariant(static_cast<int>(BeatLabelPosition::AlwaysLeft)));
+    }
+
     // The GUI is not fully setup so connecting signals before calling
     // slotUpdate can generate rebootMixxxView calls.
     // TODO(XXX): Improve this awkwardness.
@@ -188,6 +205,19 @@ DlgPrefWaveform::DlgPrefWaveform(
             this,
             &DlgPrefWaveform::slotSetUntilMarkTextHeightLimit);
 
+    connect(hoverUnitComboBox,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            &DlgPrefWaveform::slotSetOverviewHoverReadout);
+    connect(hoverPrecisionComboBox,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            &DlgPrefWaveform::slotSetOverviewHoverReadout);
+    connect(hoverLabelPositionComboBox,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            &DlgPrefWaveform::slotSetOverviewHoverReadout);
+
     setScrollSafeGuardForAllInputWidgets(this);
 }
 
@@ -236,6 +266,16 @@ void DlgPrefWaveform::slotUpdate() {
     untilMarkTextHeightLimitComboBox->setCurrentIndex(
             WaveformWidgetFactory::toUntilMarkTextHeightLimitIndex(
                     factory->getUntilMarkTextHeightLimit()));
+
+    {
+        const auto& hoverSettings = factory->getOverviewHoverReadoutSettings();
+        hoverUnitComboBox->setCurrentIndex(
+                hoverUnitComboBox->findData(static_cast<int>(hoverSettings.unit)));
+        hoverPrecisionComboBox->setCurrentIndex(
+                hoverPrecisionComboBox->findData(static_cast<int>(hoverSettings.precision)));
+        hoverLabelPositionComboBox->setCurrentIndex(
+                hoverLabelPositionComboBox->findData(static_cast<int>(hoverSettings.position)));
+    }
 
     WOverview::Type cfgOverviewType =
             m_pConfig->getValue<WOverview::Type>(kOverviewTypeCfgKey, WOverview::Type::RGB);
@@ -302,6 +342,22 @@ void DlgPrefWaveform::slotResetToDefaults() {
 
     // 50 (center) is default
     playMarkerPositionSlider->setValue(50);
+
+    // Hover readout: Bars, Whole (rounded), Auto (each is the first entry).
+    hoverUnitComboBox->setCurrentIndex(0);
+    hoverPrecisionComboBox->setCurrentIndex(0);
+    hoverLabelPositionComboBox->setCurrentIndex(0);
+}
+
+void DlgPrefWaveform::slotSetOverviewHoverReadout() {
+    using namespace mixxx::overviewlayout;
+    HoverReadoutSettings settings;
+    settings.unit = static_cast<BeatLabelUnit>(hoverUnitComboBox->currentData().toInt());
+    settings.precision =
+            static_cast<BeatLabelPrecision>(hoverPrecisionComboBox->currentData().toInt());
+    settings.position =
+            static_cast<BeatLabelPosition>(hoverLabelPositionComboBox->currentData().toInt());
+    WaveformWidgetFactory::instance()->setOverviewHoverReadoutSettings(settings);
 }
 
 void DlgPrefWaveform::slotSetFrameRate(int frameRate) {

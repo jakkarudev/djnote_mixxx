@@ -75,6 +75,7 @@ class WOverview : public WWidget, public TrackDropTarget {
 
     void slotTypeControlChanged(double v);
     void slotNormalizeOrVisualGainChanged();
+    void slotHoverReadoutSettingsChanged();
 
   private:
     // Append the waveform overview pixmap according to available data
@@ -204,7 +205,9 @@ class WOverview : public WWidget, public TrackDropTarget {
     QPointF m_timeRulerPos;
     WaveformMarkLabel m_timeRulerPositionLabel;
     WaveformMarkLabel m_timeRulerDistanceLabel;
-
+    // Beat distance label of the time ruler (own row; cleared if merged into
+    // m_timeRulerDistanceLabel or if there is no beat grid).
+    WaveformMarkLabel m_timeRulerBeatLabel;
 
     QPixmap m_backgroundPixmap;
     QString m_backgroundPixmapPath;
