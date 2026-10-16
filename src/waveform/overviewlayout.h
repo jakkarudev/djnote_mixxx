@@ -40,6 +40,16 @@ enum class HoverDisplay {
     LabelOnly,
 };
 
+// How the hover readout relates to the time ruler.
+enum class HoverMode {
+    // The hover line is the time ruler's line; the time ruler also shows the
+    // beat label.
+    ExtendTimeRuler,
+    // Plain hover has its own line and label; both are hidden while the time
+    // ruler is active, which then has no beat label.
+    SeparateHoverLine,
+};
+
 // Settings of the hover readout (Preferences -> Waveforms -> Hover readout).
 // Later tickets add the remaining hover settings here.
 struct HoverReadoutSettings {
@@ -48,6 +58,7 @@ struct HoverReadoutSettings {
     BeatLabelUnit unit = BeatLabelUnit::Bars;
     BeatLabelPrecision precision = BeatLabelPrecision::Whole;
     BeatLabelPosition position = BeatLabelPosition::Auto;
+    HoverMode hoverMode = HoverMode::ExtendTimeRuler;
 };
 
 struct Input {

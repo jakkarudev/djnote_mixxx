@@ -117,8 +117,10 @@ BeatLabelLayout layoutBeatLabel(const Input& input) {
     const HoverReadoutSettings& settings = input.hoverReadout;
     const bool plainHoverLabel = !rulerActive && input.pointerPresent &&
             settings.display != HoverDisplay::LineOnly;
+    const bool rulerLabel = rulerActive &&
+            settings.hoverMode == HoverMode::ExtendTimeRuler;
     if (!settings.showHoverReadout ||
-            !(rulerActive || plainHoverLabel) ||
+            !(rulerLabel || plainHoverLabel) ||
             input.pBeats == nullptr ||
             input.trackSamples <= 0.0 ||
             input.overviewLength <= 0.0) {

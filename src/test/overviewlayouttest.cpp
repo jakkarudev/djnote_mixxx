@@ -541,3 +541,112 @@ TEST(OverviewLayoutHoverReadoutTest, TimeRulerStatesDoNotUseHoverLine) {
     c.state = TimeRulerState::LeftDrag;
     EXPECT_FALSE(layoutHoverReadout(hoverInput(c)).lineShown);
 }
+
+// Hover mode: Extend time ruler (default) vs Separate hover line.
+namespace {
+
+const TimeRulerState kActiveStates[] = {
+        TimeRulerState::RightClickHold, TimeRulerState::LeftDrag};
+
+BeatLabelCase hoverModeCase(HoverMode mode, TimeRulerState state) {
+    auto c = plainHover();
+    c.state = state;
+    c.settings.hoverMode = mode;
+    return c;
+}
+
+} // namespace
+
+TEST(OverviewLayoutHoverModeTest, DefaultIsExtendTimeRuler) {
+    EXPECT_EQ(HoverMode::ExtendTimeRuler, HoverReadoutSettings().hoverMode);
+}
+
+TEST(OverviewLayoutHoverModeTest, ExtendShowsBeatLabelOnTimeRuler) {
+    for (auto state : kActiveStates) {
+        const auto in = hoverInput(hoverModeCase(HoverMode::ExtendTimeRuler, state));
+        EXPECT_TRUE(layoutBeatLabel(in).shown);
+        EXPECT_FALSE(layoutHoverReadout(in).lineShown);
+    }
+}
+
+TEST(OverviewLayoutHoverModeTest, ExtendPlainHoverUnchanged) {
+    const auto in = hoverInput(hoverModeCase(HoverMode::ExtendTimeRuler, TimeRulerState::Inactive));
+    EXPECT_TRUE(layoutBeatLabel(in).shown);
+    EXPECT_TRUE(layoutHoverReadout(in).lineShown);
+}
+
+TEST(OverviewLayoutHoverModeTest, SeparatePlainHoverShowsLineAndLabel) {
+    const auto in = hoverInput(
+            hoverModeCase(HoverMode::SeparateHoverLine, TimeRulerState::Inactive));
+    EXPECT_TRUE(layoutBeatLabel(in).shown);
+    EXPECT_TRUE(layoutHoverReadout(in).lineShown);
+}
+
+TEST(OverviewLayoutHoverModeTest, SeparatePlainHoverRespectsDisplay) {
+    auto c = hoverModeCase(HoverMode::SeparateHoverLine, TimeRulerState::Inactive);
+    c.settings.display = HoverDisplay::LineOnly;
+    EXPECT_FALSE(layoutBeatLabel(hoverInput(c)).shown);
+    EXPECT_TRUE(layoutHoverReadout(hoverInput(c)).lineShown);
+    c.settings.display = HoverDisplay::LabelOnly;
+    EXPECT_TRUE(layoutBeatLabel(hoverInput(c)).shown);
+    EXPECT_FALSE(layoutHoverReadout(hoverInput(c)).lineShown);
+}
+
+TEST(OverviewLayoutHoverModeTest, SeparateHidesHoverReadoutWhileTimeRulerActive) {
+    for (auto state : kActiveStates) {
+        const auto in = hoverInput(hoverModeCase(HoverMode::SeparateHoverLine, state));
+        EXPECT_FALSE(layoutBeatLabel(in).shown);
+        EXPECT_FALSE(layoutHoverReadout(in).lineShown);
+    }
+}
+
+TEST(OverviewLayoutHoverModeTest, SeparateTimeRulerHasNoBeatLabelEvenOnShortOverview) {
+    for (auto state : kActiveStates) {
+        auto c = hoverModeCase(HoverMode::SeparateHoverLine, state);
+        c.breadth = 30.0;
+        const auto in = hoverInput(c);
+        const auto label = layoutBeatLabel(in);
+        EXPECT_FALSE(label.shown);
+        EXPECT_TRUE(label.joinedDistanceLabelText.isEmpty());
+        EXPECT_TRUE(layoutTimeRuler(in).labelsShown);
+    }
+}
+
+TEST(OverviewLayoutHoverModeTest, SeparateTimeRulerIsUnchanged) {
+    for (auto state : kActiveStates) {
+        const auto sep = layoutTimeRuler(
+                hoverInput(hoverModeCase(HoverMode::SeparateHoverLine, state)));
+        const auto ext = layoutTimeRuler(
+                hoverInput(hoverModeCase(HoverMode::ExtendTimeRuler, state)));
+        EXPECT_EQ(ext.lineShown, sep.lineShown);
+        EXPECT_EQ(ext.linePos, sep.linePos);
+        EXPECT_EQ(ext.labelsShown, sep.labelsShown);
+        EXPECT_EQ(ext.positionLabelText, sep.positionLabelText);
+        EXPECT_EQ(ext.distanceLabelText, sep.distanceLabelText);
+    }
+}
+
+TEST(OverviewLayoutHoverModeTest, SeparateHoverReadoutReturnsAfterTimeRulerEnds) {
+    auto c = hoverModeCase(HoverMode::SeparateHoverLine, TimeRulerState::LeftDrag);
+    EXPECT_FALSE(layoutHoverReadout(hoverInput(c)).lineShown);
+    c.state = TimeRulerState::Inactive;
+    EXPECT_TRUE(layoutHoverReadout(hoverInput(c)).lineShown);
+    EXPECT_TRUE(layoutBeatLabel(hoverInput(c)).shown);
+    // Pointer left the overview meanwhile: nothing comes back.
+    EXPECT_FALSE(layoutHoverReadout(hoverInput(c, false)).lineShown);
+    EXPECT_FALSE(layoutBeatLabel(hoverInput(c, false)).shown);
+}
+
+TEST(OverviewLayoutHoverModeTest, ShowHoverReadoutOffShowsNothingInBothModes) {
+    for (auto mode : {HoverMode::ExtendTimeRuler, HoverMode::SeparateHoverLine}) {
+        for (auto state : {TimeRulerState::Inactive,
+                     TimeRulerState::RightClickHold,
+                     TimeRulerState::LeftDrag}) {
+            auto c = hoverModeCase(mode, state);
+            c.settings.showHoverReadout = false;
+            const auto in = hoverInput(c);
+            EXPECT_FALSE(layoutBeatLabel(in).shown);
+            EXPECT_FALSE(layoutHoverReadout(in).lineShown);
+        }
+    }
+}

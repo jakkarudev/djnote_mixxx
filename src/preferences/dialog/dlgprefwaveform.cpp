@@ -98,6 +98,10 @@ DlgPrefWaveform::DlgPrefWaveform(
                 tr("Line only"), QVariant(static_cast<int>(HoverDisplay::LineOnly)));
         hoverDisplayComboBox->addItem(
                 tr("Label only"), QVariant(static_cast<int>(HoverDisplay::LabelOnly)));
+        hoverModeComboBox->addItem(tr("Extend time ruler"),
+                QVariant(static_cast<int>(HoverMode::ExtendTimeRuler)));
+        hoverModeComboBox->addItem(tr("Separate hover line"),
+                QVariant(static_cast<int>(HoverMode::SeparateHoverLine)));
         hoverUnitComboBox->addItem(tr("Bars"), QVariant(static_cast<int>(BeatLabelUnit::Bars)));
         hoverUnitComboBox->addItem(tr("Beats"), QVariant(static_cast<int>(BeatLabelUnit::Beats)));
         hoverPrecisionComboBox->addItem(tr("Whole (rounded)"),
@@ -251,6 +255,10 @@ DlgPrefWaveform::DlgPrefWaveform(
             QOverload<int>::of(&QComboBox::currentIndexChanged),
             this,
             &DlgPrefWaveform::slotSetOverviewHoverReadout);
+    connect(hoverModeComboBox,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            &DlgPrefWaveform::slotSetOverviewHoverReadout);
     connect(hoverUnitComboBox,
             QOverload<int>::of(&QComboBox::currentIndexChanged),
             this,
@@ -324,6 +332,8 @@ void DlgPrefWaveform::slotUpdate() {
         showHoverReadoutCheckBox->setChecked(hoverSettings.showHoverReadout);
         hoverDisplayComboBox->setCurrentIndex(
                 hoverDisplayComboBox->findData(static_cast<int>(hoverSettings.display)));
+        hoverModeComboBox->setCurrentIndex(
+                hoverModeComboBox->findData(static_cast<int>(hoverSettings.hoverMode)));
         hoverUnitComboBox->setCurrentIndex(
                 hoverUnitComboBox->findData(static_cast<int>(hoverSettings.unit)));
         hoverPrecisionComboBox->setCurrentIndex(
@@ -411,6 +421,7 @@ void DlgPrefWaveform::slotResetToDefaults() {
     // is the first entry).
     showHoverReadoutCheckBox->setChecked(true);
     hoverDisplayComboBox->setCurrentIndex(0);
+    hoverModeComboBox->setCurrentIndex(0);
     hoverUnitComboBox->setCurrentIndex(0);
     hoverPrecisionComboBox->setCurrentIndex(0);
     hoverLabelPositionComboBox->setCurrentIndex(0);
@@ -421,6 +432,7 @@ void DlgPrefWaveform::slotSetOverviewHoverReadout() {
     HoverReadoutSettings settings;
     settings.showHoverReadout = showHoverReadoutCheckBox->isChecked();
     settings.display = static_cast<HoverDisplay>(hoverDisplayComboBox->currentData().toInt());
+    settings.hoverMode = static_cast<HoverMode>(hoverModeComboBox->currentData().toInt());
     settings.unit = static_cast<BeatLabelUnit>(hoverUnitComboBox->currentData().toInt());
     settings.precision =
             static_cast<BeatLabelPrecision>(hoverPrecisionComboBox->currentData().toInt());

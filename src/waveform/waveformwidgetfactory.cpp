@@ -516,6 +516,13 @@ bool WaveformWidgetFactory::setConfig(UserSettingsPointer config) {
                 display <= static_cast<int>(HoverDisplay::LabelOnly)) {
             hoverSettings.display = static_cast<HoverDisplay>(display);
         }
+        const int hoverMode = m_config->getValue(
+                ConfigKey("[Waveform]", "overviewHoverMode"),
+                static_cast<int>(hoverSettings.hoverMode));
+        if (hoverMode >= static_cast<int>(HoverMode::ExtendTimeRuler) &&
+                hoverMode <= static_cast<int>(HoverMode::SeparateHoverLine)) {
+            hoverSettings.hoverMode = static_cast<HoverMode>(hoverMode);
+        }
         m_overviewHoverReadoutSettings = hoverSettings;
     }
 
@@ -1521,6 +1528,8 @@ void WaveformWidgetFactory::setOverviewHoverReadoutSettings(
                 settings.showHoverReadout);
         m_config->setValue(ConfigKey("[Waveform]", "overviewHoverDisplay"),
                 static_cast<int>(settings.display));
+        m_config->setValue(ConfigKey("[Waveform]", "overviewHoverMode"),
+                static_cast<int>(settings.hoverMode));
     }
     emit overviewHoverReadoutSettingsChanged();
 }
