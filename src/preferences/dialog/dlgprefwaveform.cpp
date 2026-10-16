@@ -8,6 +8,7 @@
 #include "moc_dlgprefwaveform.cpp"
 #include "preferences/waveformsettings.h"
 #include "util/db/dbconnectionpooled.h"
+#include "waveform/overviewlinelayout.h"
 #include "waveform/renderers/waveformwidgetrenderer.h"
 #include "waveform/waveformwidgetfactory.h"
 #include "widget/woverview.h"
@@ -76,6 +77,17 @@ DlgPrefWaveform::DlgPrefWaveform(
 
     untilMarkTextHeightLimitComboBox->addItem(tr("1/3rd of waveform viewer"));
     untilMarkTextHeightLimitComboBox->addItem(tr("Full waveform viewer height"));
+
+    // Populate overview lines options
+    overviewLinesComboBox->addItem(tr("Bars + phrases"),
+            static_cast<int>(mixxx::overviewlayout::LinesMode::BarsAndPhrases));
+    overviewLinesComboBox->addItem(tr("Phrases only"),
+            static_cast<int>(mixxx::overviewlayout::LinesMode::PhrasesOnly));
+    overviewLinesComboBox->addItem(tr("Off"),
+            static_cast<int>(mixxx::overviewlayout::LinesMode::Off));
+    for (const int bars : {4, 8, 16, 32}) {
+        overviewPhraseBarsComboBox->addItem(tr("%1 bars").arg(bars), bars);
+    }
 
     // The GUI is not fully setup so connecting signals before calling
     // slotUpdate can generate rebootMixxxView calls.
@@ -151,6 +163,26 @@ DlgPrefWaveform::DlgPrefWaveform(
             &QCheckBox::toggled,
             this,
             &DlgPrefWaveform::slotSetNormalizeOverview);
+    connect(overviewLinesComboBox,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            &DlgPrefWaveform::slotSetOverviewLinesMode);
+    connect(overviewPhraseBarsComboBox,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            &DlgPrefWaveform::slotSetOverviewPhraseBars);
+    connect(overviewLineOpacitySpinBox,
+            QOverload<int>::of(&QSpinBox::valueChanged),
+            this,
+            &DlgPrefWaveform::slotSetOverviewLineOpacity);
+    connect(overviewLineOpacitySlider,
+            &QSlider::valueChanged,
+            overviewLineOpacitySpinBox,
+            &QSpinBox::setValue);
+    connect(overviewLineOpacitySpinBox,
+            QOverload<int>::of(&QSpinBox::valueChanged),
+            overviewLineOpacitySlider,
+            &QSlider::setValue);
     connect(factory,
             &WaveformWidgetFactory::waveformMeasured,
             this,
@@ -221,6 +253,12 @@ void DlgPrefWaveform::slotUpdate() {
     midVisualGain->setValue(factory->getVisualGain(WaveformWidgetFactory::Mid));
     highVisualGain->setValue(factory->getVisualGain(WaveformWidgetFactory::High));
     normalizeOverviewCheckBox->setChecked(factory->isOverviewNormalized());
+    overviewLinesComboBox->setCurrentIndex(overviewLinesComboBox->findData(
+            static_cast<int>(factory->getOverviewLineSettings().mode)));
+    overviewPhraseBarsComboBox->setCurrentIndex(overviewPhraseBarsComboBox->findData(
+            factory->getOverviewLineSettings().phraseBars));
+    overviewLineOpacitySpinBox->setValue(factory->getOverviewLineOpacity());
+    overviewLineOpacitySlider->setValue(factory->getOverviewLineOpacity());
     // Round zoom to int to get a default zoom index.
     defaultZoomComboBox->setCurrentIndex(static_cast<int>(factory->getDefaultZoom()) - 1);
     playMarkerPositionSlider->setValue(static_cast<int>(factory->getPlayMarkerPosition() * 100));
@@ -287,6 +325,15 @@ void DlgPrefWaveform::slotResetToDefaults() {
 
     // Don't normalize overview.
     normalizeOverviewCheckBox->setChecked(false);
+
+    // Overview lines: phrases only, 8 bars, 80% opacity.
+    const mixxx::overviewlayout::LineSettings defaultLineSettings;
+    overviewLinesComboBox->setCurrentIndex(
+            overviewLinesComboBox->findData(static_cast<int>(defaultLineSettings.mode)));
+    overviewPhraseBarsComboBox->setCurrentIndex(
+            overviewPhraseBarsComboBox->findData(defaultLineSettings.phraseBars));
+    overviewLineOpacitySlider->setValue(80);
+    overviewLineOpacitySpinBox->setValue(80);
 
     // 60FPS is the default
     frameRateSlider->setValue(60);
@@ -370,6 +417,21 @@ void DlgPrefWaveform::slotSetVisualGainHigh(double gain) {
 
 void DlgPrefWaveform::slotSetNormalizeOverview(bool normalize) {
     WaveformWidgetFactory::instance()->setOverviewNormalized(normalize);
+}
+
+void DlgPrefWaveform::slotSetOverviewLinesMode(int index) {
+    WaveformWidgetFactory::instance()->setOverviewLinesMode(
+            static_cast<mixxx::overviewlayout::LinesMode>(
+                    overviewLinesComboBox->itemData(index).toInt()));
+}
+
+void DlgPrefWaveform::slotSetOverviewPhraseBars(int index) {
+    WaveformWidgetFactory::instance()->setOverviewPhraseBars(
+            overviewPhraseBarsComboBox->itemData(index).toInt());
+}
+
+void DlgPrefWaveform::slotSetOverviewLineOpacity(int percent) {
+    WaveformWidgetFactory::instance()->setOverviewLineOpacity(percent);
 }
 
 void DlgPrefWaveform::slotWaveformMeasured(float frameRate, int droppedFrames) {

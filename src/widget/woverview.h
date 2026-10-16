@@ -92,6 +92,7 @@ class WOverview : public WWidget, public TrackDropTarget {
 
     void drawEndOfTrackBackground(QPainter* pPainter);
     void drawAxis(QPainter* pPainter);
+    void drawBarAndPhraseLines(QPainter* pPainter);
     void drawWaveformPixmap(QPainter* pPainter);
     void drawPlayedOverlay(QPainter* pPainter);
     void drawPlayPosition(QPainter* pPainter);
@@ -213,6 +214,8 @@ class WOverview : public WWidget, public TrackDropTarget {
     QColor m_labelBackgroundColor;
     QColor m_axesColor;
     QColor m_playPosColor;
+    QColor m_barLineColor;
+    QColor m_phraseLineColor;
     QColor m_endOfTrackColor;
     QColor m_passthroughOverlayColor;
     QColor m_playedOverlayColor;

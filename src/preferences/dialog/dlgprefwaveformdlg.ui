@@ -622,6 +622,79 @@ Select from different types of displays for the waveform, which differ primarily
       </layout>
      </item>
 
+     <item row="16" column="0" colspan="4">
+      <widget class="QGroupBox" name="overviewLinesGroup">
+       <property name="title">
+        <string>Overview lines</string>
+       </property>
+       <layout class="QGridLayout" name="overviewLinesGridLayout">
+        <item row="0" column="0">
+         <widget class="QLabel" name="overviewLinesLabel">
+          <property name="text">
+           <string>Lines</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="1" colspan="2">
+         <widget class="QComboBox" name="overviewLinesComboBox">
+          <property name="toolTip">
+           <string>Show bar and phrase lines on the track overview.</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="0">
+         <widget class="QLabel" name="overviewPhraseBarsLabel">
+          <property name="text">
+           <string>Phrase length</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="1" colspan="2">
+         <widget class="QComboBox" name="overviewPhraseBarsComboBox">
+          <property name="toolTip">
+           <string>Number of bars in a phrase on the track overview.</string>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="0">
+         <widget class="QLabel" name="overviewLineOpacityLabel">
+          <property name="text">
+           <string>Line opacity</string>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="1">
+         <widget class="QSlider" name="overviewLineOpacitySlider">
+          <property name="maximum">
+           <number>100</number>
+          </property>
+          <property name="value">
+           <number>80</number>
+          </property>
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="2">
+         <widget class="QSpinBox" name="overviewLineOpacitySpinBox">
+          <property name="toolTip">
+           <string>Set amount of opacity on the overview bar and phrase lines.</string>
+          </property>
+          <property name="suffix">
+           <string>%</string>
+          </property>
+          <property name="maximum">
+           <number>100</number>
+          </property>
+          <property name="value">
+           <number>80</number>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </item>
      <item row="17" column="0" colspan="4">
       <widget class="QGroupBox" name="openGLStatus">
        <property name="title">

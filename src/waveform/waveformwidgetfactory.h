@@ -9,6 +9,7 @@
 #include "skin/legacy/skincontext.h"
 #include "util/performancetimer.h"
 #include "util/singleton.h"
+#include "waveform/overviewlinelayout.h"
 #include "waveform/widgets/waveformwidgettype.h"
 
 class WVuMeterLegacy;
@@ -148,6 +149,17 @@ class WaveformWidgetFactory : public QObject, public Singleton<WaveformWidgetFac
     void setOverviewNormalized(bool normalize);
     int isOverviewNormalized() const { return m_overviewNormalized;}
 
+    // Overview bar and phrase lines (stored under [Waveform]).
+    void setOverviewLinesMode(mixxx::overviewlayout::LinesMode mode);
+    void setOverviewPhraseBars(int bars);
+    void setOverviewLineOpacity(int percent);
+    mixxx::overviewlayout::LineSettings getOverviewLineSettings() const {
+        return m_overviewLineSettings;
+    }
+    int getOverviewLineOpacity() const {
+        return m_overviewLineOpacity;
+    }
+
     const QVector<WaveformWidgetAbstractHandle>& getAvailableTypes() const {
         return m_waveformWidgetHandles;
     }
@@ -175,6 +187,7 @@ class WaveformWidgetFactory : public QObject, public Singleton<WaveformWidgetFac
     void swapVuMeters();
 
     void overviewNormalizeChanged();
+    void overviewLinesChanged();
     void overallVisualGainChanged();
 
   public slots:
@@ -224,6 +237,8 @@ class WaveformWidgetFactory : public QObject, public Singleton<WaveformWidgetFac
     bool m_zoomSync;
     double m_visualGain[FilterCount];
     bool m_overviewNormalized;
+    mixxx::overviewlayout::LineSettings m_overviewLineSettings;
+    int m_overviewLineOpacity;
 
     bool m_untilMarkShowBeats;
     bool m_untilMarkShowTime;

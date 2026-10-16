@@ -135,6 +135,7 @@ WaveformWidgetFactory::WaveformWidgetFactory()
           m_defaultZoom(WaveformWidgetRenderer::s_waveformDefaultZoom),
           m_zoomSync(true),
           m_overviewNormalized(false),
+          m_overviewLineOpacity(80),
           m_untilMarkShowBeats(false),
           m_untilMarkShowTime(false),
           m_untilMarkAlign(Qt::AlignVCenter),
@@ -426,6 +427,23 @@ bool WaveformWidgetFactory::setConfig(UserSettingsPointer config) {
         setOverviewNormalized(static_cast<bool>(overviewNormalized));
     } else {
         m_config->set(ConfigKey("[Waveform]","OverviewNormalized"), ConfigValue(m_overviewNormalized));
+    }
+
+    // Overview bar and phrase lines
+    {
+        const int linesMode = m_config->getValue(
+                ConfigKey("[Waveform]", "overviewLinesMode"),
+                static_cast<int>(m_overviewLineSettings.mode));
+        if (linesMode >= static_cast<int>(mixxx::overviewlayout::LinesMode::Off) &&
+                linesMode <= static_cast<int>(mixxx::overviewlayout::LinesMode::BarsAndPhrases)) {
+            setOverviewLinesMode(static_cast<mixxx::overviewlayout::LinesMode>(linesMode));
+        }
+        setOverviewPhraseBars(m_config->getValue(
+                ConfigKey("[Waveform]", "overviewPhraseBars"),
+                m_overviewLineSettings.phraseBars));
+        setOverviewLineOpacity(m_config->getValue(
+                ConfigKey("[Waveform]", "overviewLineOpacity"),
+                m_overviewLineOpacity));
     }
 
     m_playMarkerPosition = m_config->getValue(ConfigKey("[Waveform]","PlayMarkerPosition"),
@@ -737,6 +755,35 @@ void WaveformWidgetFactory::setOverviewNormalized(bool normalize) {
         m_config->set(ConfigKey("[Waveform]","OverviewNormalized"), ConfigValue(m_overviewNormalized));
     }
     emit overviewNormalizeChanged();
+}
+
+void WaveformWidgetFactory::setOverviewLinesMode(mixxx::overviewlayout::LinesMode mode) {
+    m_overviewLineSettings.mode = mode;
+    if (m_config) {
+        m_config->setValue(ConfigKey("[Waveform]", "overviewLinesMode"), static_cast<int>(mode));
+    }
+    emit overviewLinesChanged();
+}
+
+void WaveformWidgetFactory::setOverviewPhraseBars(int bars) {
+    // Only 4, 8, 16 and 32 bars are offered; fall back to the default for
+    // anything else in the config.
+    if (bars != 4 && bars != 8 && bars != 16 && bars != 32) {
+        bars = mixxx::overviewlayout::LineSettings().phraseBars;
+    }
+    m_overviewLineSettings.phraseBars = bars;
+    if (m_config) {
+        m_config->setValue(ConfigKey("[Waveform]", "overviewPhraseBars"), bars);
+    }
+    emit overviewLinesChanged();
+}
+
+void WaveformWidgetFactory::setOverviewLineOpacity(int percent) {
+    m_overviewLineOpacity = std::clamp(percent, 0, 100);
+    if (m_config) {
+        m_config->setValue(ConfigKey("[Waveform]", "overviewLineOpacity"), m_overviewLineOpacity);
+    }
+    emit overviewLinesChanged();
 }
 
 void WaveformWidgetFactory::setPlayMarkerPosition(double position) {

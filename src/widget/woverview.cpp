@@ -23,6 +23,7 @@
 #include "util/timer.h"
 #include "waveform/waveform.h"
 #include "waveform/overviewlayout.h"
+#include "waveform/overviewlinelayout.h"
 #include "waveform/waveformwidgetfactory.h"
 #include "widget/controlwidgetconnection.h"
 #include "wskincolor.h"
@@ -106,6 +107,11 @@ WOverview::WOverview(
             &WaveformWidgetFactory::overallVisualGainChanged,
             this,
             &WOverview::slotNormalizeOrVisualGainChanged);
+    // Bar and phrase line settings; no need to reload the track.
+    connect(widgetFactory,
+            &WaveformWidgetFactory::overviewLinesChanged,
+            this,
+            QOverload<>::of(&WOverview::update));
 
     m_pPassthroughLabel = make_parented<QLabel>(this);
 
@@ -126,6 +132,16 @@ void WOverview::setup(const QDomNode& node, const SkinContext& context) {
     m_backgroundColor = m_signalColors.getBgColor();
     m_axesColor = m_signalColors.getAxesColor();
     m_playPosColor = m_signalColors.getPlayPosColor();
+    // Optional skin colors for the bar and phrase lines, falling back to the
+    // axes color.
+    m_barLineColor = context.selectColor(node, "BarLineColor");
+    if (!m_barLineColor.isValid()) {
+        m_barLineColor = m_axesColor;
+    }
+    m_phraseLineColor = context.selectColor(node, "PhraseLineColor");
+    if (!m_phraseLineColor.isValid()) {
+        m_phraseLineColor = m_axesColor;
+    }
     m_passthroughOverlayColor = m_signalColors.getPassthroughOverlayColor();
     m_playedOverlayColor = m_signalColors.getPlayedOverlayColor();
     m_lowColor = m_signalColors.getLowColor();
@@ -357,6 +373,10 @@ void WOverview::slotLoadingTrack(TrackPointer pNewTrack, TrackPointer pOldTrack)
                 &Track::cuesUpdated,
                 this,
                 &WOverview::receiveCuesUpdated);
+        disconnect(m_pCurrentTrack.get(),
+                &Track::beatsUpdated,
+                this,
+                QOverload<>::of(&WOverview::update));
     }
 
     m_waveformSourceImage = QImage();
@@ -380,6 +400,10 @@ void WOverview::slotLoadingTrack(TrackPointer pNewTrack, TrackPointer pOldTrack)
                 &WOverview::slotWaveformSummaryUpdated);
         slotWaveformSummaryUpdated();
         connect(pNewTrack.get(), &Track::cuesUpdated, this, &WOverview::receiveCuesUpdated);
+        connect(pNewTrack.get(),
+                &Track::beatsUpdated,
+                this,
+                QOverload<>::of(&WOverview::update));
     } else {
         m_pCurrentTrack.reset();
         m_pWaveform.clear();
@@ -670,6 +694,7 @@ void WOverview::paintEvent(QPaintEvent* pEvent) {
         drawAxis(&painter);
         drawWaveformPixmap(&painter);
         drawPlayedOverlay(&painter);
+        drawBarAndPhraseLines(&painter);
         drawPlayPosition(&painter);
         drawEndOfTrackFrame(&painter);
         drawAnalyzerProgress(&painter);
@@ -714,6 +739,37 @@ void WOverview::drawAxis(QPainter* pPainter) {
     } else {
         pPainter->drawLine(width() / 2, 0, width() / 2, height());
     }
+}
+
+void WOverview::drawBarAndPhraseLines(QPainter* pPainter) {
+    const double trackSamples = getTrackSamples();
+    if (!m_pCurrentTrack || trackSamples <= 0) {
+        return;
+    }
+    WaveformWidgetFactory* widgetFactory = WaveformWidgetFactory::instance();
+    const mixxx::BeatsPointer pBeats = m_pCurrentTrack->getBeats();
+    const auto lines = mixxx::overviewlayout::layoutLines(pBeats.get(),
+            trackSamples,
+            length(),
+            widgetFactory->getOverviewLineSettings());
+
+    PainterScope painterScope(pPainter);
+    pPainter->setOpacity(widgetFactory->getOverviewLineOpacity() / 100.0);
+    const auto drawLines = [&](const std::vector<double>& positions,
+                                   const QColor& color,
+                                   double lineWidth) {
+        pPainter->setPen(QPen(color, lineWidth * m_scaleFactor));
+        for (const double pos : positions) {
+            if (m_orientation == Qt::Horizontal) {
+                pPainter->drawLine(QLineF(pos, 0.0, pos, height()));
+            } else {
+                pPainter->drawLine(QLineF(0.0, pos, width(), pos));
+            }
+        }
+    };
+    drawLines(lines.barLines, m_barLineColor, 1.0);
+    // Phrase lines go last so they sit on top of coinciding bar lines.
+    drawLines(lines.phraseLines, m_phraseLineColor, 2.0);
 }
 
 void WOverview::drawWaveformPixmap(QPainter* pPainter) {
