@@ -506,6 +506,16 @@ bool WaveformWidgetFactory::setConfig(UserSettingsPointer config) {
                 position <= static_cast<int>(BeatLabelPosition::AlwaysLeft)) {
             hoverSettings.position = static_cast<BeatLabelPosition>(position);
         }
+        hoverSettings.showHoverReadout = m_config->getValue(
+                ConfigKey("[Waveform]", "overviewHoverShow"),
+                hoverSettings.showHoverReadout);
+        const int display = m_config->getValue(
+                ConfigKey("[Waveform]", "overviewHoverDisplay"),
+                static_cast<int>(hoverSettings.display));
+        if (display >= static_cast<int>(HoverDisplay::LineAndLabel) &&
+                display <= static_cast<int>(HoverDisplay::LabelOnly)) {
+            hoverSettings.display = static_cast<HoverDisplay>(display);
+        }
         m_overviewHoverReadoutSettings = hoverSettings;
     }
 
@@ -1507,6 +1517,10 @@ void WaveformWidgetFactory::setOverviewHoverReadoutSettings(
                 static_cast<int>(settings.precision));
         m_config->setValue(ConfigKey("[Waveform]", "overviewHoverLabelPosition"),
                 static_cast<int>(settings.position));
+        m_config->setValue(ConfigKey("[Waveform]", "overviewHoverShow"),
+                settings.showHoverReadout);
+        m_config->setValue(ConfigKey("[Waveform]", "overviewHoverDisplay"),
+                static_cast<int>(settings.display));
     }
     emit overviewHoverReadoutSettingsChanged();
 }

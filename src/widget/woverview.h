@@ -172,6 +172,9 @@ class WOverview : public WWidget, public TrackDropTarget {
     // position of the overlay shadow
     int m_iPlayPos;
     bool m_bTimeRulerActive;
+    // Pointer is over the widget (plain hover readout), at m_hoverPos.
+    bool m_bPointerInside;
+    QPointF m_hoverPos;
     Qt::Orientation m_orientation;
     int m_dragMarginH;
     int m_dragMarginV;

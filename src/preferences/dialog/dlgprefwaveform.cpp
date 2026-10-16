@@ -92,6 +92,12 @@ DlgPrefWaveform::DlgPrefWaveform(
     // Populate hover readout options
     {
         using namespace mixxx::overviewlayout;
+        hoverDisplayComboBox->addItem(tr("Line + label"),
+                QVariant(static_cast<int>(HoverDisplay::LineAndLabel)));
+        hoverDisplayComboBox->addItem(
+                tr("Line only"), QVariant(static_cast<int>(HoverDisplay::LineOnly)));
+        hoverDisplayComboBox->addItem(
+                tr("Label only"), QVariant(static_cast<int>(HoverDisplay::LabelOnly)));
         hoverUnitComboBox->addItem(tr("Bars"), QVariant(static_cast<int>(BeatLabelUnit::Bars)));
         hoverUnitComboBox->addItem(tr("Beats"), QVariant(static_cast<int>(BeatLabelUnit::Beats)));
         hoverPrecisionComboBox->addItem(tr("Whole (rounded)"),
@@ -237,6 +243,14 @@ DlgPrefWaveform::DlgPrefWaveform(
             this,
             &DlgPrefWaveform::slotSetUntilMarkTextHeightLimit);
 
+    connect(showHoverReadoutCheckBox,
+            &QCheckBox::toggled,
+            this,
+            &DlgPrefWaveform::slotSetOverviewHoverReadout);
+    connect(hoverDisplayComboBox,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            &DlgPrefWaveform::slotSetOverviewHoverReadout);
     connect(hoverUnitComboBox,
             QOverload<int>::of(&QComboBox::currentIndexChanged),
             this,
@@ -307,6 +321,9 @@ void DlgPrefWaveform::slotUpdate() {
 
     {
         const auto& hoverSettings = factory->getOverviewHoverReadoutSettings();
+        showHoverReadoutCheckBox->setChecked(hoverSettings.showHoverReadout);
+        hoverDisplayComboBox->setCurrentIndex(
+                hoverDisplayComboBox->findData(static_cast<int>(hoverSettings.display)));
         hoverUnitComboBox->setCurrentIndex(
                 hoverUnitComboBox->findData(static_cast<int>(hoverSettings.unit)));
         hoverPrecisionComboBox->setCurrentIndex(
@@ -390,7 +407,10 @@ void DlgPrefWaveform::slotResetToDefaults() {
     // 50 (center) is default
     playMarkerPositionSlider->setValue(50);
 
-    // Hover readout: Bars, Whole (rounded), Auto (each is the first entry).
+    // Hover readout: shown, Line + label, Bars, Whole (rounded), Auto (each
+    // is the first entry).
+    showHoverReadoutCheckBox->setChecked(true);
+    hoverDisplayComboBox->setCurrentIndex(0);
     hoverUnitComboBox->setCurrentIndex(0);
     hoverPrecisionComboBox->setCurrentIndex(0);
     hoverLabelPositionComboBox->setCurrentIndex(0);
@@ -399,6 +419,8 @@ void DlgPrefWaveform::slotResetToDefaults() {
 void DlgPrefWaveform::slotSetOverviewHoverReadout() {
     using namespace mixxx::overviewlayout;
     HoverReadoutSettings settings;
+    settings.showHoverReadout = showHoverReadoutCheckBox->isChecked();
+    settings.display = static_cast<HoverDisplay>(hoverDisplayComboBox->currentData().toInt());
     settings.unit = static_cast<BeatLabelUnit>(hoverUnitComboBox->currentData().toInt());
     settings.precision =
             static_cast<BeatLabelPrecision>(hoverPrecisionComboBox->currentData().toInt());

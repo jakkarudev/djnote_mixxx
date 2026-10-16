@@ -428,3 +428,116 @@ TEST(OverviewLayoutBeatLabelTest, UnloadedTrackShowsNoLabel) {
     input.overviewLength = 0.0;
     EXPECT_FALSE(layoutBeatLabel(input).shown);
 }
+
+// ---------------------------------------------------------------------------
+// Plain hover readout
+// ---------------------------------------------------------------------------
+
+namespace {
+
+BeatLabelCase plainHover() {
+    BeatLabelCase c;
+    c.state = TimeRulerState::Inactive;
+    c.beatsAway(16);
+    return c;
+}
+
+Input hoverInput(const BeatLabelCase& c, bool pointerPresent = true) {
+    Input in = c.input();
+    in.pointerPresent = pointerPresent;
+    return in;
+}
+
+} // namespace
+
+TEST(OverviewLayoutHoverReadoutTest, PointerAbsentShowsNothing) {
+    const auto c = plainHover();
+    const auto in = hoverInput(c, false);
+    EXPECT_FALSE(layoutHoverReadout(in).lineShown);
+    EXPECT_FALSE(layoutBeatLabel(in).shown);
+}
+
+TEST(OverviewLayoutHoverReadoutTest, LineAndLabelByDefault) {
+    const auto c = plainHover();
+    const auto in = hoverInput(c);
+    const auto readout = layoutHoverReadout(in);
+    EXPECT_TRUE(readout.lineShown);
+    EXPECT_DOUBLE_EQ(in.pointerPos, readout.linePos);
+    const auto label = layoutBeatLabel(in);
+    EXPECT_TRUE(label.shown);
+    EXPECT_EQ("+4 bars", label.text);
+    EXPECT_EQ(LabelSlot::OwnBottomRow, label.slot);
+}
+
+TEST(OverviewLayoutHoverReadoutTest, LineOnlyDisplay) {
+    auto c = plainHover();
+    c.settings.display = HoverDisplay::LineOnly;
+    const auto in = hoverInput(c);
+    EXPECT_TRUE(layoutHoverReadout(in).lineShown);
+    EXPECT_FALSE(layoutBeatLabel(in).shown);
+}
+
+TEST(OverviewLayoutHoverReadoutTest, LabelOnlyDisplay) {
+    auto c = plainHover();
+    c.settings.display = HoverDisplay::LabelOnly;
+    const auto in = hoverInput(c);
+    EXPECT_FALSE(layoutHoverReadout(in).lineShown);
+    EXPECT_TRUE(layoutBeatLabel(in).shown);
+}
+
+TEST(OverviewLayoutHoverReadoutTest, ShowHoverReadoutOffShowsNothingOnPlainHover) {
+    auto c = plainHover();
+    c.settings.showHoverReadout = false;
+    const auto in = hoverInput(c);
+    EXPECT_FALSE(layoutHoverReadout(in).lineShown);
+    EXPECT_FALSE(layoutBeatLabel(in).shown);
+}
+
+TEST(OverviewLayoutHoverReadoutTest, ShowHoverReadoutOffHidesBeatLabelOnTimeRuler) {
+    for (auto state : {TimeRulerState::RightClickHold, TimeRulerState::LeftDrag}) {
+        auto c = plainHover();
+        c.state = state;
+        c.settings.showHoverReadout = false;
+        const auto in = hoverInput(c);
+        EXPECT_FALSE(layoutBeatLabel(in).shown);
+        // The time ruler itself is unchanged.
+        EXPECT_TRUE(layoutTimeRuler(in).labelsShown);
+        EXPECT_EQ(state == TimeRulerState::RightClickHold, layoutTimeRuler(in).lineShown);
+    }
+}
+
+TEST(OverviewLayoutHoverReadoutTest, DisplayDoesNotAffectTimeRuler) {
+    auto c = plainHover();
+    c.state = TimeRulerState::RightClickHold;
+    c.settings.display = HoverDisplay::LineOnly;
+    EXPECT_TRUE(layoutBeatLabel(hoverInput(c)).shown);
+}
+
+TEST(OverviewLayoutHoverReadoutTest, NoBeatGridShowsLineOnly) {
+    auto c = plainHover();
+    c.pBeats = nullptr;
+    const auto in = hoverInput(c);
+    EXPECT_TRUE(layoutHoverReadout(in).lineShown);
+    EXPECT_FALSE(layoutBeatLabel(in).shown);
+}
+
+TEST(OverviewLayoutHoverReadoutTest, PlainHoverNeverShowsTimeLabels) {
+    const auto c = plainHover();
+    const auto in = hoverInput(c);
+    EXPECT_FALSE(layoutTimeRuler(in).labelsShown);
+    EXPECT_TRUE(layoutBeatLabel(in).joinedDistanceLabelText.isEmpty());
+}
+
+TEST(OverviewLayoutHoverReadoutTest, ShortOverviewKeepsOwnRowOnPlainHover) {
+    auto c = plainHover();
+    c.breadth = 30.0; // less than three label rows
+    const auto label = layoutBeatLabel(hoverInput(c));
+    EXPECT_EQ(LabelSlot::OwnBottomRow, label.slot);
+    EXPECT_TRUE(label.joinedDistanceLabelText.isEmpty());
+}
+
+TEST(OverviewLayoutHoverReadoutTest, TimeRulerStatesDoNotUseHoverLine) {
+    auto c = plainHover();
+    c.state = TimeRulerState::LeftDrag;
+    EXPECT_FALSE(layoutHoverReadout(hoverInput(c)).lineShown);
+}

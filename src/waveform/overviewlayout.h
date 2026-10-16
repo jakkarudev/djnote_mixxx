@@ -33,9 +33,18 @@ enum class BeatLabelPosition {
     AlwaysLeft,
 };
 
+// What plain hover (no time ruler) shows.
+enum class HoverDisplay {
+    LineAndLabel,
+    LineOnly,
+    LabelOnly,
+};
+
 // Settings of the hover readout (Preferences -> Waveforms -> Hover readout).
 // Later tickets add the remaining hover settings here.
 struct HoverReadoutSettings {
+    bool showHoverReadout = true;
+    HoverDisplay display = HoverDisplay::LineAndLabel;
     BeatLabelUnit unit = BeatLabelUnit::Bars;
     BeatLabelPrecision precision = BeatLabelPrecision::Whole;
     BeatLabelPosition position = BeatLabelPosition::Auto;
@@ -54,6 +63,9 @@ struct Input {
     // Overview length along the track axis, in pixels.
     double overviewLength = 0.0;
     TimeRulerState timeRulerState = TimeRulerState::Inactive;
+    // Whether the pointer is over the overview. Plain hover (this with an
+    // inactive time ruler) uses pointerPos as well.
+    bool pointerPresent = false;
 
     // Hover readout / beat label inputs (see layoutBeatLabel()).
     // The track's beat grid, or nullptr if there is none. Not owned.
@@ -106,9 +118,21 @@ struct BeatLabelLayout {
     QString joinedDistanceLabelText;
 };
 
-// The beat distance label for the active time ruler. Shown iff the time ruler
-// is active and the track has a beat grid.
+// The beat distance label. Shown iff "Show hover readout" is on, the track has
+// a beat grid, and either the time ruler is active or (plain hover) the pointer
+// is present and Display includes the label. Plain hover always uses the own
+// row slot.
 BeatLabelLayout layoutBeatLabel(const Input& input);
+
+// The hover line of plain hover (no time ruler). While the time ruler is
+// active its own line is used instead (layoutTimeRuler()).
+struct HoverReadoutLayout {
+    bool lineShown = false;
+    // Pointer position along the track axis, clamped to [0, overviewLength].
+    double linePos = 0.0;
+};
+
+HoverReadoutLayout layoutHoverReadout(const Input& input);
 
 } // namespace overviewlayout
 } // namespace mixxx

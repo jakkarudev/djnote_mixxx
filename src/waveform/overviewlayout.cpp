@@ -113,7 +113,12 @@ TimeRulerLayout layoutTimeRuler(const Input& input) {
 
 BeatLabelLayout layoutBeatLabel(const Input& input) {
     BeatLabelLayout layout;
-    if (input.timeRulerState == TimeRulerState::Inactive ||
+    const bool rulerActive = input.timeRulerState != TimeRulerState::Inactive;
+    const HoverReadoutSettings& settings = input.hoverReadout;
+    const bool plainHoverLabel = !rulerActive && input.pointerPresent &&
+            settings.display != HoverDisplay::LineOnly;
+    if (!settings.showHoverReadout ||
+            !(rulerActive || plainHoverLabel) ||
             input.pBeats == nullptr ||
             input.trackSamples <= 0.0 ||
             input.overviewLength <= 0.0) {
@@ -131,7 +136,7 @@ BeatLabelLayout layoutBeatLabel(const Input& input) {
             fractionalBeatIndex(*input.pBeats, playPosition);
 
     layout.shown = true;
-    const bool joined = input.overviewBreadth < 3.0 * input.labelHeight;
+    const bool joined = rulerActive && input.overviewBreadth < 3.0 * input.labelHeight;
     if (joined) {
         layout.slot = LabelSlot::JoinedToDistanceLabel;
         layout.side = LabelSide::Right;
@@ -155,6 +160,19 @@ BeatLabelLayout layoutBeatLabel(const Input& input) {
         layout.joinedDistanceLabelText =
                 layoutTimeRuler(input).distanceLabelText + "  " + layout.text;
     }
+    return layout;
+}
+
+HoverReadoutLayout layoutHoverReadout(const Input& input) {
+    HoverReadoutLayout layout;
+    if (input.timeRulerState != TimeRulerState::Inactive ||
+            !input.pointerPresent ||
+            !input.hoverReadout.showHoverReadout ||
+            input.hoverReadout.display == HoverDisplay::LabelOnly) {
+        return layout;
+    }
+    layout.lineShown = true;
+    layout.linePos = std::clamp(input.pointerPos, 0.0, input.overviewLength);
     return layout;
 }
 
