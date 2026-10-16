@@ -2,6 +2,8 @@
 
 #include <QString>
 
+#include "track/beats.h"
+
 // Pure layout logic for the track overview (no widget, painting or GL
 // dependencies). The overview passes in its state and paints the returned
 // description. All positions are "along the track axis": x for horizontal
@@ -13,6 +15,30 @@ enum class TimeRulerState {
     Inactive,
     RightClickHold,
     LeftDrag,
+};
+
+enum class BeatLabelUnit {
+    Bars,
+    Beats,
+};
+
+enum class BeatLabelPrecision {
+    Whole,
+    Fractional,
+};
+
+enum class BeatLabelPosition {
+    Auto,
+    AlwaysRight,
+    AlwaysLeft,
+};
+
+// Settings of the hover readout (Preferences -> Waveforms -> Hover readout).
+// Later tickets add the remaining hover settings here.
+struct HoverReadoutSettings {
+    BeatLabelUnit unit = BeatLabelUnit::Bars;
+    BeatLabelPrecision precision = BeatLabelPrecision::Whole;
+    BeatLabelPosition position = BeatLabelPosition::Auto;
 };
 
 struct Input {
@@ -28,6 +54,16 @@ struct Input {
     // Overview length along the track axis, in pixels.
     double overviewLength = 0.0;
     TimeRulerState timeRulerState = TimeRulerState::Inactive;
+
+    // Hover readout / beat label inputs (see layoutBeatLabel()).
+    // The track's beat grid, or nullptr if there is none. Not owned.
+    const mixxx::Beats* pBeats = nullptr;
+    HoverReadoutSettings hoverReadout;
+    // Height of one label row in pixels, and the overview's extent across
+    // the track axis (height for horizontal, width for vertical overviews).
+    // Used for the "three label rows fit" merge rule.
+    double labelHeight = 0.0;
+    double overviewBreadth = 0.0;
 };
 
 struct TimeRulerLayout {
@@ -43,6 +79,36 @@ struct TimeRulerLayout {
 };
 
 TimeRulerLayout layoutTimeRuler(const Input& input);
+
+// Which side of the line the beat label sits on.
+enum class LabelSide {
+    Right, // "+4 bars"; below the line on vertical overviews
+    Left,  // "bars +4"; above the line on vertical overviews
+};
+
+enum class LabelSlot {
+    // Its own row at the bottom end of the line.
+    OwnBottomRow,
+    // Appended to the time ruler's distance label (overview too short for
+    // three label rows). Always on the right side of the line.
+    JoinedToDistanceLabel,
+};
+
+struct BeatLabelLayout {
+    bool shown = false;
+    // The beat distance label, e.g. "+4 bars" (side Right) or "bars +4"
+    // (side Left).
+    QString text;
+    LabelSide side = LabelSide::Right;
+    LabelSlot slot = LabelSlot::OwnBottomRow;
+    // For slot JoinedToDistanceLabel: the complete replacement text of the
+    // time ruler's distance label, e.g. "-0:32  +4 bars". Empty otherwise.
+    QString joinedDistanceLabelText;
+};
+
+// The beat distance label for the active time ruler. Shown iff the time ruler
+// is active and the track has a beat grid.
+BeatLabelLayout layoutBeatLabel(const Input& input);
 
 } // namespace overviewlayout
 } // namespace mixxx

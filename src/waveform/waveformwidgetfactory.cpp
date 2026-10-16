@@ -481,6 +481,34 @@ bool WaveformWidgetFactory::setConfig(UserSettingsPointer config) {
             m_config->getValue(ConfigKey("[Waveform]", "UntilMarkTextHeightLimit"),
                     toUntilMarkTextHeightLimitIndex(m_untilMarkTextHeightLimit))));
 
+    // Overview hover readout. Out-of-range values fall back to the defaults.
+    {
+        using namespace mixxx::overviewlayout;
+        HoverReadoutSettings hoverSettings;
+        const int unit = m_config->getValue(
+                ConfigKey("[Waveform]", "overviewHoverUnit"),
+                static_cast<int>(hoverSettings.unit));
+        if (unit >= static_cast<int>(BeatLabelUnit::Bars) &&
+                unit <= static_cast<int>(BeatLabelUnit::Beats)) {
+            hoverSettings.unit = static_cast<BeatLabelUnit>(unit);
+        }
+        const int precision = m_config->getValue(
+                ConfigKey("[Waveform]", "overviewHoverPrecision"),
+                static_cast<int>(hoverSettings.precision));
+        if (precision >= static_cast<int>(BeatLabelPrecision::Whole) &&
+                precision <= static_cast<int>(BeatLabelPrecision::Fractional)) {
+            hoverSettings.precision = static_cast<BeatLabelPrecision>(precision);
+        }
+        const int position = m_config->getValue(
+                ConfigKey("[Waveform]", "overviewHoverLabelPosition"),
+                static_cast<int>(hoverSettings.position));
+        if (position >= static_cast<int>(BeatLabelPosition::Auto) &&
+                position <= static_cast<int>(BeatLabelPosition::AlwaysLeft)) {
+            hoverSettings.position = static_cast<BeatLabelPosition>(position);
+        }
+        m_overviewHoverReadoutSettings = hoverSettings;
+    }
+
     return true;
 }
 
@@ -1467,6 +1495,20 @@ void WaveformWidgetFactory::setUntilMarkTextHeightLimit(float value) {
         m_config->setValue(ConfigKey("[Waveform]", "UntilMarkTextHeightLimit"),
                 toUntilMarkTextHeightLimitIndex(m_untilMarkTextHeightLimit));
     }
+}
+
+void WaveformWidgetFactory::setOverviewHoverReadoutSettings(
+        const mixxx::overviewlayout::HoverReadoutSettings& settings) {
+    m_overviewHoverReadoutSettings = settings;
+    if (m_config) {
+        m_config->setValue(ConfigKey("[Waveform]", "overviewHoverUnit"),
+                static_cast<int>(settings.unit));
+        m_config->setValue(ConfigKey("[Waveform]", "overviewHoverPrecision"),
+                static_cast<int>(settings.precision));
+        m_config->setValue(ConfigKey("[Waveform]", "overviewHoverLabelPosition"),
+                static_cast<int>(settings.position));
+    }
+    emit overviewHoverReadoutSettingsChanged();
 }
 
 // static

@@ -10,6 +10,7 @@
 #include "util/performancetimer.h"
 #include "util/singleton.h"
 #include "waveform/overviewlinelayout.h"
+#include "waveform/overviewlayout.h"
 #include "waveform/widgets/waveformwidgettype.h"
 
 class WVuMeterLegacy;
@@ -178,6 +179,15 @@ class WaveformWidgetFactory : public QObject, public Singleton<WaveformWidgetFac
 
     WaveformWidgetType::Type autoChooseWidgetType() const;
 
+    // Overview hover readout settings (unit, precision, label position).
+    // Setting them saves them to the config and notifies all overviews.
+    void setOverviewHoverReadoutSettings(
+            const mixxx::overviewlayout::HoverReadoutSettings& settings);
+    const mixxx::overviewlayout::HoverReadoutSettings&
+    getOverviewHoverReadoutSettings() const {
+        return m_overviewHoverReadoutSettings;
+    }
+
   signals:
     void waveformUpdateTick();
     void waveformMeasured(float frameRate, int droppedFrames);
@@ -189,6 +199,8 @@ class WaveformWidgetFactory : public QObject, public Singleton<WaveformWidgetFac
     void overviewNormalizeChanged();
     void overviewLinesChanged();
     void overallVisualGainChanged();
+
+    void overviewHoverReadoutSettingsChanged();
 
   public slots:
     void slotSkinLoaded();
@@ -262,4 +274,6 @@ class WaveformWidgetFactory : public QObject, public Singleton<WaveformWidgetFac
     double m_actualFrameRate;
     int m_vSyncType;
     double m_playMarkerPosition;
+
+    mixxx::overviewlayout::HoverReadoutSettings m_overviewHoverReadoutSettings;
 };

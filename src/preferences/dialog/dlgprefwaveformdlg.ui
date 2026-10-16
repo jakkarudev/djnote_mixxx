@@ -695,7 +695,60 @@ Select from different types of displays for the waveform, which differ primarily
        </layout>
       </widget>
      </item>
+     <!-- Hover readout group (overview beat distance label) -->
      <item row="17" column="0" colspan="4">
+      <widget class="QGroupBox" name="hoverReadoutGroupBox">
+       <property name="title">
+        <string>Hover readout</string>
+       </property>
+       <layout class="QGridLayout" name="hoverReadoutGridLayout">
+        <item row="0" column="0">
+         <widget class="QLabel" name="hoverUnitLabel">
+          <property name="text">
+           <string>Unit</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="1">
+         <widget class="QComboBox" name="hoverUnitComboBox">
+          <property name="toolTip">
+           <string>Unit of the beat distance shown on the overview while seeking.</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="0">
+         <widget class="QLabel" name="hoverPrecisionLabel">
+          <property name="text">
+           <string>Precision</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="1">
+         <widget class="QComboBox" name="hoverPrecisionComboBox">
+          <property name="toolTip">
+           <string>Whole rounds to the nearest unit. Fractional shows 2 decimals for bars and 1 for beats.</string>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="0">
+         <widget class="QLabel" name="hoverLabelPositionLabel">
+          <property name="text">
+           <string>Label position</string>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="1">
+         <widget class="QComboBox" name="hoverLabelPositionComboBox">
+          <property name="toolTip">
+           <string>Auto places the label right of the line, and left of it once the pointer passes three quarters of the overview.</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </item>
+
+     <item row="18" column="0" colspan="4">
       <widget class="QGroupBox" name="openGLStatus">
        <property name="title">
         <string>OpenGL status</string>

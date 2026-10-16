@@ -112,6 +112,10 @@ WOverview::WOverview(
             &WaveformWidgetFactory::overviewLinesChanged,
             this,
             QOverload<>::of(&WOverview::update));
+    connect(widgetFactory,
+            &WaveformWidgetFactory::overviewHoverReadoutSettingsChanged,
+            this,
+            &WOverview::slotHoverReadoutSettingsChanged);
 
     m_pPassthroughLabel = make_parented<QLabel>(this);
 
@@ -468,6 +472,10 @@ void WOverview::slotTypeControlChanged(double v) {
 }
 
 void WOverview::slotNormalizeOrVisualGainChanged() {
+    update();
+}
+
+void WOverview::slotHoverReadoutSettingsChanged() {
     update();
 }
 
@@ -1216,6 +1224,19 @@ void WOverview::drawTimeRuler(QPainter* pPainter) {
     }
     const TimeRulerLayout layout = layoutTimeRuler(input);
 
+    // Beat distance label
+    mixxx::BeatsPointer pBeats;
+    if (m_bTimeRulerActive && m_pCurrentTrack) {
+        pBeats = m_pCurrentTrack->getBeats();
+    }
+    input.pBeats = pBeats.get();
+    input.hoverReadout = WaveformWidgetFactory::instance()->getOverviewHoverReadoutSettings();
+    input.labelHeight = fontMetrics.height();
+    input.overviewBreadth = breadth();
+    const BeatLabelLayout beatLayout = layoutBeatLabel(input);
+    const bool beatLabelJoined = beatLayout.shown &&
+            beatLayout.slot == LabelSlot::JoinedToDistanceLabel;
+
     if (layout.labelsShown) {
         if (layout.lineShown) {
             QLineF line;
@@ -1255,16 +1276,48 @@ void WOverview::drawTimeRuler(QPainter* pPainter) {
 
         m_timeRulerDistanceLabel.prerender(textPointDistance,
                 QPixmap(),
-                layout.distanceLabelText,
+                beatLabelJoined ? beatLayout.joinedDistanceLabelText
+                                : layout.distanceLabelText,
                 markerFont,
                 m_labelTextColor,
                 m_labelBackgroundColor,
                 width(),
                 devicePixelRatioF());
         m_timeRulerDistanceLabel.draw(pPainter);
+
+        if (beatLayout.shown && !beatLabelJoined) {
+            // At the bottom end of the line, on the side chosen by the layout.
+            // Vertical overviews: below (right) or above (left) the line,
+            // at the far end of the line.
+            const qreal textWidth =
+                    fontMetrics.boundingRect(beatLayout.text).width() + 4.0;
+            const bool right = beatLayout.side == LabelSide::Right;
+            QPointF textPointBeats;
+            if (m_orientation == Qt::Horizontal) {
+                textPointBeats = QPointF(right ? m_timeRulerPos.x() + padding
+                                               : m_timeRulerPos.x() - padding - textWidth,
+                        height());
+            } else {
+                textPointBeats = QPointF(width(),
+                        right ? m_timeRulerPos.y() + padding + fontMetrics.height()
+                              : m_timeRulerPos.y() - padding);
+            }
+            m_timeRulerBeatLabel.prerender(textPointBeats,
+                    QPixmap(),
+                    beatLayout.text,
+                    markerFont,
+                    m_labelTextColor,
+                    m_labelBackgroundColor,
+                    width(),
+                    devicePixelRatioF());
+            m_timeRulerBeatLabel.draw(pPainter);
+        } else {
+            m_timeRulerBeatLabel.clear();
+        }
     } else {
         m_timeRulerPositionLabel.clear();
         m_timeRulerDistanceLabel.clear();
+        m_timeRulerBeatLabel.clear();
     }
 }
 
@@ -1285,6 +1338,9 @@ void WOverview::drawMarkLabels(QPainter* pPainter, const float offset, const flo
             continue;
         }
         if (pMark->m_label.intersects(m_timeRulerPositionLabel) || pMark->m_label.intersects(m_timeRulerDistanceLabel)) {
+            continue;
+        }
+        if (pMark->m_label.intersects(m_timeRulerBeatLabel)) {
             continue;
         }
 
@@ -1334,7 +1390,7 @@ void WOverview::drawMarkLabels(QPainter* pPainter, const float offset, const flo
                     width(),
                     devicePixelRatioF());
 
-            if (!(markRange.m_durationLabel.intersects(m_cuePositionLabel) || markRange.m_durationLabel.intersects(m_cueTimeDistanceLabel) || markRange.m_durationLabel.intersects(m_timeRulerPositionLabel) || markRange.m_durationLabel.intersects(m_timeRulerDistanceLabel))) {
+            if (!(markRange.m_durationLabel.intersects(m_cuePositionLabel) || markRange.m_durationLabel.intersects(m_cueTimeDistanceLabel) || markRange.m_durationLabel.intersects(m_timeRulerPositionLabel) || markRange.m_durationLabel.intersects(m_timeRulerDistanceLabel) || markRange.m_durationLabel.intersects(m_timeRulerBeatLabel))) {
                 markRange.m_durationLabel.draw(pPainter);
             }
         }
