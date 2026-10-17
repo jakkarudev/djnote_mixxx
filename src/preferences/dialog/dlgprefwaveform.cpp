@@ -115,6 +115,14 @@ DlgPrefWaveform::DlgPrefWaveform(
                 QVariant(static_cast<int>(HoverReadoutPosition::AlwaysRight)));
         hoverLabelPositionComboBox->addItem(tr("Always left"),
                 QVariant(static_cast<int>(HoverReadoutPosition::AlwaysLeft)));
+        hoverOverCueComboBox->addItem(
+                tr("Join cue times"), QVariant(static_cast<int>(OverCue::JoinCueTimes)));
+        hoverOverCueComboBox->addItem(tr("Hide hover readout"),
+                QVariant(static_cast<int>(OverCue::HideHoverReadout)));
+        hoverOverCueComboBox->addItem(
+                tr("Hide cue times"), QVariant(static_cast<int>(OverCue::HideCueTimes)));
+        hoverOverCueComboBox->addItem(tr("Move hover readout"),
+                QVariant(static_cast<int>(OverCue::MoveHoverReadout)));
     }
 
     // The GUI is not fully setup so connecting signals before calling
@@ -272,6 +280,10 @@ DlgPrefWaveform::DlgPrefWaveform(
             QOverload<int>::of(&QComboBox::currentIndexChanged),
             this,
             &DlgPrefWaveform::slotSetOverviewHoverReadout);
+    connect(hoverOverCueComboBox,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            &DlgPrefWaveform::slotSetOverviewHoverReadout);
 
     setScrollSafeGuardForAllInputWidgets(this);
 }
@@ -422,6 +434,8 @@ void DlgPrefWaveform::showHoverReadoutControls(
             hoverPrecisionComboBox->findData(static_cast<int>(settings.precision)));
     hoverLabelPositionComboBox->setCurrentIndex(
             hoverLabelPositionComboBox->findData(static_cast<int>(settings.position)));
+    hoverOverCueComboBox->setCurrentIndex(
+            hoverOverCueComboBox->findData(static_cast<int>(settings.overCue)));
 }
 
 void DlgPrefWaveform::slotSetOverviewHoverReadout() {
@@ -435,6 +449,7 @@ void DlgPrefWaveform::slotSetOverviewHoverReadout() {
             static_cast<BeatDistancePrecision>(hoverPrecisionComboBox->currentData().toInt());
     settings.position =
             static_cast<HoverReadoutPosition>(hoverLabelPositionComboBox->currentData().toInt());
+    settings.overCue = static_cast<OverCue>(hoverOverCueComboBox->currentData().toInt());
     WaveformWidgetFactory::instance()->setOverviewHoverReadoutSettings(settings);
 }
 

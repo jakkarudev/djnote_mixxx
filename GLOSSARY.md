@@ -28,6 +28,10 @@ _Avoid_: seek preview, drag ruler
 The label next to the hover line that shows the beat distance, in beats or in bars.
 _Avoid_: tooltip, beat counter
 
+**Cue times**:
+The position and time-distance labels shown next to a cue while the pointer is over the cue's line or label. They come from Mixxx and are neither the time ruler nor the hover readout.
+_Avoid_: cue tooltip, cue hover time
+
 **Beat line** / **Bar line** / **Phrase line**:
 A vertical line drawn on a waveform at the start of a beat, bar or phrase. They are drawn from the beat grid but are not the beat grid.
 _Avoid_: bar grid, phrase grid, grid lines

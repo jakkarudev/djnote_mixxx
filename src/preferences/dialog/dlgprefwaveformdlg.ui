@@ -782,6 +782,20 @@ Select from different types of displays for the waveform, which differ primarily
           </property>
          </widget>
         </item>
+        <item row="6" column="0">
+         <widget class="QLabel" name="hoverOverCueLabel">
+          <property name="text">
+           <string>Over a cue</string>
+          </property>
+         </widget>
+        </item>
+        <item row="6" column="1">
+         <widget class="QComboBox" name="hoverOverCueComboBox">
+          <property name="toolTip">
+           <string>What to do when the pointer is over a cue, where Mixxx shows cue times. The beat distance is then measured to the cue. Join cue times: add it to the cue times. Hide hover readout: don't show it. Hide cue times: hide the cue times instead. Move hover readout: show it left of the cue line.</string>
+          </property>
+         </widget>
+        </item>
        </layout>
       </widget>
      </item>

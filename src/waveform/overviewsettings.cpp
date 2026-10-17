@@ -20,6 +20,7 @@ const ConfigKey kHoverUnitCfgKey(kWaveformGroup, QStringLiteral("overviewHoverUn
 const ConfigKey kHoverPrecisionCfgKey(kWaveformGroup, QStringLiteral("overviewHoverPrecision"));
 const ConfigKey kHoverLabelPositionCfgKey(
         kWaveformGroup, QStringLiteral("overviewHoverLabelPosition"));
+const ConfigKey kHoverOverCueCfgKey(kWaveformGroup, QStringLiteral("overviewHoverOverCue"));
 
 // Reads an enum stored as int. Anything outside first..last (the enum's
 // consecutive values) yields defaultValue.
@@ -91,6 +92,11 @@ HoverReadoutSettings loadHoverReadoutSettings(const UserSettingsPointer& pConfig
             settings.position,
             HoverReadoutPosition::Auto,
             HoverReadoutPosition::AlwaysLeft);
+    settings.overCue = readEnum(pConfig,
+            kHoverOverCueCfgKey,
+            settings.overCue,
+            OverCue::JoinCueTimes,
+            OverCue::MoveHoverReadout);
     return settings;
 }
 
@@ -102,6 +108,7 @@ void saveHoverReadoutSettings(
     writeEnum(pConfig, kHoverUnitCfgKey, settings.unit);
     writeEnum(pConfig, kHoverPrecisionCfgKey, settings.precision);
     writeEnum(pConfig, kHoverLabelPositionCfgKey, settings.position);
+    writeEnum(pConfig, kHoverOverCueCfgKey, settings.overCue);
 }
 
 } // namespace overviewlayout

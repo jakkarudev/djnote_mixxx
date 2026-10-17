@@ -107,7 +107,7 @@ class WOverview : public WWidget, public TrackDropTarget {
     void drawRangeMarks(QPainter* pPainter, const float& offset, const float& gain);
     void drawMarks(QPainter* pPainter, const float offset, const float gain);
     void drawPickupPosition(QPainter* pPainter);
-    void drawTimeRuler(QPainter* pPainter);
+    void drawTimeRuler(QPainter* pPainter, const float offset, const float gain);
     void drawHoverLine(QPainter* pPainter, double linePos);
     void drawPlainHover(QPainter* pPainter,
             const mixxx::overviewlayout::HoverLineLayout& lineLayout,
@@ -246,5 +246,7 @@ class WOverview : public WWidget, public TrackDropTarget {
     WaveformMarkSet m_marks;
     std::vector<WaveformMarkRange> m_markRanges;
     WaveformMarkLabel m_cuePositionLabel;
+    // Where drawMarks puts the cue times' distance label.
+    QPointF m_cueTimeDistancePoint;
     WaveformMarkLabel m_cueTimeDistanceLabel;
 };

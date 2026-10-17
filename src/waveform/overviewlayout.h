@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QString>
+#include <functional>
 
 #include "track/beats.h"
 
@@ -50,6 +51,19 @@ enum class HoverMode {
     SeparateHoverLine,
 };
 
+// What happens when the pointer is over a cue (its line or its label), where
+// Mixxx draws cue times that would collide with the hover readout.
+enum class OverCue {
+    // The beat distance is appended to the cue times' distance label.
+    JoinCueTimes,
+    // The hover readout is not drawn.
+    HideHoverReadout,
+    // The cue times are not drawn; the hover readout is drawn at the cue line.
+    HideCueTimes,
+    // The hover readout is drawn left of the cue line.
+    MoveHoverReadout,
+};
+
 // Settings of the hover readout (Preferences -> Waveforms -> Hover readout).
 // Later tickets add the remaining hover settings here.
 struct HoverReadoutSettings {
@@ -59,6 +73,7 @@ struct HoverReadoutSettings {
     BeatDistancePrecision precision = BeatDistancePrecision::Whole;
     HoverReadoutPosition position = HoverReadoutPosition::Auto;
     HoverMode hoverMode = HoverMode::ExtendTimeRuler;
+    OverCue overCue = OverCue::JoinCueTimes;
 };
 
 struct Input {
@@ -87,6 +102,25 @@ struct Input {
     // Used for the "three label rows fit" merge rule.
     double labelHeight = 0.0;
     double overviewBreadth = 0.0;
+
+    // The cue the pointer is over (line or label), if any. While one is
+    // hovered, the cue is the target of the hover readout and plain hover has
+    // no hover line. Never set while the time ruler is active.
+    bool cueHovered = false;
+    // Its position in engine samples, and along the track axis in overview
+    // pixels (not necessarily proportional to the samples: the overview
+    // insets its marks).
+    double hoveredCueSamples = 0.0;
+    double hoveredCuePos = 0.0;
+    // Whether the skin shows cue times (ShowCueTimes).
+    bool cueTimesShown = true;
+
+    // Width in pixels of a label with the given text, including its padding.
+    // Only used to decide whether a hover readout left of a cue fits. Unset
+    // counts as zero width.
+    std::function<double(const QString&)> labelWidth;
+    // Gap between a line and a label next to it, in pixels.
+    double labelGap = 0.0;
 };
 
 struct TimeRulerLayout {
@@ -115,6 +149,9 @@ enum class LabelSlot {
     // Appended to the time ruler's distance label (overview too short for
     // three label rows). Always on the right side of the line.
     JoinedToDistanceLabel,
+    // Appended to the cue times' distance label (a cue is hovered). Always on
+    // the right side of the cue line.
+    JoinedToCueTimeDistanceLabel,
 };
 
 struct HoverReadoutLayout {
@@ -124,15 +161,20 @@ struct HoverReadoutLayout {
     QString text;
     LabelSide side = LabelSide::Right;
     LabelSlot slot = LabelSlot::OwnBottomRow;
-    // For slot JoinedToDistanceLabel: the complete replacement text of the
-    // time ruler's distance label, e.g. "-0:32  +4 bars". Empty otherwise.
+    // For slots JoinedToDistanceLabel and JoinedToCueTimeDistanceLabel: the
+    // complete replacement text of the time ruler's respectively the cue
+    // times' distance label, e.g. "-0:32  +4 bars". Empty otherwise.
     QString joinedDistanceLabelText;
+    // Where the line the readout is attached to is, along the track axis in
+    // overview pixels: the pointer clamped to the overview, or the hovered
+    // cue's position.
+    double anchorPos = 0.0;
 };
 
 // The hover readout. Shown iff "Show hover readout" is on, the track has
 // a beat grid, and either the time ruler is active or (plain hover) the pointer
-// is present and Display includes the label. Plain hover always uses the own
-// row slot.
+// is present and Display includes the label. Plain hover uses the own row slot,
+// except over a cue (see OverCue), where the readout is measured to the cue.
 HoverReadoutLayout layoutHoverReadout(const Input& input);
 
 // The hover line of plain hover (no time ruler). While the time ruler is
@@ -143,7 +185,17 @@ struct HoverLineLayout {
     double linePos = 0.0;
 };
 
+// Hidden while a cue is hovered: the cue's own line marks the spot.
 HoverLineLayout layoutHoverLine(const Input& input);
+
+// The cue times (position and time distance labels) Mixxx draws for the
+// hovered cue.
+struct CueTimesLayout {
+    // True if neither label is drawn (OverCue::HideCueTimes in effect).
+    bool hidden = false;
+};
+
+CueTimesLayout layoutCueTimes(const Input& input);
 
 } // namespace overviewlayout
 } // namespace mixxx

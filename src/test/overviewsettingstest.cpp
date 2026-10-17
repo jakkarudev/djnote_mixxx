@@ -48,6 +48,7 @@ TEST_F(OverviewSettingsTest, EmptyConfigYieldsDefaults) {
     EXPECT_EQ(defaults.showHoverReadout, hover.showHoverReadout);
     EXPECT_EQ(defaults.display, hover.display);
     EXPECT_EQ(defaults.hoverMode, hover.hoverMode);
+    EXPECT_EQ(OverCue::JoinCueTimes, hover.overCue);
     EXPECT_EQ(defaults.unit, hover.unit);
     EXPECT_EQ(defaults.precision, hover.precision);
     EXPECT_EQ(defaults.position, hover.position);
@@ -81,6 +82,7 @@ TEST_F(OverviewSettingsTest, HoverReadoutSettingsRoundTrip) {
     saved.showHoverReadout = false;
     saved.display = HoverDisplay::LabelOnly;
     saved.hoverMode = HoverMode::SeparateHoverLine;
+    saved.overCue = OverCue::MoveHoverReadout;
     saved.unit = BeatDistanceUnit::Beats;
     saved.precision = BeatDistancePrecision::Fractional;
     saved.position = HoverReadoutPosition::AlwaysLeft;
@@ -90,6 +92,7 @@ TEST_F(OverviewSettingsTest, HoverReadoutSettingsRoundTrip) {
     EXPECT_FALSE(loaded.showHoverReadout);
     EXPECT_EQ(HoverDisplay::LabelOnly, loaded.display);
     EXPECT_EQ(HoverMode::SeparateHoverLine, loaded.hoverMode);
+    EXPECT_EQ(OverCue::MoveHoverReadout, loaded.overCue);
     EXPECT_EQ(BeatDistanceUnit::Beats, loaded.unit);
     EXPECT_EQ(BeatDistancePrecision::Fractional, loaded.precision);
     EXPECT_EQ(HoverReadoutPosition::AlwaysLeft, loaded.position);
@@ -108,4 +111,17 @@ TEST_F(OverviewSettingsTest, InvalidHoverReadoutSettingsFallBackIndividually) {
     EXPECT_EQ(HoverReadoutPosition::AlwaysLeft, loaded.position);
     EXPECT_EQ(defaults.display, loaded.display);
     EXPECT_EQ(HoverMode::SeparateHoverLine, loaded.hoverMode);
+}
+
+TEST_F(OverviewSettingsTest, OverCueIsStoredUnderItsOwnKeyAndValidated) {
+    HoverReadoutSettings saved;
+    saved.overCue = OverCue::HideCueTimes;
+    saveHoverReadoutSettings(config(), saved);
+    EXPECT_EQ(static_cast<int>(OverCue::HideCueTimes),
+            config()->getValue(ConfigKey(kGroup, QStringLiteral("overviewHoverOverCue")), -1));
+
+    setInt(QStringLiteral("overviewHoverOverCue"), 4);
+    EXPECT_EQ(OverCue::JoinCueTimes, loadHoverReadoutSettings(config()).overCue);
+    setInt(QStringLiteral("overviewHoverOverCue"), -1);
+    EXPECT_EQ(OverCue::JoinCueTimes, loadHoverReadoutSettings(config()).overCue);
 }

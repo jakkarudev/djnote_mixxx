@@ -51,6 +51,9 @@ class OverviewHoverReadout {
 // overview length.
 constexpr double kAutoSideSwitchFraction = 0.75;
 
+// Slack for floating point error when checking whether a label fits.
+constexpr double kFitTolerance = 1e-6;
+
 // Fractional index of a track position on the beat grid: 0 at the grid's first
 // marker, +1 at every following beat, linear inside a beat interval.
 double fractionalBeatIndex(const Beats& beats, audio::FramePos position) {
@@ -95,6 +98,44 @@ double samplesToSeconds(const Input& input, double samples) {
     return trackTime / input.rateRatio;
 }
 
+// "M:SS" of a signed time distance, with a minus sign if negative.
+QString formatTimeDistance(double timeDistance) {
+    QString text = Duration::formatTime(std::fabs(timeDistance));
+    // Cast to int to avoid confusingly switching from -0:00 to 0:00 as
+    // the playhead passes the point
+    if (static_cast<int>(timeDistance) < 0) {
+        text = "-" + text;
+    }
+    return text;
+}
+
+// Whether the pointer targets the hovered cue instead of itself. The time
+// ruler disables cue hovering, but be safe.
+bool targetsCue(const Input& input) {
+    return input.cueHovered && input.timeRulerState == TimeRulerState::Inactive;
+}
+
+// Whether a hover readout label would be shown if no cue were hovered.
+bool readoutLabelPossible(const Input& input) {
+    const bool rulerActive = input.timeRulerState != TimeRulerState::Inactive;
+    const HoverReadoutSettings& settings = input.hoverReadout;
+    const bool plainHoverLabel = !rulerActive && input.pointerPresent &&
+            settings.display != HoverDisplay::LineOnly;
+    const bool rulerLabel = rulerActive &&
+            settings.hoverMode == HoverMode::ExtendTimeRuler;
+    return settings.showHoverReadout &&
+            (rulerLabel || plainHoverLabel) &&
+            input.pBeats != nullptr &&
+            input.trackSamples > 0.0 &&
+            input.overviewLength > 0.0;
+}
+
+// Whether the Over a cue setting applies: a cue is hovered, the skin shows
+// cue times, and there is a hover readout label that could collide with them.
+bool overCueInEffect(const Input& input) {
+    return targetsCue(input) && input.cueTimesShown && readoutLabelPossible(input);
+}
+
 } // namespace
 
 TimeRulerLayout layoutTimeRuler(const Input& input) {
@@ -117,46 +158,46 @@ TimeRulerLayout layoutTimeRuler(const Input& input) {
     layout.positionLabelText = Duration::formatTime(timePosition) + " -" +
             Duration::formatTime(timePositionTillEnd);
 
-    layout.distanceLabelText = Duration::formatTime(std::fabs(timeDistance));
-    // Cast to int to avoid confusingly switching from -0:00 to 0:00 as
-    // the playhead passes the point
-    if (static_cast<int>(timeDistance) < 0) {
-        layout.distanceLabelText = "-" + layout.distanceLabelText;
-    }
+    layout.distanceLabelText = formatTimeDistance(timeDistance);
     return layout;
 }
 
 HoverReadoutLayout layoutHoverReadout(const Input& input) {
     HoverReadoutLayout layout;
+    if (!readoutLabelPossible(input)) {
+        return layout;
+    }
     const bool rulerActive = input.timeRulerState != TimeRulerState::Inactive;
-    const HoverReadoutSettings& settings = input.hoverReadout;
-    const bool plainHoverLabel = !rulerActive && input.pointerPresent &&
-            settings.display != HoverDisplay::LineOnly;
-    const bool rulerLabel = rulerActive &&
-            settings.hoverMode == HoverMode::ExtendTimeRuler;
-    if (!settings.showHoverReadout ||
-            !(rulerLabel || plainHoverLabel) ||
-            input.pBeats == nullptr ||
-            input.trackSamples <= 0.0 ||
-            input.overviewLength <= 0.0) {
+    const bool cueTarget = targetsCue(input);
+    const bool overCueEffective = overCueInEffect(input);
+    const OverCue overCue = input.hoverReadout.overCue;
+    if (overCueEffective && overCue == OverCue::HideHoverReadout) {
         return layout;
     }
 
-    const double pointerFraction =
-            std::clamp(input.pointerPos, 0.0, input.overviewLength) /
-            input.overviewLength;
-    const auto pointerPosition = audio::FramePos::fromEngineSamplePos(
-            pointerFraction * input.trackSamples);
+    // The hovered cue, not the pointer, is the target while a cue is hovered.
+    const double targetPos = cueTarget
+            ? input.hoveredCuePos
+            : std::clamp(input.pointerPos, 0.0, input.overviewLength);
+    const double targetSamples = cueTarget
+            ? input.hoveredCueSamples
+            : targetPos / input.overviewLength * input.trackSamples;
+    const double targetFraction = targetPos / input.overviewLength;
+    const auto targetPosition = audio::FramePos::fromEngineSamplePos(targetSamples);
     const auto playPosition = audio::FramePos::fromEngineSamplePos(
             input.playPositionFraction * input.trackSamples);
-    const double beatDistance = fractionalBeatIndex(*input.pBeats, pointerPosition) -
+    const double beatDistance = fractionalBeatIndex(*input.pBeats, targetPosition) -
             fractionalBeatIndex(*input.pBeats, playPosition);
 
-    layout.shown = true;
+    layout.anchorPos = targetPos;
     const bool joined = rulerActive && input.overviewBreadth < 3.0 * input.labelHeight;
-    if (joined) {
-        layout.slot = LabelSlot::JoinedToDistanceLabel;
+    const bool joinedToCue = overCueEffective && overCue == OverCue::JoinCueTimes;
+    if (joined || joinedToCue) {
+        layout.slot = joined ? LabelSlot::JoinedToDistanceLabel
+                             : LabelSlot::JoinedToCueTimeDistanceLabel;
         layout.side = LabelSide::Right;
+    } else if (overCueEffective && overCue == OverCue::MoveHoverReadout) {
+        layout.side = LabelSide::Left;
     } else {
         switch (input.hoverReadout.position) {
         case HoverReadoutPosition::AlwaysRight:
@@ -166,17 +207,31 @@ HoverReadoutLayout layoutHoverReadout(const Input& input) {
             layout.side = LabelSide::Left;
             break;
         case HoverReadoutPosition::Auto:
-            layout.side = pointerFraction > kAutoSideSwitchFraction
+            layout.side = targetFraction > kAutoSideSwitchFraction
                     ? LabelSide::Left
                     : LabelSide::Right;
             break;
         }
     }
     layout.text = formatBeatDistance(beatDistance, input.hoverReadout, layout.side);
+    if (overCueEffective && overCue == OverCue::MoveHoverReadout) {
+        // There is no room to move it before the start edge.
+        const double width = input.labelWidth ? input.labelWidth(layout.text) : 0.0;
+        if (layout.anchorPos - input.labelGap - width < -kFitTolerance) {
+            return HoverReadoutLayout();
+        }
+    }
     if (joined) {
         layout.joinedDistanceLabelText =
                 layoutTimeRuler(input).distanceLabelText + "  " + layout.text;
+    } else if (joinedToCue) {
+        const double cueDistanceSamples = input.hoveredCueSamples -
+                input.playPositionFraction * input.trackSamples;
+        layout.joinedDistanceLabelText =
+                formatTimeDistance(samplesToSeconds(input, cueDistanceSamples)) +
+                "  " + layout.text;
     }
+    layout.shown = true;
     return layout;
 }
 
@@ -184,12 +239,20 @@ HoverLineLayout layoutHoverLine(const Input& input) {
     HoverLineLayout layout;
     if (input.timeRulerState != TimeRulerState::Inactive ||
             !input.pointerPresent ||
+            targetsCue(input) ||
             !input.hoverReadout.showHoverReadout ||
             input.hoverReadout.display == HoverDisplay::LabelOnly) {
         return layout;
     }
     layout.lineShown = true;
     layout.linePos = std::clamp(input.pointerPos, 0.0, input.overviewLength);
+    return layout;
+}
+
+CueTimesLayout layoutCueTimes(const Input& input) {
+    CueTimesLayout layout;
+    layout.hidden = overCueInEffect(input) &&
+            input.hoverReadout.overCue == OverCue::HideCueTimes;
     return layout;
 }
 
