@@ -17,7 +17,7 @@ The vertical line on a waveform that marks the play position: what the deck is c
 _Avoid_: playhead, cursor, play position line
 
 **Hover line**:
-A vertical line, drawn in the play marker's color, that follows the mouse pointer while it is over the overview. Depending on the hover mode, it is either the time ruler's line or a separate line.
+A vertical line, drawn in the play marker's color, that follows the mouse pointer while it is over the overview. With snapped seeks on, it snaps to the bar line (or, in beats, the beat) nearest the pointer. Depending on the hover mode, it is either the time ruler's line or a separate line.
 _Avoid_: cursor, white line, hover marker
 
 **Time ruler**:
@@ -27,6 +27,14 @@ _Avoid_: seek preview, drag ruler
 **Hover readout**:
 The label next to the hover line that shows the beat distance, in beats or in bars.
 _Avoid_: tooltip, beat counter
+
+**Cue times**:
+The position and time-distance labels shown next to a cue while the pointer is over the cue's line or label. They come from Mixxx and are neither the time ruler nor the hover readout.
+_Avoid_: cue tooltip, cue hover time
+
+**Snapped seek**:
+A seek from the overview that moves the play position by a whole number of bars or beats along the beat grid, keeping the play position's offset from the grid. Mixxx's Quantize is a different thing.
+_Avoid_: quantized seek, grid seek
 
 **Beat line** / **Bar line** / **Phrase line**:
 A vertical line drawn on a waveform at the start of a beat, bar or phrase. They are drawn from the beat grid but are not the beat grid.

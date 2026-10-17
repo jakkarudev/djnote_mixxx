@@ -892,6 +892,7 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/engine/controls/loopingcontrol.cpp
   src/engine/controls/quantizecontrol.cpp
   src/engine/controls/ratecontrol.cpp
+  src/engine/controls/snappedseekcontrol.cpp
   src/engine/effects/engineeffect.cpp
   src/engine/effects/engineeffectchain.cpp
   src/engine/effects/engineeffectsdelay.cpp
@@ -1272,6 +1273,9 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/waveform/vsyncthread.cpp
   src/waveform/waveform.cpp
   src/waveform/waveformfactory.cpp
+  src/waveform/overviewlayout.cpp
+  src/waveform/overviewlinelayout.cpp
+  src/waveform/overviewsettings.cpp
   src/waveform/waveformmarklabel.cpp
   src/waveform/waveformwidgetfactory.cpp
   src/waveform/widgets/emptywaveformwidget.cpp
@@ -2161,6 +2165,9 @@ if(BUILD_TESTING)
     src/test/directorydaotest.cpp
     src/test/duration_test.cpp
     src/test/durationutiltest.cpp
+    src/test/overviewlayouttest.cpp
+    src/test/overviewlinelayouttest.cpp
+    src/test/overviewsettingstest.cpp
     #TODO: write useful tests for refactored effects system
     #src/test/effectchainslottest.cpp
     src/test/enginebufferscalelineartest.cpp
@@ -2213,6 +2220,7 @@ if(BUILD_TESTING)
     src/test/seratotagstest.cpp
     src/test/signalpathtest.cpp
     src/test/skincontext_test.cpp
+    src/test/snappedseekcontrol_test.cpp
     src/test/softtakeover_test.cpp
     src/test/soundproxy_test.cpp
     src/test/soundsourceproviderregistrytest.cpp

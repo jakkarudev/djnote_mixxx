@@ -8,6 +8,7 @@
 #include "moc_dlgprefwaveform.cpp"
 #include "preferences/waveformsettings.h"
 #include "util/db/dbconnectionpooled.h"
+#include "waveform/overviewlinelayout.h"
 #include "waveform/renderers/waveformwidgetrenderer.h"
 #include "waveform/waveformwidgetfactory.h"
 #include "widget/woverview.h"
@@ -76,6 +77,53 @@ DlgPrefWaveform::DlgPrefWaveform(
 
     untilMarkTextHeightLimitComboBox->addItem(tr("1/3rd of waveform viewer"));
     untilMarkTextHeightLimitComboBox->addItem(tr("Full waveform viewer height"));
+
+    // Populate overview lines options
+    overviewLinesComboBox->addItem(tr("Bars + phrases"),
+            static_cast<int>(mixxx::overviewlayout::LinesMode::BarsAndPhrases));
+    overviewLinesComboBox->addItem(tr("Phrases only"),
+            static_cast<int>(mixxx::overviewlayout::LinesMode::PhrasesOnly));
+    overviewLinesComboBox->addItem(tr("Off"),
+            static_cast<int>(mixxx::overviewlayout::LinesMode::Off));
+    for (const int bars : mixxx::overviewlayout::kPhraseBarsChoices) {
+        // All choices are plural; the count selects the plural form.
+        overviewPhraseBarsComboBox->addItem(tr("%1 bars", "", bars).arg(bars), bars);
+    }
+
+    // Populate hover readout options
+    {
+        using namespace mixxx::overviewlayout;
+        hoverDisplayComboBox->addItem(tr("Line + label"),
+                QVariant(static_cast<int>(HoverDisplay::LineAndLabel)));
+        hoverDisplayComboBox->addItem(
+                tr("Line only"), QVariant(static_cast<int>(HoverDisplay::LineOnly)));
+        hoverDisplayComboBox->addItem(
+                tr("Label only"), QVariant(static_cast<int>(HoverDisplay::LabelOnly)));
+        hoverModeComboBox->addItem(tr("Extend time ruler"),
+                QVariant(static_cast<int>(HoverMode::ExtendTimeRuler)));
+        hoverModeComboBox->addItem(tr("Separate hover line"),
+                QVariant(static_cast<int>(HoverMode::SeparateHoverLine)));
+        hoverUnitComboBox->addItem(tr("Bars"), QVariant(static_cast<int>(BeatDistanceUnit::Bars)));
+        hoverUnitComboBox->addItem(tr("Beats"), QVariant(static_cast<int>(BeatDistanceUnit::Beats)));
+        hoverPrecisionComboBox->addItem(tr("Whole (rounded)"),
+                QVariant(static_cast<int>(BeatDistancePrecision::Whole)));
+        hoverPrecisionComboBox->addItem(tr("Fractional"),
+                QVariant(static_cast<int>(BeatDistancePrecision::Fractional)));
+        hoverLabelPositionComboBox->addItem(
+                tr("Auto"), QVariant(static_cast<int>(HoverReadoutPosition::Auto)));
+        hoverLabelPositionComboBox->addItem(tr("Always right"),
+                QVariant(static_cast<int>(HoverReadoutPosition::AlwaysRight)));
+        hoverLabelPositionComboBox->addItem(tr("Always left"),
+                QVariant(static_cast<int>(HoverReadoutPosition::AlwaysLeft)));
+        hoverOverCueComboBox->addItem(
+                tr("Join cue times"), QVariant(static_cast<int>(HoverOverCue::JoinCueTimes)));
+        hoverOverCueComboBox->addItem(tr("Hide hover readout"),
+                QVariant(static_cast<int>(HoverOverCue::HideHoverReadout)));
+        hoverOverCueComboBox->addItem(
+                tr("Hide cue times"), QVariant(static_cast<int>(HoverOverCue::HideCueTimes)));
+        hoverOverCueComboBox->addItem(tr("Move hover readout"),
+                QVariant(static_cast<int>(HoverOverCue::MoveHoverReadout)));
+    }
 
     // The GUI is not fully setup so connecting signals before calling
     // slotUpdate can generate rebootMixxxView calls.
@@ -151,6 +199,26 @@ DlgPrefWaveform::DlgPrefWaveform(
             &QCheckBox::toggled,
             this,
             &DlgPrefWaveform::slotSetNormalizeOverview);
+    connect(overviewLinesComboBox,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            &DlgPrefWaveform::slotSetOverviewLinesMode);
+    connect(overviewPhraseBarsComboBox,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            &DlgPrefWaveform::slotSetOverviewPhraseBars);
+    connect(overviewLineOpacitySpinBox,
+            QOverload<int>::of(&QSpinBox::valueChanged),
+            this,
+            &DlgPrefWaveform::slotSetOverviewLineOpacity);
+    connect(overviewLineOpacitySlider,
+            &QSlider::valueChanged,
+            overviewLineOpacitySpinBox,
+            &QSpinBox::setValue);
+    connect(overviewLineOpacitySpinBox,
+            QOverload<int>::of(&QSpinBox::valueChanged),
+            overviewLineOpacitySlider,
+            &QSlider::setValue);
     connect(factory,
             &WaveformWidgetFactory::waveformMeasured,
             this,
@@ -188,6 +256,39 @@ DlgPrefWaveform::DlgPrefWaveform(
             this,
             &DlgPrefWaveform::slotSetUntilMarkTextHeightLimit);
 
+    connect(showHoverReadoutCheckBox,
+            &QCheckBox::toggled,
+            this,
+            &DlgPrefWaveform::slotSetOverviewHoverReadout);
+    connect(hoverDisplayComboBox,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            &DlgPrefWaveform::slotSetOverviewHoverReadout);
+    connect(hoverModeComboBox,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            &DlgPrefWaveform::slotSetOverviewHoverReadout);
+    connect(hoverUnitComboBox,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            &DlgPrefWaveform::slotSetOverviewHoverReadout);
+    connect(hoverPrecisionComboBox,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            &DlgPrefWaveform::slotSetOverviewHoverReadout);
+    connect(hoverLabelPositionComboBox,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            &DlgPrefWaveform::slotSetOverviewHoverReadout);
+    connect(hoverOverCueComboBox,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            &DlgPrefWaveform::slotSetOverviewHoverReadout);
+    connect(snapSeeksCheckBox,
+            &QCheckBox::toggled,
+            this,
+            &DlgPrefWaveform::slotSetOverviewHoverReadout);
+
     setScrollSafeGuardForAllInputWidgets(this);
 }
 
@@ -221,6 +322,12 @@ void DlgPrefWaveform::slotUpdate() {
     midVisualGain->setValue(factory->getVisualGain(WaveformWidgetFactory::Mid));
     highVisualGain->setValue(factory->getVisualGain(WaveformWidgetFactory::High));
     normalizeOverviewCheckBox->setChecked(factory->isOverviewNormalized());
+    overviewLinesComboBox->setCurrentIndex(overviewLinesComboBox->findData(
+            static_cast<int>(factory->getOverviewLineSettings().mode)));
+    overviewPhraseBarsComboBox->setCurrentIndex(overviewPhraseBarsComboBox->findData(
+            factory->getOverviewLineSettings().phraseBars));
+    overviewLineOpacitySpinBox->setValue(factory->getOverviewLineSettings().opacity.percent());
+    overviewLineOpacitySlider->setValue(factory->getOverviewLineSettings().opacity.percent());
     // Round zoom to int to get a default zoom index.
     defaultZoomComboBox->setCurrentIndex(static_cast<int>(factory->getDefaultZoom()) - 1);
     playMarkerPositionSlider->setValue(static_cast<int>(factory->getPlayMarkerPosition() * 100));
@@ -236,6 +343,8 @@ void DlgPrefWaveform::slotUpdate() {
     untilMarkTextHeightLimitComboBox->setCurrentIndex(
             WaveformWidgetFactory::toUntilMarkTextHeightLimitIndex(
                     factory->getUntilMarkTextHeightLimit()));
+
+    showHoverReadoutControls(factory->getOverviewHoverReadoutSettings());
 
     WOverview::Type cfgOverviewType =
             m_pConfig->getValue<WOverview::Type>(kOverviewTypeCfgKey, WOverview::Type::RGB);
@@ -288,6 +397,15 @@ void DlgPrefWaveform::slotResetToDefaults() {
     // Don't normalize overview.
     normalizeOverviewCheckBox->setChecked(false);
 
+    // Overview lines: the defaults of LineSettings.
+    const mixxx::overviewlayout::LineSettings defaultLineSettings;
+    overviewLinesComboBox->setCurrentIndex(
+            overviewLinesComboBox->findData(static_cast<int>(defaultLineSettings.mode)));
+    overviewPhraseBarsComboBox->setCurrentIndex(
+            overviewPhraseBarsComboBox->findData(defaultLineSettings.phraseBars));
+    overviewLineOpacitySlider->setValue(defaultLineSettings.opacity.percent());
+    overviewLineOpacitySpinBox->setValue(defaultLineSettings.opacity.percent());
+
     // 60FPS is the default
     frameRateSlider->setValue(60);
     endOfTrackWarningTimeSlider->setValue(30);
@@ -302,6 +420,43 @@ void DlgPrefWaveform::slotResetToDefaults() {
 
     // 50 (center) is default
     playMarkerPositionSlider->setValue(50);
+
+    // Hover readout: the defaults of HoverReadoutSettings.
+    showHoverReadoutControls(mixxx::overviewlayout::HoverReadoutSettings());
+}
+
+void DlgPrefWaveform::showHoverReadoutControls(
+        const mixxx::overviewlayout::HoverReadoutSettings& settings) {
+    showHoverReadoutCheckBox->setChecked(settings.showHoverReadout);
+    hoverDisplayComboBox->setCurrentIndex(
+            hoverDisplayComboBox->findData(static_cast<int>(settings.display)));
+    hoverModeComboBox->setCurrentIndex(
+            hoverModeComboBox->findData(static_cast<int>(settings.hoverMode)));
+    hoverUnitComboBox->setCurrentIndex(
+            hoverUnitComboBox->findData(static_cast<int>(settings.unit)));
+    hoverPrecisionComboBox->setCurrentIndex(
+            hoverPrecisionComboBox->findData(static_cast<int>(settings.precision)));
+    hoverLabelPositionComboBox->setCurrentIndex(
+            hoverLabelPositionComboBox->findData(static_cast<int>(settings.position)));
+    hoverOverCueComboBox->setCurrentIndex(
+            hoverOverCueComboBox->findData(static_cast<int>(settings.overCue)));
+    snapSeeksCheckBox->setChecked(settings.snapSeeks);
+}
+
+void DlgPrefWaveform::slotSetOverviewHoverReadout() {
+    using namespace mixxx::overviewlayout;
+    HoverReadoutSettings settings;
+    settings.showHoverReadout = showHoverReadoutCheckBox->isChecked();
+    settings.display = static_cast<HoverDisplay>(hoverDisplayComboBox->currentData().toInt());
+    settings.hoverMode = static_cast<HoverMode>(hoverModeComboBox->currentData().toInt());
+    settings.unit = static_cast<BeatDistanceUnit>(hoverUnitComboBox->currentData().toInt());
+    settings.precision =
+            static_cast<BeatDistancePrecision>(hoverPrecisionComboBox->currentData().toInt());
+    settings.position =
+            static_cast<HoverReadoutPosition>(hoverLabelPositionComboBox->currentData().toInt());
+    settings.overCue = static_cast<HoverOverCue>(hoverOverCueComboBox->currentData().toInt());
+    settings.snapSeeks = snapSeeksCheckBox->isChecked();
+    WaveformWidgetFactory::instance()->setOverviewHoverReadoutSettings(settings);
 }
 
 void DlgPrefWaveform::slotSetFrameRate(int frameRate) {
@@ -370,6 +525,21 @@ void DlgPrefWaveform::slotSetVisualGainHigh(double gain) {
 
 void DlgPrefWaveform::slotSetNormalizeOverview(bool normalize) {
     WaveformWidgetFactory::instance()->setOverviewNormalized(normalize);
+}
+
+void DlgPrefWaveform::slotSetOverviewLinesMode(int index) {
+    WaveformWidgetFactory::instance()->setOverviewLinesMode(
+            static_cast<mixxx::overviewlayout::LinesMode>(
+                    overviewLinesComboBox->itemData(index).toInt()));
+}
+
+void DlgPrefWaveform::slotSetOverviewPhraseBars(int index) {
+    WaveformWidgetFactory::instance()->setOverviewPhraseBars(
+            overviewPhraseBarsComboBox->itemData(index).toInt());
+}
+
+void DlgPrefWaveform::slotSetOverviewLineOpacity(int percent) {
+    WaveformWidgetFactory::instance()->setOverviewLineOpacity(percent);
 }
 
 void DlgPrefWaveform::slotWaveformMeasured(float frameRate, int droppedFrames) {

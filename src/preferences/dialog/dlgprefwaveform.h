@@ -9,6 +9,10 @@
 class ControlPushButton;
 class Library;
 
+namespace mixxx::overviewlayout {
+struct HoverReadoutSettings;
+}
+
 class DlgPrefWaveform : public DlgPreferencePage, public Ui::DlgPrefWaveformDlg {
     Q_OBJECT
   public:
@@ -35,6 +39,9 @@ class DlgPrefWaveform : public DlgPreferencePage, public Ui::DlgPrefWaveformDlg 
     void slotSetVisualGainMid(double gain);
     void slotSetVisualGainHigh(double gain);
     void slotSetNormalizeOverview(bool normalize);
+    void slotSetOverviewLinesMode(int index);
+    void slotSetOverviewPhraseBars(int index);
+    void slotSetOverviewLineOpacity(int percent);
     void slotWaveformMeasured(float frameRate, int droppedFrames);
     void slotClearCachedWaveforms();
     void slotSetBeatGridAlpha(int alpha);
@@ -44,9 +51,11 @@ class DlgPrefWaveform : public DlgPreferencePage, public Ui::DlgPrefWaveformDlg 
     void slotSetUntilMarkAlign(int index);
     void slotSetUntilMarkTextPointSize(int value);
     void slotSetUntilMarkTextHeightLimit(int index);
+    void slotSetOverviewHoverReadout();
 
   private:
     void initWaveformControl();
+    void showHoverReadoutControls(const mixxx::overviewlayout::HoverReadoutSettings& settings);
     void calculateCachedWaveformDiskUsage();
     void notifyRebootNecessary();
     void updateEnableUntilMark();

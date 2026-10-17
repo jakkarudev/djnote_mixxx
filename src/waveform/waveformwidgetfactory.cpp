@@ -428,6 +428,8 @@ bool WaveformWidgetFactory::setConfig(UserSettingsPointer config) {
         m_config->set(ConfigKey("[Waveform]","OverviewNormalized"), ConfigValue(m_overviewNormalized));
     }
 
+    m_overviewLineSettings = mixxx::overviewlayout::loadLineSettings(m_config);
+
     m_playMarkerPosition = m_config->getValue(ConfigKey("[Waveform]","PlayMarkerPosition"),
             WaveformWidgetRenderer::s_defaultPlayMarkerPosition);
     setPlayMarkerPosition(m_playMarkerPosition);
@@ -462,6 +464,8 @@ bool WaveformWidgetFactory::setConfig(UserSettingsPointer config) {
     setUntilMarkTextHeightLimit(toUntilMarkTextHeightLimit(
             m_config->getValue(ConfigKey("[Waveform]", "UntilMarkTextHeightLimit"),
                     toUntilMarkTextHeightLimitIndex(m_untilMarkTextHeightLimit))));
+
+    m_overviewHoverReadoutSettings = mixxx::overviewlayout::loadHoverReadoutSettings(m_config);
 
     return true;
 }
@@ -737,6 +741,28 @@ void WaveformWidgetFactory::setOverviewNormalized(bool normalize) {
         m_config->set(ConfigKey("[Waveform]","OverviewNormalized"), ConfigValue(m_overviewNormalized));
     }
     emit overviewNormalizeChanged();
+}
+
+void WaveformWidgetFactory::setOverviewLinesMode(mixxx::overviewlayout::LinesMode mode) {
+    m_overviewLineSettings.mode = mode;
+    saveOverviewLineSettings();
+}
+
+void WaveformWidgetFactory::setOverviewPhraseBars(int bars) {
+    m_overviewLineSettings.phraseBars = mixxx::overviewlayout::validPhraseBarsOrDefault(bars);
+    saveOverviewLineSettings();
+}
+
+void WaveformWidgetFactory::setOverviewLineOpacity(int percent) {
+    m_overviewLineSettings.opacity = mixxx::overviewlayout::OpacityPercent(percent);
+    saveOverviewLineSettings();
+}
+
+void WaveformWidgetFactory::saveOverviewLineSettings() {
+    if (m_config) {
+        mixxx::overviewlayout::saveLineSettings(m_config, m_overviewLineSettings);
+    }
+    emit overviewLinesChanged();
 }
 
 void WaveformWidgetFactory::setPlayMarkerPosition(double position) {
@@ -1420,6 +1446,15 @@ void WaveformWidgetFactory::setUntilMarkTextHeightLimit(float value) {
         m_config->setValue(ConfigKey("[Waveform]", "UntilMarkTextHeightLimit"),
                 toUntilMarkTextHeightLimitIndex(m_untilMarkTextHeightLimit));
     }
+}
+
+void WaveformWidgetFactory::setOverviewHoverReadoutSettings(
+        const mixxx::overviewlayout::HoverReadoutSettings& settings) {
+    m_overviewHoverReadoutSettings = settings;
+    if (m_config) {
+        mixxx::overviewlayout::saveHoverReadoutSettings(m_config, settings);
+    }
+    emit overviewHoverReadoutSettingsChanged();
 }
 
 // static

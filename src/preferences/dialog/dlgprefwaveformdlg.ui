@@ -622,7 +622,195 @@ Select from different types of displays for the waveform, which differ primarily
       </layout>
      </item>
 
+     <item row="16" column="0" colspan="4">
+      <widget class="QGroupBox" name="overviewLinesGroup">
+       <property name="title">
+        <string>Overview lines</string>
+       </property>
+       <layout class="QGridLayout" name="overviewLinesGridLayout">
+        <item row="0" column="0">
+         <widget class="QLabel" name="overviewLinesLabel">
+          <property name="text">
+           <string>Lines</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="1" colspan="2">
+         <widget class="QComboBox" name="overviewLinesComboBox">
+          <property name="toolTip">
+           <string>Show bar and phrase lines on the track overview.</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="0">
+         <widget class="QLabel" name="overviewPhraseBarsLabel">
+          <property name="text">
+           <string>Phrase length</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="1" colspan="2">
+         <widget class="QComboBox" name="overviewPhraseBarsComboBox">
+          <property name="toolTip">
+           <string>Number of bars in a phrase on the track overview.</string>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="0">
+         <widget class="QLabel" name="overviewLineOpacityLabel">
+          <property name="text">
+           <string>Line opacity</string>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="1">
+         <widget class="QSlider" name="overviewLineOpacitySlider">
+          <property name="maximum">
+           <number>100</number>
+          </property>
+          <property name="value">
+           <number>80</number>
+          </property>
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="2">
+         <widget class="QSpinBox" name="overviewLineOpacitySpinBox">
+          <property name="toolTip">
+           <string>Set amount of opacity on the overview bar and phrase lines.</string>
+          </property>
+          <property name="suffix">
+           <string>%</string>
+          </property>
+          <property name="maximum">
+           <number>100</number>
+          </property>
+          <property name="value">
+           <number>80</number>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </item>
+     <!-- Hover readout group (overview beat distance label) -->
      <item row="17" column="0" colspan="4">
+      <widget class="QGroupBox" name="hoverReadoutGroupBox">
+       <property name="title">
+        <string>Hover readout</string>
+       </property>
+       <layout class="QGridLayout" name="hoverReadoutGridLayout">
+        <item row="0" column="0" colspan="2">
+         <widget class="QCheckBox" name="showHoverReadoutCheckBox">
+          <property name="toolTip">
+           <string>Show a line and the beat distance on the overview while hovering it with the mouse.</string>
+          </property>
+          <property name="text">
+           <string>Show hover readout</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="0">
+         <widget class="QLabel" name="hoverDisplayLabel">
+          <property name="text">
+           <string>Display</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="1">
+         <widget class="QComboBox" name="hoverDisplayComboBox">
+          <property name="toolTip">
+           <string>What the hover readout shows while hovering without a mouse button held.</string>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="0">
+         <widget class="QLabel" name="hoverModeLabel">
+          <property name="text">
+           <string>Hover mode</string>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="1">
+         <widget class="QComboBox" name="hoverModeComboBox">
+          <property name="toolTip">
+           <string>Extend time ruler: the time ruler shows the beat distance too. Separate hover line: the hover line and beat distance are hidden while the time ruler is active, and the time ruler has no beat distance.</string>
+          </property>
+         </widget>
+        </item>
+        <item row="3" column="0">
+         <widget class="QLabel" name="hoverUnitLabel">
+          <property name="text">
+           <string>Unit</string>
+          </property>
+         </widget>
+        </item>
+        <item row="3" column="1">
+         <widget class="QComboBox" name="hoverUnitComboBox">
+          <property name="toolTip">
+           <string>Unit of the beat distance shown on the overview while hovering or seeking.</string>
+          </property>
+         </widget>
+        </item>
+        <item row="4" column="0">
+         <widget class="QLabel" name="hoverPrecisionLabel">
+          <property name="text">
+           <string>Precision</string>
+          </property>
+         </widget>
+        </item>
+        <item row="4" column="1">
+         <widget class="QComboBox" name="hoverPrecisionComboBox">
+          <property name="toolTip">
+           <string>Whole rounds to the nearest unit. Fractional shows 2 decimals for bars and 1 for beats.</string>
+          </property>
+         </widget>
+        </item>
+        <item row="5" column="0">
+         <widget class="QLabel" name="hoverLabelPositionLabel">
+          <property name="text">
+           <string>Label position</string>
+          </property>
+         </widget>
+        </item>
+        <item row="5" column="1">
+         <widget class="QComboBox" name="hoverLabelPositionComboBox">
+          <property name="toolTip">
+           <string>Auto places the label right of the line, and left of it once the pointer passes three quarters of the overview.</string>
+          </property>
+         </widget>
+        </item>
+        <item row="6" column="0">
+         <widget class="QLabel" name="hoverOverCueLabel">
+          <property name="text">
+           <string>Over a cue</string>
+          </property>
+         </widget>
+        </item>
+        <item row="6" column="1">
+         <widget class="QComboBox" name="hoverOverCueComboBox">
+          <property name="toolTip">
+           <string>What to do when the pointer is over a cue, where Mixxx shows cue times. The beat distance is then measured to the cue. Join cue times: add it to the cue times. Hide hover readout: don't show it. Hide cue times: hide the cue times instead. Move hover readout: show it left of the cue line.</string>
+          </property>
+         </widget>
+        </item>
+        <item row="7" column="0" colspan="2">
+         <widget class="QCheckBox" name="snapSeeksCheckBox">
+          <property name="toolTip">
+           <string>Clicking or dragging on the overview moves the play position by whole bars (or beats, see Unit) along the beat grid, keeping the play position's offset from the grid. The hover line snaps to the bar line (or beat) nearest the mouse. Applies to tracks with a beat grid.</string>
+          </property>
+          <property name="text">
+           <string>Snap seeks to beat distance</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </item>
+
+     <item row="18" column="0" colspan="4">
       <widget class="QGroupBox" name="openGLStatus">
        <property name="title">
         <string>OpenGL status</string>

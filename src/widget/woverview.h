@@ -20,6 +20,17 @@ class PlayerManager;
 class QDomNode;
 class SkinContext;
 
+namespace mixxx {
+class Beats;
+}
+
+namespace mixxx::overviewlayout {
+struct CueTimesLayout;
+struct HoverLineLayout;
+struct HoverReadoutLayout;
+struct Input;
+} // namespace mixxx::overviewlayout
+
 class WOverview : public WWidget, public TrackDropTarget {
     Q_OBJECT
   public:
@@ -75,6 +86,7 @@ class WOverview : public WWidget, public TrackDropTarget {
 
     void slotTypeControlChanged(double v);
     void slotNormalizeOrVisualGainChanged();
+    void slotHoverReadoutSettingsChanged();
 
   private:
     // Append the waveform overview pixmap according to available data
@@ -92,15 +104,40 @@ class WOverview : public WWidget, public TrackDropTarget {
 
     void drawEndOfTrackBackground(QPainter* pPainter);
     void drawAxis(QPainter* pPainter);
+    void drawBarAndPhraseLines(QPainter* pPainter);
     void drawWaveformPixmap(QPainter* pPainter);
     void drawPlayedOverlay(QPainter* pPainter);
     void drawPlayPosition(QPainter* pPainter);
     void drawEndOfTrackFrame(QPainter* pPainter);
     void drawAnalyzerProgress(QPainter* pPainter);
     void drawRangeMarks(QPainter* pPainter, const float& offset, const float& gain);
-    void drawMarks(QPainter* pPainter, const float offset, const float gain);
-    void drawPickupPosition(QPainter* pPainter);
-    void drawTimeRuler(QPainter* pPainter);
+    // Where the line of a mark at the given sample position is drawn.
+    float markLinePosition(double samplePosition, float offset, float gain) const;
+    // The overview's state for the overview layout module: for the seek and
+    // the time ruler, and with the hover readout and the cue times.
+    mixxx::overviewlayout::Input makeSeekInput(const mixxx::Beats* pBeats);
+    mixxx::overviewlayout::Input makeLayoutInput(const QFont& markerFont,
+            const mixxx::Beats* pBeats,
+            float offset,
+            float gain);
+    qreal hoverReadoutLabelWidth(const QFontMetricsF& fontMetrics, const QString& text) const;
+    void drawMarks(QPainter* pPainter,
+            const float offset,
+            const float gain,
+            const mixxx::overviewlayout::CueTimesLayout& cueTimesLayout);
+    void drawPickupPosition(QPainter* pPainter, int pickupPos);
+    void drawTimeRuler(QPainter* pPainter,
+            const mixxx::overviewlayout::Input& layoutInput,
+            const mixxx::overviewlayout::HoverReadoutLayout& readoutLayout);
+    void drawHoverLine(QPainter* pPainter, double linePos);
+    void drawPlainHover(QPainter* pPainter,
+            const mixxx::overviewlayout::HoverLineLayout& lineLayout,
+            const mixxx::overviewlayout::HoverReadoutLayout& readoutLayout,
+            const QFont& markerFont);
+    void drawHoverReadout(QPainter* pPainter,
+            const mixxx::overviewlayout::HoverReadoutLayout& readoutLayout,
+            const QPointF& anchor,
+            const QFont& markerFont);
     void drawMarkLabels(QPainter* pPainter, const float offset, const float gain);
     void drawPassthroughOverlay(QPainter* pPainter);
     void paintText(const QString& text, QPainter* pPainter);
@@ -170,6 +207,9 @@ class WOverview : public WWidget, public TrackDropTarget {
     // position of the overlay shadow
     int m_iPlayPos;
     bool m_bTimeRulerActive;
+    // Pointer is over the widget (plain hover readout), at m_hoverPos.
+    bool m_bPointerInside;
+    QPointF m_hoverPos;
     Qt::Orientation m_orientation;
     int m_dragMarginH;
     int m_dragMarginV;
@@ -198,13 +238,16 @@ class WOverview : public WWidget, public TrackDropTarget {
     PollingControlProxy m_trackSampleRateControl;
     PollingControlProxy m_trackSamplesControl;
     PollingControlProxy m_playpositionControl;
+    parented_ptr<ControlProxy> m_pSnappedSeekControl;
     parented_ptr<ControlProxy> m_pPassthroughControl;
     parented_ptr<ControlProxy> m_pTypeControl;
 
     QPointF m_timeRulerPos;
     WaveformMarkLabel m_timeRulerPositionLabel;
     WaveformMarkLabel m_timeRulerDistanceLabel;
-
+    // Hover readout (own row; cleared if merged into
+    // m_timeRulerDistanceLabel or if there is no beat grid).
+    WaveformMarkLabel m_hoverReadoutLabel;
 
     QPixmap m_backgroundPixmap;
     QString m_backgroundPixmapPath;
@@ -213,6 +256,8 @@ class WOverview : public WWidget, public TrackDropTarget {
     QColor m_labelBackgroundColor;
     QColor m_axesColor;
     QColor m_playPosColor;
+    QColor m_barLineColor;
+    QColor m_phraseLineColor;
     QColor m_endOfTrackColor;
     QColor m_passthroughOverlayColor;
     QColor m_playedOverlayColor;

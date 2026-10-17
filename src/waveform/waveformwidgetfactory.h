@@ -9,6 +9,7 @@
 #include "skin/legacy/skincontext.h"
 #include "util/performancetimer.h"
 #include "util/singleton.h"
+#include "waveform/overviewsettings.h"
 #include "waveform/widgets/waveformwidgettype.h"
 
 class WVuMeterLegacy;
@@ -148,6 +149,14 @@ class WaveformWidgetFactory : public QObject, public Singleton<WaveformWidgetFac
     void setOverviewNormalized(bool normalize);
     int isOverviewNormalized() const { return m_overviewNormalized;}
 
+    // Overview bar and phrase lines (stored under [Waveform]).
+    void setOverviewLinesMode(mixxx::overviewlayout::LinesMode mode);
+    void setOverviewPhraseBars(int bars);
+    void setOverviewLineOpacity(int percent);
+    mixxx::overviewlayout::LineSettings getOverviewLineSettings() const {
+        return m_overviewLineSettings;
+    }
+
     const QVector<WaveformWidgetAbstractHandle>& getAvailableTypes() const {
         return m_waveformWidgetHandles;
     }
@@ -166,6 +175,15 @@ class WaveformWidgetFactory : public QObject, public Singleton<WaveformWidgetFac
 
     WaveformWidgetType::Type autoChooseWidgetType() const;
 
+    // Overview hover readout settings (unit, precision, label position).
+    // Setting them saves them to the config and notifies all overviews.
+    void setOverviewHoverReadoutSettings(
+            const mixxx::overviewlayout::HoverReadoutSettings& settings);
+    const mixxx::overviewlayout::HoverReadoutSettings&
+    getOverviewHoverReadoutSettings() const {
+        return m_overviewHoverReadoutSettings;
+    }
+
   signals:
     void waveformUpdateTick();
     void waveformMeasured(float frameRate, int droppedFrames);
@@ -175,7 +193,10 @@ class WaveformWidgetFactory : public QObject, public Singleton<WaveformWidgetFac
     void swapVuMeters();
 
     void overviewNormalizeChanged();
+    void overviewLinesChanged();
     void overallVisualGainChanged();
+
+    void overviewHoverReadoutSettingsChanged();
 
   public slots:
     void slotSkinLoaded();
@@ -224,6 +245,8 @@ class WaveformWidgetFactory : public QObject, public Singleton<WaveformWidgetFac
     bool m_zoomSync;
     double m_visualGain[FilterCount];
     bool m_overviewNormalized;
+    mixxx::overviewlayout::LineSettings m_overviewLineSettings;
+    void saveOverviewLineSettings();
 
     bool m_untilMarkShowBeats;
     bool m_untilMarkShowTime;
@@ -247,4 +270,6 @@ class WaveformWidgetFactory : public QObject, public Singleton<WaveformWidgetFac
     double m_actualFrameRate;
     int m_vSyncType;
     double m_playMarkerPosition;
+
+    mixxx::overviewlayout::HoverReadoutSettings m_overviewHoverReadoutSettings;
 };
