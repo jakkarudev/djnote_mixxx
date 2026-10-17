@@ -605,6 +605,121 @@ def write_fixtures(out_dir, signals_dir):
         print(f"wrote {name}.phfx ({len(data)} bytes)")
 
 
+# ---------------------------------------------------------------- overview
+
+# Overview (stripe) model, calibrated against Traktor's stored stripes
+# (research doc section 9). Column k covers samples [k*N, (k+1)*N) with
+# N = ceil(frames / 1024). Row y covers heights v in [(y-31)/31, (y+1-31)/31);
+# positive samples draw downward. The rows from the column's min to its max are
+# present. Their colour is the unit colour of the column's band levels times a
+# magnitude: (W . (R, G, B, B^4)) * |levels|^0.7 * density^0.25, where density
+# is the share of the column's samples that fall in the row (the "phosphor"
+# density of section 8.2). Alpha is ALPHA_PER_G times the green byte.
+STRIPE_COLUMNS, STRIPE_ROWS, STRIPE_HEADER = 1024, 64, 25
+STRIPE_CENTRE = 31.0
+STRIPE_W = np.array([83.5, 242.0, -37.4, 606.1])
+STRIPE_BLUE_POWER = 4
+STRIPE_POWER = 0.7
+DENSITY_POWER = 0.25
+ALPHA_PER_G = 2.0
+
+
+@dataclass
+class Stripe:
+    blocks: int
+    pixels: np.ndarray  # (1024, 64, 4) uint8, bytes B, G, R, A, column-major
+
+
+def read_stripe(data):
+    """Parse a Traktor `Stripes/NNN/<id>` file (research section 4.1)."""
+    if (len(data) != STRIPE_HEADER + STRIPE_COLUMNS * STRIPE_ROWS * 4
+            or data[1:5] != b"PRTS"):
+        raise ValueError("not a Traktor stripe file")
+    blocks = struct.unpack_from("<I", data, 21)[0]
+    px = np.frombuffer(data, np.uint8, STRIPE_COLUMNS * STRIPE_ROWS * 4, STRIPE_HEADER)
+    return Stripe(blocks, px.reshape(STRIPE_COLUMNS, STRIPE_ROWS, 4).copy())
+
+
+def stripe_column(samples, colour, rows=STRIPE_ROWS):
+    """One overview column (rows, 4) uint8, bytes B, G, R, A, from the column's
+    samples (floats in [-1, 1]) and its colour levels (R, G, B)."""
+    out = np.zeros((rows, 4), np.uint8)
+    samples = np.asarray(samples, np.float64)
+    colour = np.asarray(colour, float)
+    norm = np.linalg.norm(colour)
+    if len(samples) == 0 or norm <= 0:
+        return out
+    idx = np.clip(np.floor(samples * 31 + STRIPE_CENTRE).astype(int), 0, 61)
+    top, bottom = idx.min(), idx.max()
+    density = np.bincount(idx, minlength=rows)[:rows] / len(samples)
+    # Rows inside the extent that no sample reached get half a sample.
+    density = np.maximum(density, 0.5 / len(samples))
+    unit = colour / norm
+    mag = float(STRIPE_W @ np.append(unit, unit[2] ** STRIPE_BLUE_POWER)) * norm ** STRIPE_POWER
+    rgb = unit[None, :] * (mag * density ** DENSITY_POWER)[:, None]
+    px = np.zeros((rows, 4))
+    px[:, 0], px[:, 1], px[:, 2] = rgb[:, 2], rgb[:, 1], rgb[:, 0]
+    px[:, 3] = ALPHA_PER_G * rgb[:, 1]
+    px[:top] = 0
+    px[bottom + 1:] = 0
+    return np.clip(np.floor(px + 0.5), 0, 255).astype(np.uint8)
+
+
+def render_overview(mono, rate, levels, blocks, args, columns=STRIPE_COLUMNS):
+    """The Phosphor overview of a track as a (columns, 64, 4) BGRA image.
+    `mono` is float in [-1, 1], `levels` the colour track (1 ms blocks, float
+    (n, 3), see colour_track), `blocks` N = ceil(frames / 1024)."""
+    block = colour_block(rate)
+    img = np.zeros((columns, STRIPE_ROWS, 4), np.uint8)
+    for k in range(columns):
+        a, b = k * blocks, min((k + 1) * blocks, len(mono))
+        if a >= len(mono):
+            break
+        l0, l1 = a // block, max(a // block + 1, b // block)
+        lv = levels[l0:l1]
+        colour = lv.max(0) if len(lv) else np.zeros(3)
+        img[k] = stripe_column(mono[a:b], colour)
+    return img
+
+
+def _corr(x, y):
+    if np.ptp(x) == 0 or np.ptp(y) == 0:
+        return 1.0 if np.array_equal(x, y) else 0.0
+    return float(np.corrcoef(x, y)[0, 1])
+
+
+def fit_stripes(model, reference):
+    """How well `model` matches `reference` (both Stripe), over the columns
+    where both have signal: colour_error = mean distance between the columns'
+    unit colours (at the brightest row), profile_error = mean absolute alpha
+    difference in levels over pixels either has, outline_correlation = mean of
+    the Pearson correlations of the first and last row."""
+    a, b = model.pixels, reference.pixels
+    both = (a[:, :, 3].max(1) > 0) & (b[:, :, 3].max(1) > 0)
+    if not both.any():
+        return dict(columns=0, colour_error=float("nan"), profile_error=float("nan"),
+                    outline_correlation=float("nan"))
+    idx = np.nonzero(both)[0]
+
+    def unit(img):
+        top = img[idx, np.argmax(img[idx, :, 3], 1)][:, :3].astype(float)
+        return top / np.maximum(np.linalg.norm(top, axis=1, keepdims=True), 1e-9)
+
+    colour = float(np.linalg.norm(unit(a) - unit(b), axis=1).mean())
+    alpha_a, alpha_b = a[idx, :, 3].astype(float), b[idx, :, 3].astype(float)
+    either = (alpha_a > 0) | (alpha_b > 0)
+    profile = float(np.abs(alpha_a - alpha_b)[either].mean())
+
+    def extents(alpha):
+        nz = alpha > 0
+        return nz.argmax(1), alpha.shape[1] - 1 - nz[:, ::-1].argmax(1)
+
+    (ta, ba), (tb, bb) = extents(alpha_a), extents(alpha_b)
+    outline = (_corr(ta, tb) + _corr(ba, bb)) / 2
+    return dict(columns=int(both.sum()), colour_error=colour, profile_error=profile,
+                outline_correlation=outline)
+
+
 # ---------------------------------------------------------------- checks
 
 
@@ -692,6 +807,96 @@ def check_tiers(args):
         print(f"{n:7} N={TIERS[n]:<3} mean {np.mean(means[n]):.4f}  max {np.max(maxes[n]):.0f}")
 
 
+def stripe_blocks(frames):
+    """Traktor's block count N for a track: ceil(frames / 1024); each of the
+    1024 columns covers N samples."""
+    return -(-frames // 1024)
+
+
+def stripe_header_blocks(path):
+    with open(path, "rb") as f:
+        head = f.read(STRIPE_HEADER)
+    return struct.unpack_from("<I", head, 21)[0] if len(head) == STRIPE_HEADER and head[1:5] == b"PRTS" else None
+
+
+def find_stripes(traktor_dir, blocks):
+    """Paths of the stored stripes whose block count is `blocks` (read only)."""
+    found = []
+    root = os.path.join(traktor_dir, "Stripes")
+    for d in sorted(os.listdir(root)):
+        for name in sorted(os.listdir(os.path.join(root, d))):
+            path = os.path.join(root, d, name)
+            if stripe_header_blocks(path) == blocks:
+                found.append(path)
+    return found
+
+
+def stripe_image(pixels):
+    """Premultiplied BGRA (columns, rows, 4) -> RGB image (rows x columns)."""
+    return Image.fromarray(np.ascontiguousarray(pixels[:, :, 2::-1].transpose(1, 0, 2)))
+
+
+def overview_items(args):
+    """(key, path) of the five reference tracks and the test signals with a
+    stored stripe. Q3a/Q3b are left out: Traktor stored one stripe for the
+    three Q3 files and it is Q3c's (research section 8)."""
+    items = [(k, os.path.join(args.tracks_dir, f)) for k, f, _, _ in TRACKS]
+    if os.path.isdir(args.signals_dir):
+        for f in sorted(os.listdir(args.signals_dir)):
+            if f.endswith(".wav") and not f.startswith(("Q3a", "Q3b")):
+                items.append((f[:-4].replace(" ", "_"), os.path.join(args.signals_dir, f)))
+    return items
+
+
+def fit_overview(args):
+    """Render the Phosphor overview of each item and report its fit against
+    the matching stored Traktor stripe. Stripes are matched by block count; if
+    several have the same count (the Q4/Q6/Q7 and Q5/Q9 groups) the assignment
+    with the best outline correlation wins."""
+    import itertools
+    rendered = {}
+    for key, path in overview_items(args):
+        audio = decode(path)
+        mono = mono_int16(audio[:, 0], audio[:, 1]) / 32768.0
+        n = stripe_blocks(len(mono))
+        levels = colour_track(mono, RATE, args)
+        rendered[key] = (n, Stripe(n, render_overview(mono, RATE, levels, n, args)))
+    fits, missing = {}, []
+    by_n = {}
+    for key, (n, _) in rendered.items():
+        by_n.setdefault(n, []).append(key)
+    for n, keys in by_n.items():
+        paths = find_stripes(args.traktor_dir, n)
+        if not paths:
+            missing += [(k, n) for k in keys]
+            continue
+        stored = [read_stripe(open(p, "rb").read()) for p in paths]
+        table = {(k, i): fit_stripes(rendered[k][1], stored[i]) for k in keys for i in range(len(paths))}
+        best = None
+        for combo in itertools.permutations(range(len(paths)), min(len(keys), len(paths))):
+            score = sum(table[(k, i)]["outline_correlation"] for k, i in zip(keys, combo))
+            if best is None or score > best[0]:
+                best = (score, combo)
+        for k, i in zip(keys, best[1]):
+            fits[k] = (table[(k, i)], paths[i], stored[i])
+        missing += [(k, n) for k in keys[len(best[1]):]]
+    print(f"{'item':36} {'N':>6} {'cols':>5} {'colour err':>10} {'profile err':>11} {'outline r':>9}  stripe")
+    for key, (f, path, _) in fits.items():
+        print(f"{key:36} {rendered[key][0]:6d} {f['columns']:5d} {f['colour_error']:10.3f} "
+              f"{f['profile_error']:11.2f} {f['outline_correlation']:9.4f}  {os.path.relpath(path, args.traktor_dir)}")
+    for key, n in missing:
+        print(f"{key:36} {n:6d}   no stored stripe with this block count")
+    if args.overview_images and fits:
+        sheet = []
+        for key, (f, _, stored) in fits.items():
+            sheet.append(label(stripe_image(stored.pixels), f"{key}: Traktor stripe"))
+            sheet.append(label(stripe_image(rendered[key][1].pixels),
+                               f"{key}: Phosphor overview (colour {f['colour_error']:.2f}, "
+                               f"profile {f['profile_error']:.1f}, outline {f['outline_correlation']:.3f})"))
+        stack(sheet, 4).quantize(64).save(args.overview_images, optimize=True)  # small enough to commit
+        print("wrote", args.overview_images)
+
+
 # ---------------------------------------------------------------- cli
 
 # Section 8 numbers as measured on the stripe, with no screenshot tuning.
@@ -748,6 +953,12 @@ def build_parser():
     p.add_argument("--check-fir", action="store_true", help="FFT vs FIR colours on the five tracks")
     p.add_argument("--check-tiers", action="store_true", help="detail tiers vs Full on the five tracks")
     p.add_argument("--tracks-dir", default=TRACKS_DIR)
+    p.add_argument("--fit-overview", action="store_true",
+                   help="render the overview of the five tracks and the test signals and fit them to Traktor's stripes")
+    p.add_argument("--traktor-dir",
+                   default=os.path.join(os.path.expanduser("~"), "Documents", "Native Instruments", "Traktor 4.0.2"),
+                   help="Traktor data folder (read only)")
+    p.add_argument("--overview-images", metavar="PNG", help="with --fit-overview: write a comparison sheet")
     p.add_argument("--tier-images", default="docs/research/phosphor-detail-tiers")
     p.add_argument("--fixtures", metavar="DIR", help="write the C++ test fixtures to DIR")
     p.add_argument("--signals-dir", default="waveform-tests",
@@ -770,6 +981,9 @@ def main():
         return
     if args.check_tiers:
         check_tiers(args)
+        return
+    if args.fit_overview:
+        fit_overview(args)
         return
     if not args.audio:
         parser.error("audio file required")
