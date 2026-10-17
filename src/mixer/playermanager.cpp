@@ -184,7 +184,7 @@ void PlayerManager::bindToLibrary(Library* pLibrary) {
     // Connect the player to the analyzer queue so that loaded tracks are
     // analyzed.
     foreach(Deck* pDeck, m_decks) {
-        connect(pDeck, &BaseTrackPlayer::newTrackLoaded, this, &PlayerManager::slotAnalyzeTrack);
+        connect(pDeck, &BaseTrackPlayer::newTrackLoaded, this, &PlayerManager::slotAnalyzeDeckTrack);
     }
 
     // Connect the player to the analyzer queue so that loaded tracks are
@@ -363,7 +363,7 @@ void PlayerManager::addDeckInner() {
         connect(pDeck,
                 &BaseTrackPlayer::newTrackLoaded,
                 this,
-                &PlayerManager::slotAnalyzeTrack);
+                &PlayerManager::slotAnalyzeDeckTrack);
     }
 
     m_players[handleGroup.handle()] = pDeck;
@@ -729,11 +729,22 @@ void PlayerManager::slotLoadTrackIntoNextAvailableSampler(TrackPointer pTrack) {
 }
 
 void PlayerManager::slotAnalyzeTrack(TrackPointer track) {
+    analyzeLoadedTrack(std::move(track), AnalyzerTrack::Options());
+}
+
+void PlayerManager::slotAnalyzeDeckTrack(TrackPointer track) {
+    AnalyzerTrack::Options options;
+    options.buildPhosphor = true;
+    analyzeLoadedTrack(std::move(track), options);
+}
+
+void PlayerManager::analyzeLoadedTrack(TrackPointer track, AnalyzerTrack::Options options) {
     VERIFY_OR_DEBUG_ASSERT(track) {
         return;
     }
     if (m_pTrackAnalysisScheduler) {
-        if (m_pTrackAnalysisScheduler->scheduleTrack(track->getId())) {
+        if (m_pTrackAnalysisScheduler->scheduleTrack(
+                    AnalyzerScheduledTrack(track->getId(), options))) {
             m_pTrackAnalysisScheduler->resume();
         }
         // The first progress signal will suspend a running batch analysis
