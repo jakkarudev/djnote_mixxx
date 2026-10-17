@@ -5,6 +5,7 @@
 #include <QStack>
 #include <QUrl>
 #include <memory>
+#include <mutex>
 
 #include "audio/streaminfo.h"
 #include "sources/metadatasource.h"
@@ -17,6 +18,7 @@
 #include "util/compatibility/qmutex.h"
 #include "util/fileaccess.h"
 #include "util/performancetimer.h"
+#include "waveform/phosphor/phosphordata.h"
 #include "waveform/waveform.h"
 
 class Track : public QObject {
@@ -286,6 +288,12 @@ class Track : public QObject {
     ConstWaveformPointer getWaveformSummary() const;
     void setWaveformSummary(ConstWaveformPointer pWaveform);
 
+    /// The Phosphor waveform data (ADR-0002): built at deck load, never
+    /// stored, shared by every deck that has the track loaded. Null until the
+    /// analyzer started. Safe to call from any thread.
+    mixxx::phosphor::PhosphorDataPointer getPhosphorData() const;
+    void setPhosphorData(mixxx::phosphor::PhosphorDataPointer pData);
+
     /// Get the track's main cue point
     mixxx::audio::FramePos getMainCuePosition() const;
     // Set the track's main cue point
@@ -439,6 +447,10 @@ class Track : public QObject {
     void infoChanged();
 
     void waveformUpdated();
+
+    /// The Phosphor data object was set or replaced (progress while it is
+    /// filled is published through the data object itself).
+    void phosphorDataUpdated();
     void waveformSummaryUpdated();
     void coverArtUpdated();
     void beatsUpdated();
@@ -576,6 +588,9 @@ class Track : public QObject {
     // Visual waveform data
     ConstWaveformPointer m_waveform;
     ConstWaveformPointer m_waveformSummary;
+
+    mutable std::mutex m_phosphorMutex;
+    mixxx::phosphor::PhosphorDataPointer m_pPhosphorData;
 
     mixxx::BeatsImporterPointer m_pBeatsImporterPending;
     std::unique_ptr<mixxx::CueInfoImporter> m_pCueInfoImporterPending;

@@ -936,6 +936,19 @@ void Track::setWaveformSummary(ConstWaveformPointer pWaveform) {
     emit waveformSummaryUpdated();
 }
 
+mixxx::phosphor::PhosphorDataPointer Track::getPhosphorData() const {
+    const std::lock_guard lock(m_phosphorMutex);
+    return m_pPhosphorData;
+}
+
+void Track::setPhosphorData(mixxx::phosphor::PhosphorDataPointer pData) {
+    {
+        const std::lock_guard lock(m_phosphorMutex);
+        m_pPhosphorData = std::move(pData);
+    }
+    emit phosphorDataUpdated();
+}
+
 void Track::setMainCuePosition(mixxx::audio::FramePos position) {
     auto locked = lockMutex(&m_qMutex);
 
