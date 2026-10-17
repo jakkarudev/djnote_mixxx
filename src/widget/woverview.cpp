@@ -88,6 +88,8 @@ WOverview::WOverview(
     // Needed to recalculate range durations when rate slider is moved without the deck playing
     m_pRateRatioControl->connectValueChanged(
             this, &WOverview::onRateRatioChange);
+    m_pSnappedSeekControl = make_parented<ControlProxy>(
+            m_group, QStringLiteral("overview_snapped_seek"), this, ControlFlag::NoAssertIfMissing);
     m_pPassthroughControl = make_parented<ControlProxy>(
             m_group, QStringLiteral("passthrough"), this, ControlFlag::NoAssertIfMissing);
     m_pPassthroughControl->connectValueChanged(this, &WOverview::onPassthroughChange);
@@ -583,9 +585,22 @@ void WOverview::mouseReleaseEvent(QMouseEvent* e) {
         if (m_bLeftClickDragging) {
             unsetCursor();
             if (isPosInAllowedPosDragZone(e->pos())) {
-                m_iPlayPos = m_iPickupPos;
-                double dValue = positionToValue(m_iPickupPos);
-                setControlParameterUp(dValue);
+                const mixxx::overviewlayout::SnappedSeekLayout snap =
+                        mixxx::overviewlayout::layoutSnappedSeek(makeSeekInput(
+                                m_pCurrentTrack ? m_pCurrentTrack->getBeats().get() : nullptr));
+                if (snap.snapped) {
+                    // A relative jump along the beat grid, made by the engine.
+                    // The pickup position goes back to the play position; it
+                    // follows it when the engine has moved it.
+                    m_iPickupPos = m_iPlayPos;
+                    if (snap.jumpBeats != 0) {
+                        m_pSnappedSeekControl->set(snap.jumpBeats);
+                    }
+                } else {
+                    m_iPlayPos = m_iPickupPos;
+                    double dValue = positionToValue(m_iPickupPos);
+                    setControlParameterUp(dValue);
+                }
                 m_bLeftClickDragging = false;
             } else {
                 // Abort dragging if we are way outside the widget.
@@ -734,7 +749,16 @@ void WOverview::paintEvent(QPaintEvent* pEvent) {
 
             drawRangeMarks(&painter, offset, gain);
             drawMarks(&painter, offset, gain, mixxx::overviewlayout::layoutCueTimes(layoutInput));
-            drawPickupPosition(&painter);
+            // The pickup position is the time ruler's line during a left-drag.
+            int pickupPos = m_iPickupPos;
+            if (m_bLeftClickDragging && m_bTimeRulerActive) {
+                const mixxx::overviewlayout::SnappedSeekLayout snap =
+                        mixxx::overviewlayout::layoutSnappedSeek(layoutInput);
+                if (snap.snapped) {
+                    pickupPos = math_clamp(static_cast<int>(snap.linePos), 0, length() - 1);
+                }
+            }
+            drawPickupPosition(&painter, pickupPos);
             drawTimeRuler(&painter, layoutInput, readoutLayout);
             drawMarkLabels(&painter, offset, gain);
         }
@@ -968,14 +992,10 @@ float WOverview::markLinePosition(double samplePosition, float offset, float gai
             static_cast<float>(width()));
 }
 
-// The state of the overview for the layout of the hover readout and the cue
-// times. The hovered cue counts only if drawMarks renders it.
-mixxx::overviewlayout::Input WOverview::makeLayoutInput(const QFont& markerFont,
-        const mixxx::Beats* pBeats,
-        float offset,
-        float gain) {
+// The state of the overview for the layout of the time ruler, the hover line
+// and the seek.
+mixxx::overviewlayout::Input WOverview::makeSeekInput(const mixxx::Beats* pBeats) {
     using namespace mixxx::overviewlayout;
-    const QFontMetricsF fontMetrics(markerFont);
     Input input;
     input.trackSamples = getTrackSamples();
     input.sampleRate = m_trackSampleRateControl.get();
@@ -998,10 +1018,20 @@ mixxx::overviewlayout::Input WOverview::makeLayoutInput(const QFont& markerFont,
     } else {
         input.timeRulerState = TimeRulerState::RightClickHold;
     }
-
-    // Hover readout (beat distance)
     input.pBeats = pBeats;
     input.hoverReadout = WaveformWidgetFactory::instance()->getOverviewHoverReadoutSettings();
+    return input;
+}
+
+// The state of the overview for the layout of the hover readout and the cue
+// times. The hovered cue counts only if drawMarks renders it.
+mixxx::overviewlayout::Input WOverview::makeLayoutInput(const QFont& markerFont,
+        const mixxx::Beats* pBeats,
+        float offset,
+        float gain) {
+    using namespace mixxx::overviewlayout;
+    const QFontMetricsF fontMetrics(markerFont);
+    Input input = makeSeekInput(pBeats);
     input.labelHeight = fontMetrics.height();
     input.overviewBreadth = breadth();
     if (m_pHoveredMark != nullptr &&
@@ -1231,7 +1261,7 @@ void WOverview::drawMarks(QPainter* pPainter,
     }
 }
 
-void WOverview::drawPickupPosition(QPainter* pPainter) {
+void WOverview::drawPickupPosition(QPainter* pPainter, int pickupPos) {
     PainterScope painterScope(pPainter);
 
     if (m_orientation == Qt::Vertical) {
@@ -1241,23 +1271,23 @@ void WOverview::drawPickupPosition(QPainter* pPainter) {
     // draw dark play position outlines
     pPainter->setPen(QPen(QBrush(m_backgroundColor), m_scaleFactor));
     pPainter->setOpacity(0.5);
-    pPainter->drawLine(m_iPickupPos + 1, 0, m_iPickupPos + 1, breadth());
-    pPainter->drawLine(m_iPickupPos - 1, 0, m_iPickupPos - 1, breadth());
+    pPainter->drawLine(pickupPos + 1, 0, pickupPos + 1, breadth());
+    pPainter->drawLine(pickupPos - 1, 0, pickupPos - 1, breadth());
 
     // draw colored play position line
     pPainter->setPen(QPen(m_playPosColor, m_scaleFactor));
     pPainter->setOpacity(1.0);
-    pPainter->drawLine(m_iPickupPos, 0, m_iPickupPos, breadth());
+    pPainter->drawLine(pickupPos, 0, pickupPos, breadth());
 
     // draw triangle at the top
-    pPainter->drawLine(m_iPickupPos - 2, 0, m_iPickupPos, 2);
-    pPainter->drawLine(m_iPickupPos, 2, m_iPickupPos + 2, 0);
-    pPainter->drawLine(m_iPickupPos - 2, 0, m_iPickupPos + 2, 0);
+    pPainter->drawLine(pickupPos - 2, 0, pickupPos, 2);
+    pPainter->drawLine(pickupPos, 2, pickupPos + 2, 0);
+    pPainter->drawLine(pickupPos - 2, 0, pickupPos + 2, 0);
 
     // draw triangle at the bottom
-    pPainter->drawLine(m_iPickupPos - 2, breadth() - 1, m_iPickupPos, breadth() - 3);
-    pPainter->drawLine(m_iPickupPos, breadth() - 3, m_iPickupPos + 2, breadth() - 1);
-    pPainter->drawLine(m_iPickupPos - 2, breadth() - 1, m_iPickupPos + 2, breadth() - 1);
+    pPainter->drawLine(pickupPos - 2, breadth() - 1, pickupPos, breadth() - 3);
+    pPainter->drawLine(pickupPos, breadth() - 3, pickupPos + 2, breadth() - 1);
+    pPainter->drawLine(pickupPos - 2, breadth() - 1, pickupPos + 2, breadth() - 1);
 }
 
 void WOverview::drawTimeRuler(QPainter* pPainter,
@@ -1285,8 +1315,15 @@ void WOverview::drawTimeRuler(QPainter* pPainter,
             drawHoverLine(pPainter, layout.linePos);
         }
 
-        QPointF textPoint = m_timeRulerPos;
-        QPointF textPointDistance = m_timeRulerPos;
+        // The ruler's line, which is snapped to the beat grid if seeks snap.
+        QPointF rulerPoint = m_timeRulerPos;
+        if (m_orientation == Qt::Horizontal) {
+            rulerPoint.setX(layout.linePos);
+        } else {
+            rulerPoint.setY(layout.linePos);
+        }
+        QPointF textPoint = rulerPoint;
+        QPointF textPointDistance = rulerPoint;
         if (m_orientation == Qt::Horizontal) {
             textPoint = QPointF(textPoint.x() + kLineLabelPadding, fontMetrics.height());
             textPointDistance = QPointF(textPointDistance.x() + kLineLabelPadding,
@@ -1318,7 +1355,7 @@ void WOverview::drawTimeRuler(QPainter* pPainter,
         m_timeRulerDistanceLabel.draw(pPainter);
 
         if (readoutLayout.shown && !readoutJoined) {
-            drawHoverReadout(pPainter, readoutLayout, m_timeRulerPos, markerFont);
+            drawHoverReadout(pPainter, readoutLayout, rulerPoint, markerFont);
         } else {
             m_hoverReadoutLabel.clear();
         }

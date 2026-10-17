@@ -183,22 +183,66 @@ OverCueDecision decideOverCue(const Input& input) {
 
 } // namespace
 
+SnappedSeekLayout layoutSnappedSeek(const Input& input) {
+    SnappedSeekLayout layout;
+    layout.linePos = std::clamp(input.pointerPos, 0.0, input.overviewLength);
+    layout.landingSamples = input.overviewLength > 0.0
+            ? layout.linePos / input.overviewLength * input.trackSamples
+            : 0.0;
+    if (!input.hoverReadout.snapSeeks ||
+            input.pBeats == nullptr ||
+            input.trackSamples <= 0.0 ||
+            input.overviewLength <= 0.0) {
+        return layout;
+    }
+    const Beats& beats = *input.pBeats;
+    const int unitBeats = input.hoverReadout.unit == BeatDistanceUnit::Bars ? kBeatsPerBar : 1;
+
+    const auto pointerPosition = audio::FramePos::fromEngineSamplePos(layout.landingSamples);
+    const auto playPosition = audio::FramePos::fromEngineSamplePos(
+            input.playPositionFraction * input.trackSamples);
+
+    // The bar (or beat) line nearest the pointer, and the bar (or beat) the
+    // play marker is in, both as a count of units from the grid's first beat.
+    // Counts are negative before it: the grid's bars continue backwards.
+    const auto targetUnit = static_cast<int>(
+            std::floor(fractionalBeatIndex(beats, pointerPosition) / unitBeats + 0.5));
+    const auto playUnit = static_cast<int>(
+            std::floor(fractionalBeatIndex(beats, playPosition) / unitBeats));
+
+    layout.snapped = true;
+    layout.jumpCount = targetUnit - playUnit;
+    layout.jumpBeats = layout.jumpCount * unitBeats;
+
+    const audio::FramePos linePosition = *(beats.cfirstmarker() + targetUnit * unitBeats);
+    layout.linePos = std::clamp(
+            linePosition.toEngineSamplePos() / input.trackSamples * input.overviewLength,
+            0.0,
+            input.overviewLength);
+
+    // The same computation the engine makes when it processes the seek.
+    const audio::FramePos landing = beats.findNBeatsFromPosition(playPosition, layout.jumpBeats);
+    layout.landingSamples = std::clamp(landing.toEngineSamplePos(), 0.0, input.trackSamples);
+    return layout;
+}
+
 TimeRulerLayout layoutTimeRuler(const Input& input) {
     TimeRulerLayout layout;
     if (input.timeRulerState == TimeRulerState::Inactive) {
         return layout;
     }
 
+    // The labels describe the spot a seek would land on.
+    const SnappedSeekLayout snap = layoutSnappedSeek(input);
     layout.labelsShown = true;
     layout.lineShown = input.timeRulerState == TimeRulerState::RightClickHold;
-    layout.linePos = std::clamp(input.pointerPos, 0.0, input.overviewLength);
+    layout.linePos = snap.linePos;
 
-    const double fraction = layout.linePos / input.overviewLength;
-    const double timePosition = samplesToSeconds(input, fraction * input.trackSamples);
+    const double timePosition = samplesToSeconds(input, snap.landingSamples);
     const double timePositionTillEnd =
-            samplesToSeconds(input, (1 - fraction) * input.trackSamples);
+            samplesToSeconds(input, input.trackSamples - snap.landingSamples);
     const double timeDistance = samplesToSeconds(input,
-            (fraction - input.playPositionFraction) * input.trackSamples);
+            snap.landingSamples - input.playPositionFraction * input.trackSamples);
 
     layout.positionLabelText = formatPositionLabel(timePosition, timePositionTillEnd);
 
@@ -219,18 +263,25 @@ HoverReadoutLayout layoutHoverReadout(const Input& input) {
     const bool cueTarget = targetsCue(input);
 
     // The hovered cue, not the pointer, is the target while a cue is hovered.
-    const double targetPos = cueTarget
-            ? input.hoveredCuePos
-            : std::clamp(input.pointerPos, 0.0, input.overviewLength);
+    // The label is attached to the target's line, which is snapped.
+    const SnappedSeekLayout snap = layoutSnappedSeek(input);
+    const double pointerPos = std::clamp(input.pointerPos, 0.0, input.overviewLength);
+    const double targetPos = cueTarget ? input.hoveredCuePos : snap.linePos;
     const double targetSamples = cueTarget
             ? input.hoveredCueSamples
-            : targetPos / input.overviewLength * input.trackSamples;
+            : pointerPos / input.overviewLength * input.trackSamples;
     const double targetFraction = targetPos / input.overviewLength;
     const auto targetPosition = audio::FramePos::fromEngineSamplePos(targetSamples);
     const auto playPosition = audio::FramePos::fromEngineSamplePos(
             input.playPositionFraction * input.trackSamples);
-    const double beatDistance = fractionalBeatIndex(*input.pBeats, targetPosition) -
+    // The pointer's true beat distance. With whole precision the label shows
+    // the jump instead, so that label, line and landing agree.
+    double beatDistance = fractionalBeatIndex(*input.pBeats, targetPosition) -
             fractionalBeatIndex(*input.pBeats, playPosition);
+    if (!cueTarget && snap.snapped &&
+            input.hoverReadout.precision == BeatDistancePrecision::Whole) {
+        beatDistance = snap.jumpBeats;
+    }
 
     layout.anchorPos = targetPos;
     const bool joinedToTimeRuler = rulerActive && input.overviewBreadth < 3.0 * input.labelHeight;
@@ -282,7 +333,7 @@ HoverLineLayout layoutHoverLine(const Input& input) {
         return layout;
     }
     layout.lineShown = true;
-    layout.linePos = std::clamp(input.pointerPos, 0.0, input.overviewLength);
+    layout.linePos = layoutSnappedSeek(input).linePos;
     return layout;
 }
 

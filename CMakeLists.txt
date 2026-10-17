@@ -892,6 +892,7 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/engine/controls/loopingcontrol.cpp
   src/engine/controls/quantizecontrol.cpp
   src/engine/controls/ratecontrol.cpp
+  src/engine/controls/snappedseekcontrol.cpp
   src/engine/effects/engineeffect.cpp
   src/engine/effects/engineeffectchain.cpp
   src/engine/effects/engineeffectsdelay.cpp
@@ -2219,6 +2220,7 @@ if(BUILD_TESTING)
     src/test/seratotagstest.cpp
     src/test/signalpathtest.cpp
     src/test/skincontext_test.cpp
+    src/test/snappedseekcontrol_test.cpp
     src/test/softtakeover_test.cpp
     src/test/soundproxy_test.cpp
     src/test/soundsourceproviderregistrytest.cpp

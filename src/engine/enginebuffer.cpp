@@ -18,6 +18,7 @@
 #include "engine/controls/loopingcontrol.h"
 #include "engine/controls/quantizecontrol.h"
 #include "engine/controls/ratecontrol.h"
+#include "engine/controls/snappedseekcontrol.h"
 #include "engine/enginemixer.h"
 #include "engine/readaheadmanager.h"
 #include "engine/sync/enginesync.h"
@@ -224,6 +225,8 @@ EngineBuffer::EngineBuffer(const QString& group,
 
     m_pKeyControl = new KeyControl(group, pConfig);
     addControl(m_pKeyControl);
+
+    addControl(new SnappedSeekControl(group, pConfig));
 
     // Create the clock controller
     m_pClockControl = new ClockControl(group, pConfig);

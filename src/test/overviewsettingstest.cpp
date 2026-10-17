@@ -52,6 +52,8 @@ TEST_F(OverviewSettingsTest, EmptyConfigYieldsDefaults) {
     EXPECT_EQ(defaults.unit, hover.unit);
     EXPECT_EQ(defaults.precision, hover.precision);
     EXPECT_EQ(defaults.position, hover.position);
+    EXPECT_EQ(defaults.snapSeeks, hover.snapSeeks);
+    EXPECT_TRUE(hover.snapSeeks);
 }
 
 TEST_F(OverviewSettingsTest, LineSettingsRoundTrip) {
@@ -86,6 +88,7 @@ TEST_F(OverviewSettingsTest, HoverReadoutSettingsRoundTrip) {
     saved.unit = BeatDistanceUnit::Beats;
     saved.precision = BeatDistancePrecision::Fractional;
     saved.position = HoverReadoutPosition::AlwaysLeft;
+    saved.snapSeeks = false;
     saveHoverReadoutSettings(config(), saved);
 
     const HoverReadoutSettings loaded = loadHoverReadoutSettings(config());
@@ -96,6 +99,17 @@ TEST_F(OverviewSettingsTest, HoverReadoutSettingsRoundTrip) {
     EXPECT_EQ(BeatDistanceUnit::Beats, loaded.unit);
     EXPECT_EQ(BeatDistancePrecision::Fractional, loaded.precision);
     EXPECT_EQ(HoverReadoutPosition::AlwaysLeft, loaded.position);
+    EXPECT_FALSE(loaded.snapSeeks);
+}
+
+TEST_F(OverviewSettingsTest, SnapSeeksIsStoredUnderItsOwnKey) {
+    HoverReadoutSettings saved;
+    saved.snapSeeks = false;
+    saveHoverReadoutSettings(config(), saved);
+    EXPECT_EQ(0, config()->getValue(ConfigKey(kGroup, QStringLiteral("overviewHoverSnapSeeks")), -1));
+    saved.snapSeeks = true;
+    saveHoverReadoutSettings(config(), saved);
+    EXPECT_EQ(1, config()->getValue(ConfigKey(kGroup, QStringLiteral("overviewHoverSnapSeeks")), -1));
 }
 
 TEST_F(OverviewSettingsTest, InvalidHoverReadoutSettingsFallBackIndividually) {

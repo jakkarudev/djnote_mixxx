@@ -135,6 +135,12 @@ struct HoverReadoutCase {
     double breadth = 60.0;
     double length = kOverviewLength;
 
+    // The tests of the hover readout predate snapped seeks and describe the
+    // overview with the setting off.
+    HoverReadoutCase() {
+        settings.snapSeeks = false;
+    }
+
     Input input() const {
         Input in;
         in.trackSamples = kTrackFrames * 2;
@@ -954,4 +960,335 @@ TEST(OverviewLayoutOverCueTest, LabelOnlyDisplayStillTargetsTheCue) {
     c.settings.display = HoverDisplay::LabelOnly;
     EXPECT_EQ("-4 bars", c.readout().text);
     EXPECT_TRUE(layoutCueTimes(c.cueInput()).hidden);
+}
+
+// ---------------------------------------------------------------------------
+// Snapped seek
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// Frame of a (fractional) beat index on kConstTempoBeats.
+double constBeatFrame(double beatIndex) {
+    return 400 + beatIndex * 24000.0;
+}
+
+// Overview pixel of a frame (1000 px for kTrackFrames).
+double framePx(double frame) {
+    return frame / kTrackFrames * kOverviewLength;
+}
+
+struct SnapCase : HoverReadoutCase {
+    SnapCase() {
+        settings.snapSeeks = true;
+        state = TimeRulerState::Inactive;
+        settings.unit = BeatDistanceUnit::Bars;
+        settings.precision = BeatDistancePrecision::Whole;
+        playBeat(100);
+        pointerBeat(100);
+    }
+    SnapCase& playBeat(double beatIndex) {
+        playFrame = constBeatFrame(beatIndex);
+        return *this;
+    }
+    SnapCase& pointerBeat(double beatIndex) {
+        pointerFrame = constBeatFrame(beatIndex);
+        return *this;
+    }
+    Input snapInput() const {
+        Input in = input();
+        in.pointerPresent = true;
+        return in;
+    }
+    SnappedSeekLayout snap() const {
+        return layoutSnappedSeek(snapInput());
+    }
+};
+
+} // namespace
+
+TEST(OverviewLayoutSnappedSeekTest, SnapsToTheBarLineNearestThePointer) {
+    // Bar lines are on beats 104, 108, 112. The midpoint between 108 and 112
+    // is beat 110.
+    SnapCase c;
+    c.pointerBeat(109.9);
+    auto snap = c.snap();
+    EXPECT_TRUE(snap.snapped);
+    EXPECT_NEAR(framePx(constBeatFrame(108)), snap.linePos, 1e-9);
+    EXPECT_EQ(2, snap.jumpCount);
+
+    c.pointerBeat(110.1);
+    snap = c.snap();
+    EXPECT_NEAR(framePx(constBeatFrame(112)), snap.linePos, 1e-9);
+    EXPECT_EQ(3, snap.jumpCount);
+}
+
+TEST(OverviewLayoutSnappedSeekTest, HoverLineFollowsTheSnappedLine) {
+    SnapCase c;
+    c.pointerBeat(109.9);
+    const auto line = layoutHoverLine(c.snapInput());
+    EXPECT_TRUE(line.lineShown);
+    EXPECT_NEAR(framePx(constBeatFrame(108)), line.linePos, 1e-9);
+}
+
+TEST(OverviewLayoutSnappedSeekTest, HoverLineStaysPutWhilePlayMarkerCrossesBarLines) {
+    // Still mouse on a playing deck: only the count changes. The play marker
+    // passes the bar line on beat 100 (bar 25).
+    SnapCase c;
+    c.pointerBeat(163.9);
+    c.playBeat(99.9);
+    auto snap = c.snap();
+    const double linePos = snap.linePos;
+    EXPECT_EQ(17, snap.jumpCount); // bar 24 -> bar 41
+    c.playBeat(100.1);
+    snap = c.snap();
+    EXPECT_DOUBLE_EQ(linePos, snap.linePos);
+    EXPECT_EQ(16, snap.jumpCount); // bar 25 -> bar 41
+}
+
+TEST(OverviewLayoutSnappedSeekTest, JumpCountWithPlayMarkerOffItsBarLine) {
+    // The play marker is 0.3 beats after the line of the bar starting on beat
+    // 100; the pointer is nearest the line on beat 164, 16 bars later.
+    SnapCase c;
+    c.playBeat(100.3);
+    c.pointerBeat(164.6);
+    const auto snap = c.snap();
+    EXPECT_EQ(16, snap.jumpCount);
+    EXPECT_EQ(64, snap.jumpBeats);
+    EXPECT_NEAR(framePx(constBeatFrame(164)), snap.linePos, 1e-9);
+    // Exactly 64 beats later along the grid, keeping the offset.
+    EXPECT_NEAR(2 * constBeatFrame(164.3), snap.landingSamples, 1e-6);
+}
+
+TEST(OverviewLayoutSnappedSeekTest, PlayMarkerOnItsBarLineLandsOnTheTargetBarLine) {
+    SnapCase c;
+    c.pointerBeat(163.9);
+    const auto snap = c.snap();
+    EXPECT_EQ(16, snap.jumpCount);
+    EXPECT_NEAR(2 * constBeatFrame(164), snap.landingSamples, 1e-6);
+}
+
+TEST(OverviewLayoutSnappedSeekTest, BackwardJump) {
+    SnapCase c;
+    c.playBeat(100.3);
+    c.pointerBeat(36.2);
+    const auto snap = c.snap();
+    EXPECT_EQ(-16, snap.jumpCount);
+    EXPECT_NEAR(2 * constBeatFrame(36.3), snap.landingSamples, 1e-6);
+}
+
+TEST(OverviewLayoutSnappedSeekTest, SnappingToThePlayMarkersOwnBarDoesNothing) {
+    SnapCase c;
+    c.playBeat(101.5);
+    c.pointerBeat(100.5);
+    auto snap = c.snap();
+    EXPECT_TRUE(snap.snapped);
+    EXPECT_EQ(0, snap.jumpCount);
+    EXPECT_EQ(0, snap.jumpBeats);
+    EXPECT_NEAR(framePx(constBeatFrame(100)), snap.linePos, 1e-9);
+    EXPECT_NEAR(2 * constBeatFrame(101.5), snap.landingSamples, 1e-6);
+    EXPECT_EQ("0 bars", layoutHoverReadout(c.snapInput()).text);
+
+    // Past the middle of the own bar the next bar's line is nearest.
+    c.pointerBeat(102.5);
+    snap = c.snap();
+    EXPECT_EQ(1, snap.jumpCount);
+}
+
+TEST(OverviewLayoutSnappedSeekTest, BeatsUnitSnapsToBeats) {
+    SnapCase c;
+    c.settings.unit = BeatDistanceUnit::Beats;
+    c.playBeat(100.3);
+    c.pointerBeat(105.6);
+    auto snap = c.snap();
+    EXPECT_EQ(6, snap.jumpCount); // beat 106 - beat 100
+    EXPECT_EQ(6, snap.jumpBeats);
+    EXPECT_NEAR(framePx(constBeatFrame(106)), snap.linePos, 1e-9);
+    EXPECT_NEAR(2 * constBeatFrame(106.3), snap.landingSamples, 1e-6);
+    EXPECT_EQ("+6 beats", layoutHoverReadout(c.snapInput()).text);
+
+    c.pointerBeat(105.4);
+    EXPECT_EQ(5, c.snap().jumpCount);
+}
+
+TEST(OverviewLayoutSnappedSeekTest, SnappingNeverUsesDecimals) {
+    SnapCase c;
+    c.settings.precision = BeatDistancePrecision::Fractional;
+    c.pointerBeat(109.9);
+    const auto snap = c.snap();
+    EXPECT_EQ(2, snap.jumpCount);
+    EXPECT_NEAR(framePx(constBeatFrame(108)), snap.linePos, 1e-9);
+}
+
+TEST(OverviewLayoutSnappedSeekTest, WholeLabelShowsTheJumpCount) {
+    SnapCase c;
+    c.settings.position = HoverReadoutPosition::AlwaysRight;
+    c.playBeat(100.3);
+    c.pointerBeat(164.6);
+    const auto readout = layoutHoverReadout(c.snapInput());
+    EXPECT_TRUE(readout.shown);
+    EXPECT_EQ("+16 bars", readout.text);
+    // The label sits at the snapped line.
+    EXPECT_NEAR(framePx(constBeatFrame(164)), readout.anchorPos, 1e-9);
+}
+
+TEST(OverviewLayoutSnappedSeekTest, FractionalLabelShowsTheTrueBeatDistance) {
+    // The play marker is 0.075 bar (0.3 beats) into bar 10 (beat 40), the
+    // pointer is at 25.525 bars: the label shows 15.45 bars while the jump
+    // is to bar 26, 16 bars.
+    SnapCase c;
+    c.settings.precision = BeatDistancePrecision::Fractional;
+    c.playBeat(40.3);
+    c.pointerBeat(25.525 * 4);
+    EXPECT_EQ("+15.45 bars", layoutHoverReadout(c.snapInput()).text);
+    EXPECT_EQ(16, c.snap().jumpCount);
+
+    c.settings.precision = BeatDistancePrecision::Whole;
+    EXPECT_EQ("+16 bars", layoutHoverReadout(c.snapInput()).text);
+}
+
+TEST(OverviewLayoutSnappedSeekTest, LabelIsNotNeededForSnapping) {
+    SnapCase c;
+    c.pointerBeat(163.9);
+    c.settings.showHoverReadout = false;
+    EXPECT_EQ(16, c.snap().jumpCount);
+    c.settings.showHoverReadout = true;
+    c.settings.display = HoverDisplay::LineOnly;
+    EXPECT_EQ(16, c.snap().jumpCount);
+    c.settings.hoverMode = HoverMode::SeparateHoverLine;
+    c.state = TimeRulerState::LeftDrag;
+    EXPECT_EQ(16, c.snap().jumpCount);
+}
+
+TEST(OverviewLayoutSnappedSeekTest, TimeRulerLineSnapsInBothHoverModes) {
+    for (const auto mode : {HoverMode::ExtendTimeRuler, HoverMode::SeparateHoverLine}) {
+        SnapCase c;
+        c.settings.hoverMode = mode;
+        c.state = TimeRulerState::RightClickHold;
+        c.pointerBeat(109.9);
+        const auto ruler = layoutTimeRuler(c.snapInput());
+        EXPECT_TRUE(ruler.lineShown);
+        EXPECT_NEAR(framePx(constBeatFrame(108)), ruler.linePos, 1e-9);
+    }
+}
+
+TEST(OverviewLayoutSnappedSeekTest, TimeRulerLabelsDescribeTheLandingSpot) {
+    // 120 BPM from frame 0: one beat is 0.5 s. The play marker is on beat
+    // 100.5 (50.25 s); the pointer is nearest the bar line on beat 164, so
+    // the landing spot is beat 164.5 (82.25 s of the 100 s track).
+    const auto beats = Beats(audio::FramePos(0), kBpm, kSampleRate, QString());
+    SnapCase c;
+    c.pBeats = &beats;
+    c.playFrame = 100.5 * 24000;
+    c.pointerFrame = 163.5 * 24000;
+    c.state = TimeRulerState::RightClickHold;
+    const auto ruler = layoutTimeRuler(c.snapInput());
+    EXPECT_EQ("1:22 -0:17", ruler.positionLabelText);
+    EXPECT_EQ("0:32", ruler.distanceLabelText);
+    EXPECT_NEAR(framePx(164 * 24000.0), ruler.linePos, 1e-9);
+
+    // Left-drag has the same labels (and no ruler line).
+    c.state = TimeRulerState::LeftDrag;
+    const auto drag = layoutTimeRuler(c.snapInput());
+    EXPECT_FALSE(drag.lineShown);
+    EXPECT_EQ(ruler.positionLabelText, drag.positionLabelText);
+    EXPECT_EQ(ruler.distanceLabelText, drag.distanceLabelText);
+}
+
+TEST(OverviewLayoutSnappedSeekTest, JoinedDistanceLabelUsesTheLandingSpot) {
+    const auto beats = Beats(audio::FramePos(0), kBpm, kSampleRate, QString());
+    SnapCase c;
+    c.pBeats = &beats;
+    c.playFrame = 100.5 * 24000;
+    c.pointerFrame = 163.5 * 24000;
+    c.state = TimeRulerState::RightClickHold;
+    c.breadth = 20.0; // too short for three label rows
+    const auto readout = layoutHoverReadout(c.snapInput());
+    EXPECT_EQ("0:32  +16 bars", readout.joinedDistanceLabelText);
+}
+
+TEST(OverviewLayoutSnappedSeekTest, BarLinesContinueBeforeTheFirstBeat) {
+    // The first beat is 5 beats into the track, so the bar lines before it
+    // are on beats -4 (frame 24000) and -8 (before the start).
+    const auto beats = Beats(audio::FramePos(5 * 24000), kBpm, kSampleRate, QString());
+    SnapCase c;
+    c.pBeats = &beats;
+    c.playFrame = (5 + 6) * 24000.0; // beat index 6: bar 1, 2 beats in
+    c.pointerFrame = 30000;          // beat index -3.75
+    const auto snap = c.snap();
+    EXPECT_EQ(-2, snap.jumpCount);
+    EXPECT_NEAR(framePx(24000), snap.linePos, 1e-9);
+    EXPECT_NEAR(2 * (5 + 6 - 8) * 24000.0, snap.landingSamples, 1e-6);
+}
+
+TEST(OverviewLayoutSnappedSeekTest, LandingPastTheEndIsClampedToTheEnd) {
+    SnapCase c;
+    c.playBeat(100.3);
+    c.pointerFrame = kTrackFrames; // nearest bar line is beat 200, 25 bars on
+    const auto snap = c.snap();
+    EXPECT_EQ(25, snap.jumpCount);
+    EXPECT_DOUBLE_EQ(kTrackFrames * 2, snap.landingSamples);
+
+    c.state = TimeRulerState::RightClickHold;
+    EXPECT_EQ("1:40 -0:00", layoutTimeRuler(c.snapInput()).positionLabelText);
+}
+
+TEST(OverviewLayoutSnappedSeekTest, VariableTempoGridKeepsTheOffsetAlongTheGrid) {
+    // Beats 0-8 are 24000 frames long, 8-24 are 48000 frames long. The play
+    // marker is on beat 6.5; the pointer is on the line of bar 3 (beat 12).
+    // 2 bars (8 beats) later is beat 14.5: half a (long) beat after beat 14.
+    SnapCase c;
+    c.pBeats = &kNonConstTempoBeats;
+    c.playFrame = 400 + 6.5 * 24000;
+    c.pointerFrame = 400 + 192000 + 4 * 48000.0;
+    const auto snap = c.snap();
+    EXPECT_EQ(2, snap.jumpCount);
+    EXPECT_EQ(8, snap.jumpBeats);
+    EXPECT_NEAR(framePx(400 + 192000 + 4 * 48000.0), snap.linePos, 1e-9);
+    EXPECT_NEAR(2 * 504400.0, snap.landingSamples, 1e-6);
+}
+
+TEST(OverviewLayoutSnappedSeekTest, SettingOffBehavesAsBefore) {
+    SnapCase c;
+    c.settings.snapSeeks = false;
+    c.settings.position = HoverReadoutPosition::AlwaysRight;
+    c.playBeat(100.3);
+    c.pointerBeat(164.6);
+    const auto snap = c.snap();
+    EXPECT_FALSE(snap.snapped);
+    EXPECT_EQ(0, snap.jumpBeats);
+    EXPECT_NEAR(framePx(constBeatFrame(164.6)), snap.linePos, 1e-9);
+    EXPECT_NEAR(2 * constBeatFrame(164.6), snap.landingSamples, 1e-6);
+    // Line and label follow the pointer.
+    EXPECT_NEAR(framePx(constBeatFrame(164.6)), layoutHoverLine(c.snapInput()).linePos, 1e-9);
+    EXPECT_EQ("+16 bars", layoutHoverReadout(c.snapInput()).text); // 16.075 bars
+    c.pointerBeat(160.9);
+    EXPECT_EQ("+15 bars", layoutHoverReadout(c.snapInput()).text); // 15.15 bars
+    c.state = TimeRulerState::RightClickHold;
+    EXPECT_NEAR(framePx(constBeatFrame(160.9)), layoutTimeRuler(c.snapInput()).linePos, 1e-9);
+}
+
+TEST(OverviewLayoutSnappedSeekTest, NoBeatGridBehavesAsBefore) {
+    SnapCase c;
+    c.pBeats = nullptr;
+    c.pointerBeat(164.6);
+    const auto snap = c.snap();
+    EXPECT_FALSE(snap.snapped);
+    EXPECT_EQ(0, snap.jumpBeats);
+    EXPECT_NEAR(framePx(constBeatFrame(164.6)), snap.linePos, 1e-9);
+    EXPECT_NEAR(2 * constBeatFrame(164.6), snap.landingSamples, 1e-6);
+    EXPECT_NEAR(framePx(constBeatFrame(164.6)), layoutHoverLine(c.snapInput()).linePos, 1e-9);
+    EXPECT_FALSE(layoutHoverReadout(c.snapInput()).shown);
+}
+
+TEST(OverviewLayoutSnappedSeekTest, HoveredCueIsStillTheTargetOfTheReadout) {
+    SnapCase c;
+    c.playBeat(100.3);
+    Input in = c.snapInput();
+    in.cueHovered = true;
+    in.hoveredCueSamples = 2 * constBeatFrame(90.5);
+    in.hoveredCuePos = framePx(constBeatFrame(90.5));
+    const auto readout = layoutHoverReadout(in);
+    EXPECT_NEAR(in.hoveredCuePos, readout.anchorPos, 1e-9);
+    EXPECT_FALSE(layoutHoverLine(in).lineShown);
 }

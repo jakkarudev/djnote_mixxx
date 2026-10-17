@@ -796,6 +796,16 @@ Select from different types of displays for the waveform, which differ primarily
           </property>
          </widget>
         </item>
+        <item row="7" column="0" colspan="2">
+         <widget class="QCheckBox" name="snapSeeksCheckBox">
+          <property name="toolTip">
+           <string>Clicking or dragging on the overview moves the play position by whole bars (or beats, see Unit) along the beat grid, keeping the play position's offset from the grid. The hover line snaps to the bar line (or beat) nearest the mouse. Applies to tracks with a beat grid.</string>
+          </property>
+          <property name="text">
+           <string>Snap seeks to beat distance</string>
+          </property>
+         </widget>
+        </item>
        </layout>
       </widget>
      </item>

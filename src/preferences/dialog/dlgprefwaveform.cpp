@@ -284,6 +284,10 @@ DlgPrefWaveform::DlgPrefWaveform(
             QOverload<int>::of(&QComboBox::currentIndexChanged),
             this,
             &DlgPrefWaveform::slotSetOverviewHoverReadout);
+    connect(snapSeeksCheckBox,
+            &QCheckBox::toggled,
+            this,
+            &DlgPrefWaveform::slotSetOverviewHoverReadout);
 
     setScrollSafeGuardForAllInputWidgets(this);
 }
@@ -436,6 +440,7 @@ void DlgPrefWaveform::showHoverReadoutControls(
             hoverLabelPositionComboBox->findData(static_cast<int>(settings.position)));
     hoverOverCueComboBox->setCurrentIndex(
             hoverOverCueComboBox->findData(static_cast<int>(settings.overCue)));
+    snapSeeksCheckBox->setChecked(settings.snapSeeks);
 }
 
 void DlgPrefWaveform::slotSetOverviewHoverReadout() {
@@ -450,6 +455,7 @@ void DlgPrefWaveform::slotSetOverviewHoverReadout() {
     settings.position =
             static_cast<HoverReadoutPosition>(hoverLabelPositionComboBox->currentData().toInt());
     settings.overCue = static_cast<HoverOverCue>(hoverOverCueComboBox->currentData().toInt());
+    settings.snapSeeks = snapSeeksCheckBox->isChecked();
     WaveformWidgetFactory::instance()->setOverviewHoverReadoutSettings(settings);
 }
 

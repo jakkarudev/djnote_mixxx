@@ -113,7 +113,9 @@ class WOverview : public WWidget, public TrackDropTarget {
     void drawRangeMarks(QPainter* pPainter, const float& offset, const float& gain);
     // Where the line of a mark at the given sample position is drawn.
     float markLinePosition(double samplePosition, float offset, float gain) const;
-    // The overview's state for the overview layout module.
+    // The overview's state for the overview layout module: for the seek and
+    // the time ruler, and with the hover readout and the cue times.
+    mixxx::overviewlayout::Input makeSeekInput(const mixxx::Beats* pBeats);
     mixxx::overviewlayout::Input makeLayoutInput(const QFont& markerFont,
             const mixxx::Beats* pBeats,
             float offset,
@@ -123,7 +125,7 @@ class WOverview : public WWidget, public TrackDropTarget {
             const float offset,
             const float gain,
             const mixxx::overviewlayout::CueTimesLayout& cueTimesLayout);
-    void drawPickupPosition(QPainter* pPainter);
+    void drawPickupPosition(QPainter* pPainter, int pickupPos);
     void drawTimeRuler(QPainter* pPainter,
             const mixxx::overviewlayout::Input& layoutInput,
             const mixxx::overviewlayout::HoverReadoutLayout& readoutLayout);
@@ -236,6 +238,7 @@ class WOverview : public WWidget, public TrackDropTarget {
     PollingControlProxy m_trackSampleRateControl;
     PollingControlProxy m_trackSamplesControl;
     PollingControlProxy m_playpositionControl;
+    parented_ptr<ControlProxy> m_pSnappedSeekControl;
     parented_ptr<ControlProxy> m_pPassthroughControl;
     parented_ptr<ControlProxy> m_pTypeControl;
 

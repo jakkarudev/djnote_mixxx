@@ -74,6 +74,8 @@ struct HoverReadoutSettings {
     HoverReadoutPosition position = HoverReadoutPosition::Auto;
     HoverMode hoverMode = HoverMode::ExtendTimeRuler;
     HoverOverCue overCue = HoverOverCue::JoinCueTimes;
+    // Snapped seek (see layoutSnappedSeek()).
+    bool snapSeeks = true;
 };
 
 struct Input {
@@ -124,6 +126,27 @@ struct Input {
     // Gap between a line and a label next to it, in pixels.
     double labelGap = 0.0;
 };
+
+// A snapped seek: the hover line and the time ruler's line sit on the bar line
+// (Unit = Bars) or beat (Unit = Beats) nearest the pointer, and a seek from
+// the overview moves the play position by the whole number of bars or beats
+// between the one the play marker is in and that one. The play position keeps
+// its offset from the beat grid. Snapping needs "Snap seeks to beat distance"
+// and a beat grid; it does not depend on the hover readout or its Display.
+struct SnappedSeekLayout {
+    // Whether snapping is in effect. If not, the hover line, the time ruler
+    // and the seek follow the pointer, and the other fields describe that.
+    bool snapped = false;
+    // The line's position along the track axis, clamped to [0, overviewLength].
+    double linePos = 0.0;
+    // The jump in bars or beats (the Unit), and in beats. Zero if not snapped.
+    int jumpCount = 0;
+    int jumpBeats = 0;
+    // Where a seek lands, in engine samples, clamped to the track.
+    double landingSamples = 0.0;
+};
+
+SnappedSeekLayout layoutSnappedSeek(const Input& input);
 
 struct TimeRulerLayout {
     bool lineShown = false;
