@@ -55,6 +55,13 @@ constexpr double kAutoSideSwitchFraction = 0.75;
 // Slack for floating point error when checking whether a label fits.
 constexpr double kFitTolerance = 1e-6;
 
+// How far below a beat the play marker may be and still count as on it, in
+// beats. The rounding error of the play position's round trip through a
+// fraction of the track is around a billionth of a frame; a millionth of a beat
+// is far above it and, at a few hundredths of a frame, far below any offset
+// that matters.
+constexpr double kPlayMarkerTolerance = 1e-6;
+
 // Fractional index of a track position on the beat grid: 0 at the grid's first
 // marker, +1 at every following beat, linear inside a beat interval.
 double fractionalBeatIndex(const Beats& beats, audio::FramePos position) {
@@ -205,20 +212,38 @@ SnappedSeekLayout layoutSnappedSeek(const Input& input) {
     // The bar (or beat) line nearest the pointer, and the bar (or beat) the
     // play marker is in, both as a count of units from the grid's first beat.
     // Counts are negative before it: the grid's bars continue backwards.
-    const auto targetUnit = static_cast<int>(
+    auto targetUnit = static_cast<int>(
             std::floor(fractionalBeatIndex(beats, pointerPosition) / unitBeats + 0.5));
-    const auto playUnit = static_cast<int>(
-            std::floor(fractionalBeatIndex(beats, playPosition) / unitBeats));
+    // The play marker can sit exactly on a bar line or beat, but the GUI only
+    // has it as a fraction of the track, which may round to a hair before the
+    // line. Without the tolerance that would count as the previous bar.
+    const auto playUnit = static_cast<int>(std::floor(
+            (fractionalBeatIndex(beats, playPosition) + kPlayMarkerTolerance) / unitBeats));
+
+    // Only lines within the track count. The pointer is within the track, so
+    // if the nearest line is before its start, the next one is the nearest
+    // within it.
+    const auto unitLine = [&](int unit) {
+        return *(beats.cfirstmarker() + unit * unitBeats);
+    };
+    while (unitLine(targetUnit) < audio::FramePos(0.0)) {
+        ++targetUnit;
+    }
 
     layout.snapped = true;
     layout.jumpCount = targetUnit - playUnit;
     layout.jumpBeats = layout.jumpCount * unitBeats;
+    layout.seek = layout.jumpBeats == 0 ? SnappedSeekLayout::Seek::None
+                                        : SnappedSeekLayout::Seek::SnappedJump;
 
-    const audio::FramePos linePosition = *(beats.cfirstmarker() + targetUnit * unitBeats);
+    const audio::FramePos linePosition = unitLine(targetUnit);
     layout.linePos = std::clamp(
             linePosition.toEngineSamplePos() / input.trackSamples * input.overviewLength,
             0.0,
             input.overviewLength);
+    layout.pickupPos = static_cast<int>(std::clamp(std::round(layout.linePos),
+            0.0,
+            std::max(std::floor(input.overviewLength) - 1.0, 0.0)));
 
     // The same computation the engine makes when it processes the seek.
     const audio::FramePos landing = beats.findNBeatsFromPosition(playPosition, layout.jumpBeats);

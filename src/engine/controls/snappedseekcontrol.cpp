@@ -57,7 +57,9 @@ void SnappedSeekControl::process(const double dRate,
     if (!seekPosition.isValid()) {
         return;
     }
-    seekPosition = std::min(seekPosition, trackEndPosition);
+    // The layout in the overview never lands outside the track, and neither
+    // does the engine, whatever the grid says before the first beat.
+    seekPosition = std::clamp(seekPosition, mixxx::audio::FramePos(0.0), trackEndPosition);
     // seekExact bypasses Quantize, like a beat jump does. A loop is left
     // alone: it is handled as for any other seek.
     seekExact(seekPosition);

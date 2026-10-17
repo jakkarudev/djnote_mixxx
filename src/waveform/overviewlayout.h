@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include <QString>
 #include <functional>
 
@@ -132,8 +134,23 @@ struct Input {
 // the overview moves the play position by the whole number of bars or beats
 // between the one the play marker is in and that one. The play position keeps
 // its offset from the beat grid. Snapping needs "Snap seeks to beat distance"
-// and a beat grid; it does not depend on the hover readout or its Display.
+// and a beat grid. It applies whether or not the hover readout's label is
+// shown (so independent of its Display), and uses the readout's Unit.
+// Snapping only ever uses bar lines and beats within the track.
 struct SnappedSeekLayout {
+    // What a seek from the overview requests.
+    enum class Seek {
+        // Nothing: the jump is zero bars (or beats).
+        None,
+        // The pointer's position in the track, as for a seek without snapping.
+        ToPointer,
+        // A relative jump of jumpBeats along the beat grid.
+        SnappedJump,
+    };
+    Seek seek = Seek::ToPointer;
+    // The position of the pickup line drawn during a left-drag, rounded to a
+    // pixel. Empty if the overview keeps its own, i.e. if not snapped.
+    std::optional<int> pickupPos;
     // Whether snapping is in effect. If not, the hover line, the time ruler
     // and the seek follow the pointer, and the other fields describe that.
     bool snapped = false;

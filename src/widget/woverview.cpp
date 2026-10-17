@@ -588,18 +588,21 @@ void WOverview::mouseReleaseEvent(QMouseEvent* e) {
                 const mixxx::overviewlayout::SnappedSeekLayout snap =
                         mixxx::overviewlayout::layoutSnappedSeek(makeSeekInput(
                                 m_pCurrentTrack ? m_pCurrentTrack->getBeats().get() : nullptr));
-                if (snap.snapped) {
+                switch (snap.seek) {
+                case mixxx::overviewlayout::SnappedSeekLayout::Seek::SnappedJump:
                     // A relative jump along the beat grid, made by the engine.
                     // The pickup position goes back to the play position; it
                     // follows it when the engine has moved it.
                     m_iPickupPos = m_iPlayPos;
-                    if (snap.jumpBeats != 0) {
-                        m_pSnappedSeekControl->set(snap.jumpBeats);
-                    }
-                } else {
+                    m_pSnappedSeekControl->set(snap.jumpBeats);
+                    break;
+                case mixxx::overviewlayout::SnappedSeekLayout::Seek::None:
+                    m_iPickupPos = m_iPlayPos;
+                    break;
+                case mixxx::overviewlayout::SnappedSeekLayout::Seek::ToPointer:
                     m_iPlayPos = m_iPickupPos;
-                    double dValue = positionToValue(m_iPickupPos);
-                    setControlParameterUp(dValue);
+                    setControlParameterUp(positionToValue(m_iPickupPos));
+                    break;
                 }
                 m_bLeftClickDragging = false;
             } else {
@@ -754,8 +757,8 @@ void WOverview::paintEvent(QPaintEvent* pEvent) {
             if (m_bLeftClickDragging && m_bTimeRulerActive) {
                 const mixxx::overviewlayout::SnappedSeekLayout snap =
                         mixxx::overviewlayout::layoutSnappedSeek(layoutInput);
-                if (snap.snapped) {
-                    pickupPos = math_clamp(static_cast<int>(snap.linePos), 0, length() - 1);
+                if (snap.pickupPos) {
+                    pickupPos = *snap.pickupPos;
                 }
             }
             drawPickupPosition(&painter, pickupPos);

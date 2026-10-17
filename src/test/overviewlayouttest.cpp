@@ -1221,6 +1221,97 @@ TEST(OverviewLayoutSnappedSeekTest, BarLinesContinueBeforeTheFirstBeat) {
     EXPECT_NEAR(2 * (5 + 6 - 8) * 24000.0, snap.landingSamples, 1e-6);
 }
 
+TEST(OverviewLayoutSnappedSeekTest, NeverSnapsToABarLineBeforeTheTrackStart) {
+    // The first beat is 3 beats into the track: the bar line on beat index -4
+    // is before the start of the track, the next one is on the first beat.
+    const auto beats = Beats(audio::FramePos(3 * 24000), kBpm, kSampleRate, QString());
+    SnapCase c;
+    c.pBeats = &beats;
+    c.playFrame = (3 + 5) * 24000.0; // beat index 5: bar 1, 1 beat in
+    c.pointerFrame = 0;              // beat index -3, nearest bar line is -4
+    const auto snap = c.snap();
+    EXPECT_TRUE(snap.snapped);
+    EXPECT_EQ(-1, snap.jumpCount);
+    EXPECT_NEAR(framePx(3 * 24000), snap.linePos, 1e-9);
+    EXPECT_NEAR(2 * (3 + 1) * 24000.0, snap.landingSamples, 1e-6);
+    EXPECT_GE(snap.landingSamples, 0.0);
+}
+
+TEST(OverviewLayoutSnappedSeekTest, NeverSnapsToABeatBeforeTheTrackStart) {
+    // The first beat is 3.6 beats into the track: the beat on index -4 is 0.4
+    // beats before the start and is the nearest to the start of the track.
+    const auto beats = Beats(audio::FramePos(3.6 * 24000), kBpm, kSampleRate, QString());
+    SnapCase c;
+    c.settings.unit = BeatDistanceUnit::Beats;
+    c.pBeats = &beats;
+    c.playFrame = (3.6 + 5.5) * 24000.0;
+    c.pointerFrame = 0; // beat index -3.6
+    const auto snap = c.snap();
+    EXPECT_EQ(-8, snap.jumpCount); // beat index -3 - beat index 5
+    EXPECT_NEAR(framePx(0.6 * 24000), snap.linePos, 1e-6);
+    EXPECT_NEAR(2 * (0.6 + 0.5) * 24000.0, snap.landingSamples, 1e-6);
+}
+
+TEST(OverviewLayoutSnappedSeekTest, PlayMarkerAHairBelowABarLineIsOnIt) {
+    // The GUI has the play position as a fraction of the track, so a play
+    // marker exactly on the line of the bar starting on beat 100 can come out
+    // a hair before it.
+    SnapCase c;
+    c.playFrame = constBeatFrame(100) * (1 - 1e-12);
+    ASSERT_LT(c.playFrame, constBeatFrame(100));
+    c.pointerBeat(163.9);
+    const auto snap = c.snap();
+    EXPECT_EQ(16, snap.jumpCount);
+    EXPECT_EQ(64, snap.jumpBeats);
+    EXPECT_NEAR(2 * constBeatFrame(164), snap.landingSamples, 1e-3);
+
+    // The same in Beats.
+    c.settings.unit = BeatDistanceUnit::Beats;
+    c.pointerBeat(163.9);
+    EXPECT_EQ(64, c.snap().jumpCount);
+}
+
+TEST(OverviewLayoutSnappedSeekTest, PlayMarkerJustBelowTheToleranceIsInThePreviousBar) {
+    SnapCase c;
+    c.playBeat(100 - 1e-3);
+    c.pointerBeat(163.9);
+    EXPECT_EQ(17, c.snap().jumpCount);
+}
+
+TEST(OverviewLayoutSnappedSeekTest, SeekRequestsWhatTheSeekIs) {
+    SnapCase c;
+    c.playBeat(100.3);
+    c.pointerBeat(164.6);
+    auto snap = c.snap();
+    EXPECT_EQ(SnappedSeekLayout::Seek::SnappedJump, snap.seek);
+    EXPECT_EQ(64, snap.jumpBeats);
+
+    c.pointerBeat(100.5); // the play marker's own bar
+    EXPECT_EQ(SnappedSeekLayout::Seek::None, c.snap().seek);
+
+    c.settings.snapSeeks = false;
+    EXPECT_EQ(SnappedSeekLayout::Seek::ToPointer, c.snap().seek);
+    EXPECT_FALSE(c.snap().pickupPos.has_value());
+
+    c.settings.snapSeeks = true;
+    c.pBeats = nullptr;
+    EXPECT_EQ(SnappedSeekLayout::Seek::ToPointer, c.snap().seek);
+    EXPECT_FALSE(c.snap().pickupPos.has_value());
+}
+
+TEST(OverviewLayoutSnappedSeekTest, PickupPositionIsTheSnappedLineRounded) {
+    // The bar line on beat index 8 is at pixel 40.55: rounded, not truncated.
+    const auto beats = Beats(audio::FramePos(2640), kBpm, kSampleRate, QString());
+    SnapCase c;
+    c.pBeats = &beats;
+    c.playFrame = 2640;
+    c.pointerFrame = 2640 + 9 * 24000.0;
+    const auto snap = c.snap();
+    EXPECT_NEAR(40.55, snap.linePos, 1e-9);
+    ASSERT_TRUE(snap.pickupPos.has_value());
+    EXPECT_EQ(41, *snap.pickupPos);
+}
+
 TEST(OverviewLayoutSnappedSeekTest, LandingPastTheEndIsClampedToTheEnd) {
     SnapCase c;
     c.playBeat(100.3);

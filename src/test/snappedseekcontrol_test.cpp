@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cmath>
 #include <memory>
 
 #include "control/controlobject.h"
@@ -82,6 +83,12 @@ TEST_F(SnappedSeekControlTest, ZeroBeatsDoesNotMove) {
     EXPECT_NEAR(4.3 * kBeatFrames, position(), kFrameTolerance);
 }
 
+TEST_F(SnappedSeekControlTest, LandingBeforeTheStartIsClampedToTheStart) {
+    seekTo(1.3);
+    snappedSeek(-4);
+    EXPECT_NEAR(0.0, position(), kFrameTolerance);
+}
+
 TEST_F(SnappedSeekControlTest, LandingPastTheEndIsClampedToTheEnd) {
     seekTo(15.3);
     snappedSeek(16);
@@ -105,6 +112,15 @@ TEST_F(SnappedSeekControlTest, ExactWhilePlayingWithQuantizeAndAnotherDeckPlayin
     const double advance = advancePerBuffer();
     ASSERT_GT(advance, 0.0);
 
+    // Contrast: a standard seek to a spot a whole number of beats away is
+    // moved to match the phase of the other deck, so it lands elsewhere.
+    const double target = position() + 8 * kBeatFrames;
+    ControlObject::set(ConfigKey(m_sGroup1, "playposition"),
+            target / (ControlObject::get(ConfigKey(m_sGroup1, "track_samples")) / 2));
+    ProcessBuffer();
+    EXPECT_GT(std::abs(position() - (target + advance)), 0.01 * kBeatFrames);
+    seekTo(4.3);
+
     // The jump starts where the deck is when the request is processed, which
     // is where the next buffer starts, not where the request was made.
     requestSnappedSeek(8);
@@ -114,8 +130,9 @@ TEST_F(SnappedSeekControlTest, ExactWhilePlayingWithQuantizeAndAnotherDeckPlayin
 }
 
 TEST_F(SnappedSeekControlTest, ActiveLoopIsNotMoved) {
-    // A loop of 4 beats, from beat 2 to beat 6. A beat jump inside a loop
-    // would move the loop.
+    // The deck plays. A loop of 4 beats, from about beat 2 to about beat 6. A
+    // beat jump inside a loop would move the loop.
+    ControlObject::set(ConfigKey(m_sGroup1, "play"), 1.0);
     seekTo(2.0);
     ControlObject::set(ConfigKey(m_sGroup1, "beatloop_size"), 4.0);
     ControlObject::set(ConfigKey(m_sGroup1, "beatloop_activate"), 1.0);
@@ -125,17 +142,23 @@ TEST_F(SnappedSeekControlTest, ActiveLoopIsNotMoved) {
     const double loopStart = ControlObject::get(ConfigKey(m_sGroup1, "loop_start_position"));
     const double loopEnd = ControlObject::get(ConfigKey(m_sGroup1, "loop_end_position"));
     seekTo(2.5);
+    const double advance = advancePerBuffer();
+    ASSERT_GT(advance, 0.0);
 
-    snappedSeek(2);
-    EXPECT_NEAR(4.5 * kBeatFrames, position(), kFrameTolerance);
+    requestSnappedSeek(2);
+    double jumpStart = position();
+    ProcessBuffer();
+    EXPECT_NEAR(jumpStart + 2 * kBeatFrames + advance, position(), kFrameTolerance);
     EXPECT_EQ(loopStart, ControlObject::get(ConfigKey(m_sGroup1, "loop_start_position")));
     EXPECT_EQ(loopEnd, ControlObject::get(ConfigKey(m_sGroup1, "loop_end_position")));
     EXPECT_TRUE(ControlObject::toBool(ConfigKey(m_sGroup1, "loop_enabled")));
 
     // Jumping out of the loop leaves the loop where it is and turns it off, as
     // any other seek does.
-    snappedSeek(8);
-    EXPECT_NEAR(12.5 * kBeatFrames, position(), kFrameTolerance);
+    requestSnappedSeek(8);
+    jumpStart = position();
+    ProcessBuffer();
+    EXPECT_NEAR(jumpStart + 8 * kBeatFrames + advance, position(), kFrameTolerance);
     EXPECT_EQ(loopStart, ControlObject::get(ConfigKey(m_sGroup1, "loop_start_position")));
     EXPECT_EQ(loopEnd, ControlObject::get(ConfigKey(m_sGroup1, "loop_end_position")));
     EXPECT_FALSE(ControlObject::toBool(ConfigKey(m_sGroup1, "loop_enabled")));
