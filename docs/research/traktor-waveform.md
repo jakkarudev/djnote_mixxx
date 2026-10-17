@@ -303,7 +303,7 @@ The low-frequency "grain" in the original screenshots is therefore real signal s
 
 ### 8.5 Prototype check against a real track (2026-10-17)
 
-**Method.** `tools/PROTOTYPE_traktor_waveform.py` (throwaway, outside the build) renders the §8 model from the decoded FLAC. It draws signed min..max of (L+R)/2, sample-density brightness with per-channel clipping, and a smoothed colour from three zero-phase filters fitted to the §8.3 table. The target is the deck B lane of `SCREENSHOTS/waveforms/Screenshot 2026-10-17 203136.png` (CYK "Gigando", 04:41). The result is `SCREENSHOTS/waveforms/PROTOTYPE_gigando_comparison.png`. Fits are per-column outlines and per-region mean colours measured against the screenshot. Evidence is **[V]** plus those fits.
+**Method.** `tools/PROTOTYPE_traktor_waveform.py` (throwaway, outside the build; now `tools/phosphor_waveform.py`) renders the §8 model from the decoded FLAC. It draws signed min..max of (L+R)/2, sample-density brightness with per-channel clipping, and a smoothed colour from three zero-phase filters fitted to the §8.3 table. The target is the deck B lane of `SCREENSHOTS/waveforms/Screenshot 2026-10-17 203136.png` (CYK "Gigando", 04:41). The result is `SCREENSHOTS/waveforms/PROTOTYPE_gigando_comparison.png`. Fits are per-column outlines and per-region mean colours measured against the screenshot. Evidence is **[V]** plus those fits.
 
 - **NML `CUE_V2 START` is in milliseconds.** Gigando's AutoGrid starts at 1.16 ms, so bar 176 is at 281.60 s. Fitting the outlines independently puts the playhead at 281.59 s.
 - **Zoom:** 136.1 px per track second (217.4 px per bar at 150 BPM), i.e. 7.35 ms per column.
@@ -376,6 +376,38 @@ The low-frequency "grain" in the original screenshots is therefore real signal s
   - These look right on all five tracks without per-track tuning. Body colour error is 7–12 levels and centre-line error 9–20.
   - Remaining visible gap: yellow/white centre blobs between the kicks on dense tracks (*Progress Paradox*), where Traktor stays pink.
   - Sheets: `SCREENSHOTS/traktor_screenshots/PROTOTYPE_*_comparison.png`.
+
+### 8.6 Reference script checks (2026-10-18)
+
+`tools/phosphor_waveform.py` is the maintained reference script (the prototype promoted, see `docs/research/traktor-waveform-brief.md`, "Reproducing"). It uses the spec's decisions: a 2-column shape window, zoom in px per bar, linear-phase FIR colour filters and detail tiers. Both checks below ran on the five reference tracks (`--check-fir`, `--check-tiers`).
+
+**FFT vs FIR colours.** Whole-track zero-phase FFT filtering vs the 4096-tap FIR (overlap-add, delay-compensated). Difference of the final colour of a density-1 pixel (colour x 0.7, 0-255, unclipped), over the whole track:
+
+| Track | max R | max G | max B | mean R | mean G | mean B |
+|---|---|---|---|---|---|---|
+| Gigando | 0.47 | 0.29 | 0.37 | 0.104 | 0.059 | 0.043 |
+| ren intro meaning | 0.09 | 0.05 | 0.07 | 0.016 | 0.004 | 0.003 |
+| Braindrain intro | 0.31 | 0.20 | 0.12 | 0.073 | 0.020 | 0.010 |
+| Spiritual | 0.66 | 0.42 | 0.39 | 0.113 | 0.064 | 0.046 |
+| Progress Paradox | 0.55 | 0.38 | 0.52 | 0.160 | 0.090 | 0.061 |
+
+The worst difference is 0.66 levels, under the 2-level criterion. The FIR filters keep the defaults.
+
+**Detail tiers.** Pixel difference (0-255 per channel, whole lane) of each tier from Full, at the fitted play marker plus four more positions (20/40/60/80 % of the track): the mean over the five tracks and the largest single-pixel difference. Per-track means range from 0.3 to 13.3.
+
+| Tier | N | Mean diff | Max diff |
+|---|---|---|---|
+| High | 4 | 2.41 | 106 |
+| Medium | 8 | 4.51 | 166 |
+| Low | 16 | 6.85 | 212 |
+| Lowest | 32 | 9.35 | 227 |
+
+Comparison images (Full above the four tiers, 4x around the play marker, per track): `docs/research/phosphor-detail-tiers/*.png`.
+
+- The outline is identical by construction, as the images show. What changes is the texture inside the shape: single pixels flip between dim and bright, hence the large maxima.
+- **High** and **Medium** look the same as Full at normal viewing size. Medium's texture is slightly grainier.
+- **Low** has visibly more speckle on dense tracks (*Progress Paradox*, *Spiritual*). It is borderline.
+- **Lowest** is visibly different: white speckle pixels in the density and a coarser texture. **Proposal: drop Lowest** (N = 32) from the list. Keep Full, High, Medium and Low. If Low looks wrong in the user's final manual check, drop it too.
 
 ## Implications for a Traktor-style renderer in Mixxx
 
