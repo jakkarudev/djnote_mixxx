@@ -94,7 +94,7 @@ All numbers are prototype defaults. "Measured" means it came from controlled tes
 - The exact two-colour mixing rule (Q9 data is in research doc §8.5).
 - Whether the shape window depends on zoom: only two zooms have been checked.
 - Opaque vs additive drawing.
-- Whether Traktor's waveform follows EQ/kills.
+- ~~Whether Traktor's waveform follows EQ/kills.~~ Settled 2026-10-18 (user observation): neither gain nor EQ changes Traktor's waveform.
 - Q1: does the stripe hold band data or a rendered image?
 
 ## Reproducing the prototype

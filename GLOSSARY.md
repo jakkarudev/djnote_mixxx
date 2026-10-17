@@ -36,6 +36,30 @@ _Avoid_: cue tooltip, cue hover time
 A seek from the overview that moves the play position by a whole number of bars or beats along the beat grid, keeping the play position's offset from the grid. Mixxx's Quantize is a different thing.
 _Avoid_: quantized seek, grid seek
 
+**Phosphor waveform**:
+DJNote's Traktor-like waveform style, offered both as a scrolling waveform and as an overview. Its brightness shows how much of the time the audio spends at each height, and its color shows the audio's frequency content.
+_Avoid_: Traktor waveform, Traktor-style waveform, Spectrum waveform
+
+**Density**:
+How much of a column's time the audio spends at a given height. On a Phosphor waveform it sets the pixel's brightness, which is why square waves look hollow and noise looks evenly filled.
+_Avoid_: grain, texture, glow
+
+**Color track**:
+The color of a track's audio over time, derived from its low, mid and high content and smoothed so that it changes gradually. It is separate from the waveform's shape.
+_Avoid_: color data, spectrum data
+
+**Waveform detail**:
+The preference, from Full down to Lowest, that sets how much of a loaded track's audio the Phosphor scrolling waveform keeps in memory. Lower detail uses less memory and mostly affects the density, never the outline.
+_Avoid_: waveform quality, resolution
+
+**Visual gain**:
+A display preference that scales the drawn waveform (All) or its frequency bands (Low, Mid, High). It is not the deck's gain and does not change what you hear.
+_Avoid_: waveform gain, display gain
+
+**Follows gain** / **Follows EQ**:
+Preferences that decide whether the deck's gain (the gain knob and ReplayGain), and its EQ knobs and kills, change the drawn scrolling waveform. With both off, the waveform shows the track as recorded, as in Traktor.
+_Avoid_: Traktor mode, Mixxx mode
+
 **Beat line** / **Bar line** / **Phrase line**:
 A vertical line drawn on a waveform at the start of a beat, bar or phrase. They are drawn from the beat grid but are not the beat grid.
 _Avoid_: bar grid, phrase grid, grid lines
