@@ -134,6 +134,8 @@ WaveformWidgetFactory::WaveformWidgetFactory()
           m_endOfTrackWarningTime(30),
           m_defaultZoom(WaveformWidgetRenderer::s_waveformDefaultZoom),
           m_zoomSync(true),
+          m_followsGain(true),
+          m_followsEq(true),
           m_overviewNormalized(false),
           m_untilMarkShowBeats(false),
           m_untilMarkShowTime(false),
@@ -420,6 +422,9 @@ bool WaveformWidgetFactory::setConfig(UserSettingsPointer config) {
                           QString::number(m_visualGain[i]));
         }
     }
+
+    setFollowsGain(m_config->getValue(ConfigKey("[Waveform]", "FollowsGain"), true));
+    setFollowsEq(m_config->getValue(ConfigKey("[Waveform]", "FollowsEq"), true));
 
     int overviewNormalized = m_config->getValueString(ConfigKey("[Waveform]","OverviewNormalized")).toInt(&ok);
     if (ok) {
@@ -733,6 +738,20 @@ void WaveformWidgetFactory::setVisualGain(FilterIndex index, double gain) {
 
 double WaveformWidgetFactory::getVisualGain(FilterIndex index) const {
     return m_visualGain[index];
+}
+
+void WaveformWidgetFactory::setFollowsGain(bool follows) {
+    m_followsGain = follows;
+    if (m_config) {
+        m_config->setValue(ConfigKey("[Waveform]", "FollowsGain"), follows);
+    }
+}
+
+void WaveformWidgetFactory::setFollowsEq(bool follows) {
+    m_followsEq = follows;
+    if (m_config) {
+        m_config->setValue(ConfigKey("[Waveform]", "FollowsEq"), follows);
+    }
 }
 
 void WaveformWidgetFactory::setOverviewNormalized(bool normalize) {
