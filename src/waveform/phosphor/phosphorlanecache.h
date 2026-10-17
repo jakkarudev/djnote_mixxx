@@ -43,6 +43,14 @@ class PhosphorLaneCache {
     /// next call that changes the cache (column, retain, setParams).
     const LaneColumn* column(int64_t k);
 
+    bool contains(int64_t k) const {
+        return m_columns.find(k) != m_columns.end();
+    }
+
+    const PhosphorDataPointer& data() const {
+        return m_pData;
+    }
+
     size_t cachedColumns() const {
         return m_columns.size();
     }

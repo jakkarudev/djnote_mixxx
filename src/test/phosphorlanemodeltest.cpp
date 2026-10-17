@@ -8,6 +8,7 @@
 #include "test/phosphorfixture.h"
 #include "waveform/phosphor/phosphorlanecache.h"
 #include "waveform/phosphor/phosphorlanemodel.h"
+#include "waveform/phosphor/phosphortexelcodec.h"
 
 using namespace mixxx::phosphor;
 
@@ -133,6 +134,32 @@ TEST(PhosphorLaneModelPlainTest, ColumnsNeedDecodedData) {
     data.append(s.data(), 400);
     data.append(s.data(), 200);
     EXPECT_TRUE(isColumnReady(data, params, 999));
+}
+
+TEST(PhosphorTexelCodecTest, DensityRoundTripsAndSilenceMarksTheCentreRow) {
+    LaneColumn column;
+    column.status = ColumnStatus::Signal;
+    column.density = {0.0f, 0.25f, 1.0f, 3.9f, 7.0f};
+    std::vector<uint8_t> texels(5 * kBytesPerTexel);
+    encodeColumn(&column, 5, texels.data());
+    EXPECT_NEAR(0.25f, decodeDensity(&texels[1 * 4]), 1e-3);
+    EXPECT_NEAR(3.9f, decodeDensity(&texels[3 * 4]), 1e-3);
+    EXPECT_NEAR(kTexelDensityMax, decodeDensity(&texels[4 * 4]), 1e-3); // clipped
+    for (int row = 0; row < 5; ++row) {
+        EXPECT_EQ(0, texels[row * 4 + 1]) << row;
+    }
+
+    column.status = ColumnStatus::Silence;
+    column.density.assign(5, 0.0f);
+    encodeColumn(&column, 5, texels.data());
+    for (int row = 0; row < 5; ++row) {
+        EXPECT_EQ(row == rowOfValue(0, 5) ? 255 : 0, texels[row * 4 + 1]) << row;
+    }
+
+    encodeColumn(nullptr, 5, texels.data());
+    for (const uint8_t b : texels) {
+        EXPECT_EQ(0, b);
+    }
 }
 
 // --- cache -----------------------------------------------------------------
