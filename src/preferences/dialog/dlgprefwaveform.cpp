@@ -116,13 +116,13 @@ DlgPrefWaveform::DlgPrefWaveform(
         hoverLabelPositionComboBox->addItem(tr("Always left"),
                 QVariant(static_cast<int>(HoverReadoutPosition::AlwaysLeft)));
         hoverOverCueComboBox->addItem(
-                tr("Join cue times"), QVariant(static_cast<int>(OverCue::JoinCueTimes)));
+                tr("Join cue times"), QVariant(static_cast<int>(HoverOverCue::JoinCueTimes)));
         hoverOverCueComboBox->addItem(tr("Hide hover readout"),
-                QVariant(static_cast<int>(OverCue::HideHoverReadout)));
+                QVariant(static_cast<int>(HoverOverCue::HideHoverReadout)));
         hoverOverCueComboBox->addItem(
-                tr("Hide cue times"), QVariant(static_cast<int>(OverCue::HideCueTimes)));
+                tr("Hide cue times"), QVariant(static_cast<int>(HoverOverCue::HideCueTimes)));
         hoverOverCueComboBox->addItem(tr("Move hover readout"),
-                QVariant(static_cast<int>(OverCue::MoveHoverReadout)));
+                QVariant(static_cast<int>(HoverOverCue::MoveHoverReadout)));
     }
 
     // The GUI is not fully setup so connecting signals before calling
@@ -449,7 +449,7 @@ void DlgPrefWaveform::slotSetOverviewHoverReadout() {
             static_cast<BeatDistancePrecision>(hoverPrecisionComboBox->currentData().toInt());
     settings.position =
             static_cast<HoverReadoutPosition>(hoverLabelPositionComboBox->currentData().toInt());
-    settings.overCue = static_cast<OverCue>(hoverOverCueComboBox->currentData().toInt());
+    settings.overCue = static_cast<HoverOverCue>(hoverOverCueComboBox->currentData().toInt());
     WaveformWidgetFactory::instance()->setOverviewHoverReadoutSettings(settings);
 }
 

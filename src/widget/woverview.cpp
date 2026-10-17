@@ -7,6 +7,7 @@
 #include <QPainter>
 #include <QPen>
 #include <QVBoxLayout>
+#include <algorithm>
 
 #include "analyzer/analyzerprogress.h"
 #include "control/controlproxy.h"
@@ -720,10 +721,21 @@ void WOverview::paintEvent(QPaintEvent* pEvent) {
             const auto gain = static_cast<CSAMPLE_GAIN>(length() - 2) /
                     static_cast<CSAMPLE_GAIN>(trackSamples);
 
+            QFont markerFont = painter.font();
+            markerFont.setPixelSize(static_cast<int>(m_iLabelFontSize * m_scaleFactor));
+            mixxx::BeatsPointer pBeats;
+            if ((m_bTimeRulerActive || m_bPointerInside) && m_pCurrentTrack) {
+                pBeats = m_pCurrentTrack->getBeats();
+            }
+            const mixxx::overviewlayout::Input layoutInput =
+                    makeLayoutInput(markerFont, pBeats.get(), offset, gain);
+            const mixxx::overviewlayout::HoverReadoutLayout readoutLayout =
+                    mixxx::overviewlayout::layoutHoverReadout(layoutInput);
+
             drawRangeMarks(&painter, offset, gain);
-            drawMarks(&painter, offset, gain);
+            drawMarks(&painter, offset, gain, mixxx::overviewlayout::layoutCueTimes(layoutInput));
             drawPickupPosition(&painter);
-            drawTimeRuler(&painter, offset, gain);
+            drawTimeRuler(&painter, layoutInput, readoutLayout);
             drawMarkLabels(&painter, offset, gain);
         }
     }
@@ -950,7 +962,73 @@ void WOverview::drawRangeMarks(QPainter* pPainter, const float& offset, const fl
     }
 }
 
-void WOverview::drawMarks(QPainter* pPainter, const float offset, const float gain) {
+float WOverview::markLinePosition(double samplePosition, float offset, float gain) const {
+    return math_clamp(offset + static_cast<float>(samplePosition) * gain,
+            0.0f,
+            static_cast<float>(width()));
+}
+
+// The state of the overview for the layout of the hover readout and the cue
+// times. The hovered cue counts only if drawMarks renders it.
+mixxx::overviewlayout::Input WOverview::makeLayoutInput(const QFont& markerFont,
+        const mixxx::Beats* pBeats,
+        float offset,
+        float gain) {
+    using namespace mixxx::overviewlayout;
+    const QFontMetricsF fontMetrics(markerFont);
+    Input input;
+    input.trackSamples = getTrackSamples();
+    input.sampleRate = m_trackSampleRateControl.get();
+    input.rateRatio = m_pRateRatioControl->get();
+    input.playPositionFraction = m_playpositionControl.get();
+    input.overviewLength = length();
+    // The time ruler follows its own (clamped) position; plain hover follows
+    // the pointer.
+    const QPointF pointerPoint = m_bTimeRulerActive ? m_timeRulerPos : m_hoverPos;
+    if (m_orientation == Qt::Horizontal) {
+        input.pointerPos = pointerPoint.x();
+    } else {
+        input.pointerPos = pointerPoint.y();
+    }
+    input.pointerPresent = m_bPointerInside;
+    if (!m_bTimeRulerActive) {
+        input.timeRulerState = TimeRulerState::Inactive;
+    } else if (m_bLeftClickDragging) {
+        input.timeRulerState = TimeRulerState::LeftDrag;
+    } else {
+        input.timeRulerState = TimeRulerState::RightClickHold;
+    }
+
+    // Hover readout (beat distance)
+    input.pBeats = pBeats;
+    input.hoverReadout = WaveformWidgetFactory::instance()->getOverviewHoverReadoutSettings();
+    input.labelHeight = fontMetrics.height();
+    input.overviewBreadth = breadth();
+    if (m_pHoveredMark != nullptr &&
+            std::find(m_marks.cbegin(), m_marks.cend(), m_pHoveredMark) != m_marks.cend()) {
+        input.cueHovered = true;
+        input.hoveredCueSamples = m_pHoveredMark->getSamplePosition();
+        input.hoveredCuePos = markLinePosition(input.hoveredCueSamples, offset, gain);
+    }
+    input.cueTimesShown = m_bShowCueTimes;
+    input.labelGap = kLineLabelPadding;
+    input.labelExtent = [this, fontMetrics](const QString& text) {
+        return m_orientation == Qt::Horizontal
+                ? hoverReadoutLabelWidth(fontMetrics, text)
+                : fontMetrics.height();
+    };
+    return input;
+}
+
+qreal WOverview::hoverReadoutLabelWidth(
+        const QFontMetricsF& fontMetrics, const QString& text) const {
+    return math_min<qreal>(fontMetrics.boundingRect(text).width() + 4.0, width());
+}
+
+void WOverview::drawMarks(QPainter* pPainter,
+        const float offset,
+        const float gain,
+        const mixxx::overviewlayout::CueTimesLayout& cueTimesLayout) {
     QFont markerFont = pPainter->font();
     markerFont.setPixelSize(static_cast<int>(m_iLabelFontSize * m_scaleFactor));
     QFontMetricsF fontMetrics(markerFont);
@@ -974,10 +1052,7 @@ void WOverview::drawMarks(QPainter* pPainter, const float offset, const float ga
         PainterScope painterScope(pPainter);
         const WaveformMarkPointer& pMark = *it;
         double samplePosition = pMark->getSamplePosition();
-        const float markPosition = math_clamp(
-                offset + static_cast<float>(samplePosition) * gain,
-                0.0f,
-                static_cast<float>(width()));
+        const float markPosition = markLinePosition(samplePosition, offset, gain);
         pMark->m_linePosition = markPosition;
 
         QLineF line;
@@ -1123,42 +1198,30 @@ void WOverview::drawMarks(QPainter* pPainter, const float offset, const float ga
                 positionTextPoint.setY(fontMetrics.height());
             }
 
-            double markSamples = pMark->getSamplePosition();
-            double trackSamples = getTrackSamples();
-            double currentPositionSamples = m_playpositionControl.get() * trackSamples;
-            double markTime = samplePositionToSeconds(markSamples);
-            double markTimeRemaining = samplePositionToSeconds(trackSamples - markSamples);
-            double markTimeDistance = samplePositionToSeconds(markSamples - currentPositionSamples);
-            QString cuePositionText = mixxx::Duration::formatTime(markTime) + " -" +
-                    mixxx::Duration::formatTime(markTimeRemaining);
-            QString cueTimeDistanceText = mixxx::Duration::formatTime(fabs(markTimeDistance));
-            // Cast to int to avoid confusingly switching from -0:00 to 0:00 as
-            // the playhead passes the cue
-            if (static_cast<int>(markTimeDistance) < 0) {
-                cueTimeDistanceText = "-" + cueTimeDistanceText;
+            if (cueTimesLayout.hidden) {
+                m_cuePositionLabel.clear();
+                m_cueTimeDistanceLabel.clear();
+            } else {
+                m_cuePositionLabel.prerender(positionTextPoint,
+                        QPixmap(),
+                        cueTimesLayout.positionLabelText,
+                        markerFont,
+                        m_labelTextColor,
+                        m_labelBackgroundColor,
+                        width(),
+                        devicePixelRatioF());
+
+                QPointF timeDistancePoint(positionTextPoint.x(),
+                        (fontMetrics.height() + height()) / 2);
+                m_cueTimeDistanceLabel.prerender(timeDistancePoint,
+                        QPixmap(),
+                        cueTimesLayout.distanceLabelText,
+                        markerFont,
+                        m_labelTextColor,
+                        m_labelBackgroundColor,
+                        width(),
+                        devicePixelRatioF());
             }
-
-            m_cuePositionLabel.prerender(positionTextPoint,
-                    QPixmap(),
-                    cuePositionText,
-                    markerFont,
-                    m_labelTextColor,
-                    m_labelBackgroundColor,
-                    width(),
-                    devicePixelRatioF());
-
-            QPointF timeDistancePoint(positionTextPoint.x(),
-                    (fontMetrics.height() + height()) / 2);
-            m_cueTimeDistancePoint = timeDistancePoint;
-
-            m_cueTimeDistanceLabel.prerender(timeDistancePoint,
-                    QPixmap(),
-                    cueTimeDistanceText,
-                    markerFont,
-                    m_labelTextColor,
-                    m_labelBackgroundColor,
-                    width(),
-                    devicePixelRatioF());
             markHovered = true;
         }
     }
@@ -1197,7 +1260,9 @@ void WOverview::drawPickupPosition(QPainter* pPainter) {
     pPainter->drawLine(m_iPickupPos - 2, breadth() - 1, m_iPickupPos + 2, breadth() - 1);
 }
 
-void WOverview::drawTimeRuler(QPainter* pPainter, const float offset, const float gain) {
+void WOverview::drawTimeRuler(QPainter* pPainter,
+        const mixxx::overviewlayout::Input& input,
+        const mixxx::overviewlayout::HoverReadoutLayout& readoutLayout) {
     QFont markerFont = pPainter->font();
     markerFont.setPixelSize(static_cast<int>(m_iLabelFontSize * m_scaleFactor));
     QFontMetricsF fontMetrics(markerFont);
@@ -1211,71 +1276,10 @@ void WOverview::drawTimeRuler(QPainter* pPainter, const float offset, const floa
     shadowFont.setPixelSize(static_cast<int>(m_iLabelFontSize * m_scaleFactor));
 
     using namespace mixxx::overviewlayout;
-    Input input;
-    input.trackSamples = getTrackSamples();
-    input.sampleRate = m_trackSampleRateControl.get();
-    input.rateRatio = m_pRateRatioControl->get();
-    input.playPositionFraction = m_playpositionControl.get();
-    input.overviewLength = length();
-    // The time ruler follows its own (clamped) position; plain hover follows
-    // the pointer.
-    const QPointF pointerPoint = m_bTimeRulerActive ? m_timeRulerPos : m_hoverPos;
-    if (m_orientation == Qt::Horizontal) {
-        input.pointerPos = pointerPoint.x();
-    } else {
-        input.pointerPos = pointerPoint.y();
-    }
-    input.pointerPresent = m_bPointerInside;
-    if (!m_bTimeRulerActive) {
-        input.timeRulerState = TimeRulerState::Inactive;
-    } else if (m_bLeftClickDragging) {
-        input.timeRulerState = TimeRulerState::LeftDrag;
-    } else {
-        input.timeRulerState = TimeRulerState::RightClickHold;
-    }
     const TimeRulerLayout layout = layoutTimeRuler(input);
-
-    // Hover readout (beat distance)
-    mixxx::BeatsPointer pBeats;
-    if ((m_bTimeRulerActive || m_bPointerInside) && m_pCurrentTrack) {
-        pBeats = m_pCurrentTrack->getBeats();
-    }
-    input.pBeats = pBeats.get();
-    input.hoverReadout = WaveformWidgetFactory::instance()->getOverviewHoverReadoutSettings();
-    input.labelHeight = fontMetrics.height();
-    input.overviewBreadth = breadth();
-    // The cue under the pointer, if any (not while the time ruler is active).
-    if (m_pHoveredMark != nullptr && !m_bTimeRulerActive) {
-        input.cueHovered = true;
-        input.hoveredCueSamples = m_pHoveredMark->getSamplePosition();
-        input.hoveredCuePos = offset + input.hoveredCueSamples * gain;
-    }
-    input.cueTimesShown = m_bShowCueTimes;
-    input.labelGap = kLineLabelPadding;
-    input.labelWidth = [&](const QString& text) {
-        return math_min<qreal>(fontMetrics.boundingRect(text).width() + 4.0, width());
-    };
-    const HoverReadoutLayout readoutLayout = layoutHoverReadout(input);
     const bool readoutJoined = readoutLayout.shown &&
-            readoutLayout.slot == LabelSlot::JoinedToDistanceLabel;
+            readoutLayout.slot == LabelSlot::JoinedToTimeRulerDistanceLabel;
     const HoverLineLayout hoverLayout = layoutHoverLine(input);
-
-    // Over a cue: the cue times were prerendered by drawMarks. Hide them or
-    // add the beat distance to their distance label.
-    if (layoutCueTimes(input).hidden) {
-        m_cuePositionLabel.clear();
-        m_cueTimeDistanceLabel.clear();
-    } else if (readoutLayout.shown &&
-            readoutLayout.slot == LabelSlot::JoinedToCueTimeDistanceLabel) {
-        m_cueTimeDistanceLabel.prerender(m_cueTimeDistancePoint,
-                QPixmap(),
-                readoutLayout.joinedDistanceLabelText,
-                markerFont,
-                m_labelTextColor,
-                m_labelBackgroundColor,
-                width(),
-                devicePixelRatioF());
-    }
     if (layout.labelsShown) {
         if (layout.lineShown) {
             drawHoverLine(pPainter, layout.linePos);
@@ -1369,8 +1373,7 @@ void WOverview::drawHoverReadout(QPainter* pPainter,
         const QFont& markerFont) {
     using mixxx::overviewlayout::LabelSide;
     const QFontMetricsF fontMetrics(markerFont);
-    const qreal textWidth = math_min<qreal>(
-            fontMetrics.boundingRect(readoutLayout.text).width() + 4.0, width());
+    const qreal textWidth = hoverReadoutLabelWidth(fontMetrics, readoutLayout.text);
     const qreal textHeight = fontMetrics.height();
     const bool right = readoutLayout.side == LabelSide::Right;
     QPointF bottomLeft;

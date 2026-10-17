@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iterator>
+#include <optional>
 
 #include "engine/engine.h"
 #include "util/duration.h"
@@ -102,15 +103,28 @@ double samplesToSeconds(const Input& input, double samples) {
 QString formatTimeDistance(double timeDistance) {
     QString text = Duration::formatTime(std::fabs(timeDistance));
     // Cast to int to avoid confusingly switching from -0:00 to 0:00 as
-    // the playhead passes the point
+    // the play marker passes the point
     if (static_cast<int>(timeDistance) < 0) {
         text = "-" + text;
     }
     return text;
 }
 
+// Signed time distance from the play position to the hovered cue.
+QString cueTimeDistanceText(const Input& input) {
+    const double cueDistanceSamples = input.hoveredCueSamples -
+            input.playPositionFraction * input.trackSamples;
+    return formatTimeDistance(samplesToSeconds(input, cueDistanceSamples));
+}
+
+// "M:SS -M:SS" (position and time remaining)
+QString formatPositionLabel(double timePosition, double timePositionTillEnd) {
+    return Duration::formatTime(timePosition) + " -" +
+            Duration::formatTime(timePositionTillEnd);
+}
+
 // Whether the pointer targets the hovered cue instead of itself. The time
-// ruler disables cue hovering, but be safe.
+// ruler disables cue hovering.
 bool targetsCue(const Input& input) {
     return input.cueHovered && input.timeRulerState == TimeRulerState::Inactive;
 }
@@ -130,10 +144,41 @@ bool readoutLabelPossible(const Input& input) {
             input.overviewLength > 0.0;
 }
 
-// Whether the Over a cue setting applies: a cue is hovered, the skin shows
-// cue times, and there is a hover readout label that could collide with them.
-bool overCueInEffect(const Input& input) {
-    return targetsCue(input) && input.cueTimesShown && readoutLabelPossible(input);
+// What the Over a cue choice does, when it is in effect: a cue is hovered, the
+// skin shows cue times, and there is a hover readout label that could collide
+// with them. Everything stays at its default when not in effect.
+struct OverCueDecision {
+    bool readoutHidden = false;
+    bool cueTimesHidden = false;
+    // Set to override the slot and side of the hover readout.
+    std::optional<LabelSlot> slot;
+    std::optional<LabelSide> side;
+    // The hover readout is not drawn if it does not fit before the start edge.
+    bool mustFitBeforeStartEdge = false;
+};
+
+OverCueDecision decideOverCue(const Input& input) {
+    OverCueDecision decision;
+    if (!targetsCue(input) || !input.cueTimesShown || !readoutLabelPossible(input)) {
+        return decision;
+    }
+    switch (input.hoverReadout.overCue) {
+    case HoverOverCue::JoinCueTimes:
+        decision.slot = LabelSlot::JoinedToCueTimeDistanceLabel;
+        decision.side = LabelSide::Right;
+        break;
+    case HoverOverCue::HideHoverReadout:
+        decision.readoutHidden = true;
+        break;
+    case HoverOverCue::HideCueTimes:
+        decision.cueTimesHidden = true;
+        break;
+    case HoverOverCue::MoveHoverReadout:
+        decision.side = LabelSide::Left;
+        decision.mustFitBeforeStartEdge = true;
+        break;
+    }
+    return decision;
 }
 
 } // namespace
@@ -155,8 +200,7 @@ TimeRulerLayout layoutTimeRuler(const Input& input) {
     const double timeDistance = samplesToSeconds(input,
             (fraction - input.playPositionFraction) * input.trackSamples);
 
-    layout.positionLabelText = Duration::formatTime(timePosition) + " -" +
-            Duration::formatTime(timePositionTillEnd);
+    layout.positionLabelText = formatPositionLabel(timePosition, timePositionTillEnd);
 
     layout.distanceLabelText = formatTimeDistance(timeDistance);
     return layout;
@@ -167,13 +211,12 @@ HoverReadoutLayout layoutHoverReadout(const Input& input) {
     if (!readoutLabelPossible(input)) {
         return layout;
     }
-    const bool rulerActive = input.timeRulerState != TimeRulerState::Inactive;
-    const bool cueTarget = targetsCue(input);
-    const bool overCueEffective = overCueInEffect(input);
-    const OverCue overCue = input.hoverReadout.overCue;
-    if (overCueEffective && overCue == OverCue::HideHoverReadout) {
+    const OverCueDecision overCue = decideOverCue(input);
+    if (overCue.readoutHidden) {
         return layout;
     }
+    const bool rulerActive = input.timeRulerState != TimeRulerState::Inactive;
+    const bool cueTarget = targetsCue(input);
 
     // The hovered cue, not the pointer, is the target while a cue is hovered.
     const double targetPos = cueTarget
@@ -190,14 +233,13 @@ HoverReadoutLayout layoutHoverReadout(const Input& input) {
             fractionalBeatIndex(*input.pBeats, playPosition);
 
     layout.anchorPos = targetPos;
-    const bool joined = rulerActive && input.overviewBreadth < 3.0 * input.labelHeight;
-    const bool joinedToCue = overCueEffective && overCue == OverCue::JoinCueTimes;
-    if (joined || joinedToCue) {
-        layout.slot = joined ? LabelSlot::JoinedToDistanceLabel
-                             : LabelSlot::JoinedToCueTimeDistanceLabel;
+    const bool joinedToTimeRuler = rulerActive && input.overviewBreadth < 3.0 * input.labelHeight;
+    if (joinedToTimeRuler) {
+        layout.slot = LabelSlot::JoinedToTimeRulerDistanceLabel;
         layout.side = LabelSide::Right;
-    } else if (overCueEffective && overCue == OverCue::MoveHoverReadout) {
-        layout.side = LabelSide::Left;
+    } else if (overCue.side) {
+        layout.slot = overCue.slot.value_or(LabelSlot::OwnBottomRow);
+        layout.side = *overCue.side;
     } else {
         switch (input.hoverReadout.position) {
         case HoverReadoutPosition::AlwaysRight:
@@ -214,22 +256,17 @@ HoverReadoutLayout layoutHoverReadout(const Input& input) {
         }
     }
     layout.text = formatBeatDistance(beatDistance, input.hoverReadout, layout.side);
-    if (overCueEffective && overCue == OverCue::MoveHoverReadout) {
-        // There is no room to move it before the start edge.
-        const double width = input.labelWidth ? input.labelWidth(layout.text) : 0.0;
-        if (layout.anchorPos - input.labelGap - width < -kFitTolerance) {
+    if (overCue.mustFitBeforeStartEdge) {
+        const double extent = input.labelExtent ? input.labelExtent(layout.text) : 0.0;
+        if (layout.anchorPos - input.labelGap - extent < -kFitTolerance) {
             return HoverReadoutLayout();
         }
     }
-    if (joined) {
+    if (joinedToTimeRuler) {
         layout.joinedDistanceLabelText =
                 layoutTimeRuler(input).distanceLabelText + "  " + layout.text;
-    } else if (joinedToCue) {
-        const double cueDistanceSamples = input.hoveredCueSamples -
-                input.playPositionFraction * input.trackSamples;
-        layout.joinedDistanceLabelText =
-                formatTimeDistance(samplesToSeconds(input, cueDistanceSamples)) +
-                "  " + layout.text;
+    } else if (layout.slot == LabelSlot::JoinedToCueTimeDistanceLabel) {
+        layout.joinedDistanceLabelText = cueTimeDistanceText(input) + "  " + layout.text;
     }
     layout.shown = true;
     return layout;
@@ -251,8 +288,21 @@ HoverLineLayout layoutHoverLine(const Input& input) {
 
 CueTimesLayout layoutCueTimes(const Input& input) {
     CueTimesLayout layout;
-    layout.hidden = overCueInEffect(input) &&
-            input.hoverReadout.overCue == OverCue::HideCueTimes;
+    if (!input.cueHovered) {
+        return layout;
+    }
+    if (decideOverCue(input).cueTimesHidden) {
+        layout.hidden = true;
+        return layout;
+    }
+    layout.positionLabelText = formatPositionLabel(
+            samplesToSeconds(input, input.hoveredCueSamples),
+            samplesToSeconds(input, input.trackSamples - input.hoveredCueSamples));
+    const HoverReadoutLayout readout = layoutHoverReadout(input);
+    layout.distanceLabelText = readout.shown &&
+                    readout.slot == LabelSlot::JoinedToCueTimeDistanceLabel
+            ? readout.joinedDistanceLabelText
+            : cueTimeDistanceText(input);
     return layout;
 }
 

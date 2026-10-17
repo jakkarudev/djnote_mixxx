@@ -153,7 +153,7 @@ struct HoverReadoutCase {
         return layoutHoverReadout(input());
     }
     // Pointer `beats` beats after the play position on the constant grid.
-    HoverReadoutCase& beatsAway(double beats) {
+    HoverReadoutCase& pointerBeatDistance(double beats) {
         pointerFrame = playFrame + beats * 24000.0;
         return *this;
     }
@@ -165,7 +165,7 @@ QString textFor(double beats,
     HoverReadoutCase c;
     c.settings.unit = unit;
     c.settings.precision = precision;
-    c.beatsAway(beats);
+    c.pointerBeatDistance(beats);
     return c.layout().text;
 }
 
@@ -173,7 +173,7 @@ QString textFor(double beats,
 
 TEST(OverviewLayoutBeatDistanceTest, FourBarsAheadOnConstantGrid) {
     HoverReadoutCase c;
-    c.beatsAway(16);
+    c.pointerBeatDistance(16);
     const auto layout = c.layout();
     EXPECT_TRUE(layout.shown);
     EXPECT_EQ("+4 bars", layout.text);
@@ -224,7 +224,7 @@ TEST(OverviewLayoutBeatDistanceTest, UnaffectedByRateRatio) {
             HoverReadoutCase c;
             c.settings.unit = unit;
             c.settings.position = side;
-            c.beatsAway(12);
+            c.pointerBeatDistance(12);
             const QString expected = c.layout().text;
             for (const double rateRatio : {0.5, 0.92, 1.08, 1.5, 2.0}) {
                 Input in = c.input();
@@ -259,9 +259,9 @@ TEST(OverviewLayoutBeatDistanceTest, FractionalPositionInsideBeat) {
     c.settings.unit = BeatDistanceUnit::Beats;
     c.settings.precision = BeatDistancePrecision::Fractional;
     c.playFrame = 400 + 3 * 24000.0;
-    c.beatsAway(1.3);
+    c.pointerBeatDistance(1.3);
     EXPECT_EQ("+1.3 beats", c.layout().text);
-    c.beatsAway(0.1);
+    c.pointerBeatDistance(0.1);
     EXPECT_EQ("+0.1 beats", c.layout().text);
 }
 
@@ -270,7 +270,7 @@ TEST(OverviewLayoutBeatDistanceTest, PlayPositionInsideBeatIsMeasuredFromThere) 
     c.settings.unit = BeatDistanceUnit::Beats;
     c.settings.precision = BeatDistancePrecision::Fractional;
     c.playFrame = 400 + 12000.0; // half a beat after the first beat
-    c.beatsAway(2);
+    c.pointerBeatDistance(2);
     EXPECT_EQ("+2.0 beats", c.layout().text);
 }
 
@@ -326,18 +326,18 @@ TEST(OverviewLayoutBeatDistanceTest, BarsAreAQuarterOfBeats) {
 
 TEST(OverviewLayoutBeatDistanceTest, TextOrderPerSide) {
     HoverReadoutCase c;
-    c.beatsAway(16);
+    c.pointerBeatDistance(16);
     c.settings.position = HoverReadoutPosition::AlwaysRight;
     EXPECT_EQ("+4 bars", c.layout().text);
     c.settings.position = HoverReadoutPosition::AlwaysLeft;
     const auto layout = c.layout();
     EXPECT_EQ(LabelSide::Left, layout.side);
     EXPECT_EQ("bars +4", layout.text);
-    c.beatsAway(4);
+    c.pointerBeatDistance(4);
     EXPECT_EQ("bar +1", c.layout().text);
-    c.beatsAway(0);
+    c.pointerBeatDistance(0);
     EXPECT_EQ("bars 0", c.layout().text);
-    c.beatsAway(-8);
+    c.pointerBeatDistance(-8);
     EXPECT_EQ("bars -2", c.layout().text);
     c.settings.unit = BeatDistanceUnit::Beats;
     EXPECT_EQ("beats -8", c.layout().text);
@@ -382,7 +382,7 @@ TEST(OverviewLayoutBeatDistanceTest, ThreeRowsFitGivesOwnRow) {
     HoverReadoutCase c;
     c.labelHeight = 15.0;
     c.breadth = 45.0; // exactly three rows
-    c.beatsAway(16);
+    c.pointerBeatDistance(16);
     const auto layout = c.layout();
     EXPECT_EQ(LabelSlot::OwnBottomRow, layout.slot);
     EXPECT_TRUE(layout.joinedDistanceLabelText.isEmpty());
@@ -392,14 +392,14 @@ TEST(OverviewLayoutBeatDistanceTest, ShortOverviewJoinsTimeDistanceLabel) {
     HoverReadoutCase c;
     c.labelHeight = 15.0;
     c.breadth = 44.9;
-    c.beatsAway(17); // 8.5 s at 120 BPM
+    c.pointerBeatDistance(17); // 8.5 s at 120 BPM
     auto layout = c.layout();
     EXPECT_TRUE(layout.shown);
-    EXPECT_EQ(LabelSlot::JoinedToDistanceLabel, layout.slot);
+    EXPECT_EQ(LabelSlot::JoinedToTimeRulerDistanceLabel, layout.slot);
     EXPECT_EQ("+4 bars", layout.text);
     EXPECT_EQ("0:08  +4 bars", layout.joinedDistanceLabelText);
 
-    c.beatsAway(-17);
+    c.pointerBeatDistance(-17);
     EXPECT_EQ("-0:08  -4 bars", c.layout().joinedDistanceLabelText);
 }
 
@@ -407,7 +407,7 @@ TEST(OverviewLayoutBeatDistanceTest, JoinedLabelStaysOnTheRightOfTheLine) {
     HoverReadoutCase c;
     c.breadth = 10.0;
     c.settings.position = HoverReadoutPosition::AlwaysLeft;
-    c.beatsAway(17);
+    c.pointerBeatDistance(17);
     const auto layout = c.layout();
     EXPECT_EQ(LabelSide::Right, layout.side);
     EXPECT_EQ("0:08  +4 bars", layout.joinedDistanceLabelText);
@@ -416,7 +416,7 @@ TEST(OverviewLayoutBeatDistanceTest, JoinedLabelStaysOnTheRightOfTheLine) {
 TEST(OverviewLayoutBeatDistanceTest, NoBeatGridNoLabel) {
     HoverReadoutCase c;
     c.pBeats = nullptr;
-    c.beatsAway(17);
+    c.pointerBeatDistance(17);
     const auto layout = c.layout();
     EXPECT_FALSE(layout.shown);
     EXPECT_TRUE(layout.text.isEmpty());
@@ -427,14 +427,14 @@ TEST(OverviewLayoutBeatDistanceTest, NoBeatGridNoLabel) {
 TEST(OverviewLayoutBeatDistanceTest, InactiveTimeRulerShowsNoLabel) {
     HoverReadoutCase c;
     c.state = TimeRulerState::Inactive;
-    c.beatsAway(16);
+    c.pointerBeatDistance(16);
     EXPECT_FALSE(c.layout().shown);
 }
 
 TEST(OverviewLayoutBeatDistanceTest, LeftDragAlsoShowsLabel) {
     HoverReadoutCase c;
     c.state = TimeRulerState::LeftDrag;
-    c.beatsAway(16);
+    c.pointerBeatDistance(16);
     EXPECT_TRUE(c.layout().shown);
     EXPECT_EQ("+4 bars", c.layout().text);
 }
@@ -466,7 +466,7 @@ namespace {
 HoverReadoutCase plainHover() {
     HoverReadoutCase c;
     c.state = TimeRulerState::Inactive;
-    c.beatsAway(16);
+    c.pointerBeatDistance(16);
     return c;
 }
 
@@ -682,10 +682,10 @@ TEST(OverviewLayoutHoverModeTest, ShowHoverReadoutOffShowsNothingInBothModes) {
 // Over a cue: hovering a cue (line or label) where Mixxx draws cue times.
 namespace {
 
-const OverCue kAllOverCueChoices[] = {OverCue::JoinCueTimes,
-        OverCue::HideHoverReadout,
-        OverCue::HideCueTimes,
-        OverCue::MoveHoverReadout};
+const HoverOverCue kAllOverCueChoices[] = {HoverOverCue::JoinCueTimes,
+        HoverOverCue::HideHoverReadout,
+        HoverOverCue::HideCueTimes,
+        HoverOverCue::MoveHoverReadout};
 
 // Plain hover with the pointer 2 bars (8 beats, 4 s) after the play position
 // and a cue hovered, 4 bars before the play position. 1 px = 4800 frames =
@@ -694,11 +694,16 @@ struct OverCueCase : HoverReadoutCase {
     double cueFrame = 400 + 100 * 24000.0 - 16 * 24000.0;
     bool cueTimesShown = true;
     bool cueHovered = true;
+    // Extent of a hover readout label along the track axis: its width on a
+    // horizontal overview, 10 px per character here.
+    std::function<double(const QString&)> labelExtent = [](const QString& text) {
+        return 10.0 * text.size();
+    };
 
-    explicit OverCueCase(OverCue overCue = OverCue::JoinCueTimes) {
+    explicit OverCueCase(HoverOverCue overCue = HoverOverCue::JoinCueTimes) {
         state = TimeRulerState::Inactive;
         settings.overCue = overCue;
-        beatsAway(8);
+        pointerBeatDistance(8);
     }
     double cuePos() const {
         return cueFrame / kTrackFrames * length;
@@ -711,7 +716,7 @@ struct OverCueCase : HoverReadoutCase {
         in.hoveredCuePos = cuePos();
         in.cueTimesShown = cueTimesShown;
         in.labelGap = 1.0;
-        in.labelWidth = [](const QString& text) { return 10.0 * text.size(); };
+        in.labelExtent = labelExtent;
         return in;
     }
     HoverReadoutLayout readout() const {
@@ -720,10 +725,6 @@ struct OverCueCase : HoverReadoutCase {
 };
 
 } // namespace
-
-TEST(OverviewLayoutOverCueTest, DefaultIsJoinCueTimes) {
-    EXPECT_EQ(OverCue::JoinCueTimes, HoverReadoutSettings().overCue);
-}
 
 TEST(OverviewLayoutOverCueTest, JoinAppendsBeatDistanceToCueTimeDistance) {
     const OverCueCase c;
@@ -760,15 +761,15 @@ TEST(OverviewLayoutOverCueTest, JoinIgnoresLabelPosition) {
 
 TEST(OverviewLayoutOverCueTest, BeatDistanceIsMeasuredToTheCueNotThePointer) {
     // The pointer is on the cue label, 12 bars after the cue line.
-    for (const auto choice : {OverCue::HideCueTimes, OverCue::MoveHoverReadout}) {
+    for (const auto choice : {HoverOverCue::HideCueTimes, HoverOverCue::MoveHoverReadout}) {
         OverCueCase c(choice);
-        c.beatsAway(32);
+        c.pointerBeatDistance(32);
         const auto readout = c.readout();
         EXPECT_TRUE(readout.shown);
         EXPECT_TRUE(readout.text.contains("-4")) << readout.text.toStdString();
     }
     OverCueCase c;
-    c.beatsAway(32);
+    c.pointerBeatDistance(32);
     EXPECT_EQ("-0:08  -4 bars", c.readout().joinedDistanceLabelText);
 }
 
@@ -801,13 +802,13 @@ TEST(OverviewLayoutOverCueTest, HoverLineIsHiddenOverACueForEveryDisplay) {
 }
 
 TEST(OverviewLayoutOverCueTest, HideHoverReadoutDrawsNothingAndKeepsCueTimes) {
-    const OverCueCase c(OverCue::HideHoverReadout);
+    const OverCueCase c(HoverOverCue::HideHoverReadout);
     EXPECT_FALSE(c.readout().shown);
     EXPECT_FALSE(layoutCueTimes(c.cueInput()).hidden);
 }
 
 TEST(OverviewLayoutOverCueTest, HideCueTimesDrawsReadoutInOwnRowAtTheCue) {
-    const OverCueCase c(OverCue::HideCueTimes);
+    const OverCueCase c(HoverOverCue::HideCueTimes);
     const auto readout = c.readout();
     EXPECT_TRUE(readout.shown);
     EXPECT_EQ(LabelSlot::OwnBottomRow, readout.slot);
@@ -818,7 +819,7 @@ TEST(OverviewLayoutOverCueTest, HideCueTimesDrawsReadoutInOwnRowAtTheCue) {
 }
 
 TEST(OverviewLayoutOverCueTest, HideCueTimesFollowsLabelPosition) {
-    OverCueCase c(OverCue::HideCueTimes);
+    OverCueCase c(HoverOverCue::HideCueTimes);
     c.settings.position = HoverReadoutPosition::AlwaysLeft;
     const auto readout = c.readout();
     EXPECT_EQ(LabelSide::Left, readout.side);
@@ -826,7 +827,7 @@ TEST(OverviewLayoutOverCueTest, HideCueTimesFollowsLabelPosition) {
 }
 
 TEST(OverviewLayoutOverCueTest, MoveDrawsReadoutLeftOfTheCueIgnoringLabelPosition) {
-    OverCueCase c(OverCue::MoveHoverReadout);
+    OverCueCase c(HoverOverCue::MoveHoverReadout);
     c.settings.position = HoverReadoutPosition::AlwaysRight;
     const auto readout = c.readout();
     EXPECT_TRUE(readout.shown);
@@ -838,7 +839,7 @@ TEST(OverviewLayoutOverCueTest, MoveDrawsReadoutLeftOfTheCueIgnoringLabelPositio
 }
 
 TEST(OverviewLayoutOverCueTest, MoveIsNotDrawnWhereItDoesNotFitBeforeTheStartEdge) {
-    OverCueCase c(OverCue::MoveHoverReadout);
+    OverCueCase c(HoverOverCue::MoveHoverReadout);
     // Near the start edge the cue is ~21 bars before the play position:
     // "bars -21" is 8 chars = 80 px wide in this test, plus the 1 px gap.
     c.cueFrame = 81 * 4800.0;
@@ -851,6 +852,62 @@ TEST(OverviewLayoutOverCueTest, MoveIsNotDrawnWhereItDoesNotFitBeforeTheStartEdg
     EXPECT_FALSE(c.readout().shown);
     // The cue times are still Mixxx's.
     EXPECT_FALSE(layoutCueTimes(c.cueInput()).hidden);
+}
+
+TEST(OverviewLayoutOverCueTest, MoveFitUsesTheLabelExtentAlongTheTrackAxis) {
+    OverCueCase c(HoverOverCue::MoveHoverReadout);
+    // Like a vertical overview: the label extends above the line by its
+    // height (15 px), not by its width (80 px).
+    c.labelExtent = [](const QString&) { return 15.0; };
+    c.cueFrame = 20 * 4800.0;
+    EXPECT_DOUBLE_EQ(20.0, c.cuePos());
+    EXPECT_TRUE(c.readout().shown); // 20 - 1 - 15 >= 0
+    c.cueFrame = 15 * 4800.0;
+    EXPECT_FALSE(c.readout().shown); // 15 - 1 - 15 < 0
+}
+
+TEST(OverviewLayoutOverCueTest, CueTimesAreUpstreamsUnlessJoined) {
+    for (const auto choice : {HoverOverCue::HideHoverReadout, HoverOverCue::MoveHoverReadout}) {
+        OverCueCase c(choice);
+        c.cueFrame = 40 * 48000.0; // 40 s into the track
+        c.playFrame = 50 * 48000.0;
+        const auto cueTimes = layoutCueTimes(c.cueInput());
+        EXPECT_FALSE(cueTimes.hidden);
+        EXPECT_EQ("0:40 -1:00", cueTimes.positionLabelText);
+        EXPECT_EQ("-0:10", cueTimes.distanceLabelText);
+    }
+}
+
+TEST(OverviewLayoutOverCueTest, JoinedCueTimesDistanceLabelCarriesTheBeatDistance) {
+    const OverCueCase c;
+    const auto cueTimes = layoutCueTimes(c.cueInput());
+    EXPECT_FALSE(cueTimes.hidden);
+    EXPECT_EQ("-0:08  -4 bars", cueTimes.distanceLabelText);
+    EXPECT_FALSE(cueTimes.positionLabelText.isEmpty());
+}
+
+TEST(OverviewLayoutOverCueTest, HiddenCueTimesHaveNoText) {
+    const OverCueCase c(HoverOverCue::HideCueTimes);
+    const auto cueTimes = layoutCueTimes(c.cueInput());
+    EXPECT_TRUE(cueTimes.hidden);
+    EXPECT_TRUE(cueTimes.positionLabelText.isEmpty());
+    EXPECT_TRUE(cueTimes.distanceLabelText.isEmpty());
+}
+
+TEST(OverviewLayoutOverCueTest, ACueThatIsNotRenderedGivesTheNoCueLayout) {
+    // The hovered cue stopped being rendered (deleted, cleared from a
+    // controller): the overview says no cue is hovered, whatever position
+    // the stale cue had.
+    for (const auto choice : kAllOverCueChoices) {
+        OverCueCase c(choice);
+        c.cueHovered = false;
+        const auto cueTimes = layoutCueTimes(c.cueInput());
+        EXPECT_FALSE(cueTimes.hidden);
+        EXPECT_TRUE(cueTimes.positionLabelText.isEmpty());
+        EXPECT_TRUE(cueTimes.distanceLabelText.isEmpty());
+        EXPECT_NE(LabelSlot::JoinedToCueTimeDistanceLabel, c.readout().slot);
+        EXPECT_TRUE(layoutHoverLine(c.cueInput()).lineShown);
+    }
 }
 
 TEST(OverviewLayoutOverCueTest, SettingHasNoEffectWhenSkinHidesCueTimes) {
@@ -870,7 +927,7 @@ TEST(OverviewLayoutOverCueTest, SettingHasNoEffectWhenSkinHidesCueTimes) {
 }
 
 TEST(OverviewLayoutOverCueTest, SettingHasNoEffectWithoutAReadoutLabel) {
-    for (const auto choice : {OverCue::JoinCueTimes, OverCue::HideCueTimes}) {
+    for (const auto choice : {HoverOverCue::JoinCueTimes, HoverOverCue::HideCueTimes}) {
         {
             OverCueCase c(choice);
             c.pBeats = nullptr;
@@ -893,7 +950,7 @@ TEST(OverviewLayoutOverCueTest, SettingHasNoEffectWithoutAReadoutLabel) {
 }
 
 TEST(OverviewLayoutOverCueTest, LabelOnlyDisplayStillTargetsTheCue) {
-    OverCueCase c(OverCue::HideCueTimes);
+    OverCueCase c(HoverOverCue::HideCueTimes);
     c.settings.display = HoverDisplay::LabelOnly;
     EXPECT_EQ("-4 bars", c.readout().text);
     EXPECT_TRUE(layoutCueTimes(c.cueInput()).hidden);

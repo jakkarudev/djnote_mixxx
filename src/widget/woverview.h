@@ -20,9 +20,15 @@ class PlayerManager;
 class QDomNode;
 class SkinContext;
 
+namespace mixxx {
+class Beats;
+}
+
 namespace mixxx::overviewlayout {
+struct CueTimesLayout;
 struct HoverLineLayout;
 struct HoverReadoutLayout;
+struct Input;
 } // namespace mixxx::overviewlayout
 
 class WOverview : public WWidget, public TrackDropTarget {
@@ -105,9 +111,22 @@ class WOverview : public WWidget, public TrackDropTarget {
     void drawEndOfTrackFrame(QPainter* pPainter);
     void drawAnalyzerProgress(QPainter* pPainter);
     void drawRangeMarks(QPainter* pPainter, const float& offset, const float& gain);
-    void drawMarks(QPainter* pPainter, const float offset, const float gain);
+    // Where the line of a mark at the given sample position is drawn.
+    float markLinePosition(double samplePosition, float offset, float gain) const;
+    // The overview's state for the overview layout module.
+    mixxx::overviewlayout::Input makeLayoutInput(const QFont& markerFont,
+            const mixxx::Beats* pBeats,
+            float offset,
+            float gain);
+    qreal hoverReadoutLabelWidth(const QFontMetricsF& fontMetrics, const QString& text) const;
+    void drawMarks(QPainter* pPainter,
+            const float offset,
+            const float gain,
+            const mixxx::overviewlayout::CueTimesLayout& cueTimesLayout);
     void drawPickupPosition(QPainter* pPainter);
-    void drawTimeRuler(QPainter* pPainter, const float offset, const float gain);
+    void drawTimeRuler(QPainter* pPainter,
+            const mixxx::overviewlayout::Input& layoutInput,
+            const mixxx::overviewlayout::HoverReadoutLayout& readoutLayout);
     void drawHoverLine(QPainter* pPainter, double linePos);
     void drawPlainHover(QPainter* pPainter,
             const mixxx::overviewlayout::HoverLineLayout& lineLayout,
@@ -246,7 +265,5 @@ class WOverview : public WWidget, public TrackDropTarget {
     WaveformMarkSet m_marks;
     std::vector<WaveformMarkRange> m_markRanges;
     WaveformMarkLabel m_cuePositionLabel;
-    // Where drawMarks puts the cue times' distance label.
-    QPointF m_cueTimeDistancePoint;
     WaveformMarkLabel m_cueTimeDistanceLabel;
 };

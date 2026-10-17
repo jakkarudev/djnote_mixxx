@@ -95,8 +95,8 @@ HoverReadoutSettings loadHoverReadoutSettings(const UserSettingsPointer& pConfig
     settings.overCue = readEnum(pConfig,
             kHoverOverCueCfgKey,
             settings.overCue,
-            OverCue::JoinCueTimes,
-            OverCue::MoveHoverReadout);
+            HoverOverCue::JoinCueTimes,
+            HoverOverCue::MoveHoverReadout);
     return settings;
 }
 
