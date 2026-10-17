@@ -2,6 +2,7 @@
 
 #include "control/controlproxy.h"
 #include "util/colorcomponents.h"
+#include "waveform/waveformgains.h"
 #include "waveform/waveformwidgetfactory.h"
 #include "waveformwidgetrenderer.h"
 
@@ -175,55 +176,37 @@ void WaveformRendererSignalBase::getGains(float* pAllGain,
         float* pMidGain,
         float* pHighGain) {
     WaveformWidgetFactory* factory = WaveformWidgetFactory::instance();
-    if (pAllGain) {
-        *pAllGain = static_cast<CSAMPLE_GAIN>(m_waveformRenderer->getGain(applyCompensation)) *
-                static_cast<CSAMPLE_GAIN>(factory->getVisualGain(WaveformWidgetFactory::All));
-        ;
+    mixxx::waveformgains::Inputs in;
+    in.totalGain = static_cast<float>(m_waveformRenderer->getGain(false));
+    in.applyCompensation = applyCompensation;
+    in.followsGain = factory->followsGain();
+    in.followsEq = factory->followsEq();
+    in.visualAll = static_cast<float>(factory->getVisualGain(WaveformWidgetFactory::All));
+    in.visualLow = static_cast<float>(factory->getVisualGain(WaveformWidgetFactory::Low));
+    in.visualMid = static_cast<float>(factory->getVisualGain(WaveformWidgetFactory::Mid));
+    in.visualHigh = static_cast<float>(factory->getVisualGain(WaveformWidgetFactory::High));
+    in.eqEnabled = m_pEQEnabled->get() > 0.0;
+    if (m_pLowFilterControlObject && m_pMidFilterControlObject && m_pHighFilterControlObject) {
+        in.lowKnob = static_cast<float>(m_pLowFilterControlObject->get());
+        in.midKnob = static_cast<float>(m_pMidFilterControlObject->get());
+        in.highKnob = static_cast<float>(m_pHighFilterControlObject->get());
     }
+    in.lowKill = m_pLowKillControlObject && m_pLowKillControlObject->get() > 0.0;
+    in.midKill = m_pMidKillControlObject && m_pMidKillControlObject->get() > 0.0;
+    in.highKill = m_pHighKillControlObject && m_pHighKillControlObject->get() > 0.0;
 
-    if (pLowGain || pMidGain || pHighGain) {
-        // Per-band gain from the EQ knobs.
-        CSAMPLE_GAIN lowGain = 1.0, midGain = 1.0, highGain = 1.0;
-
-        // Only adjust low/mid/high gains if EQs are enabled.
-        if (m_pEQEnabled->get() > 0.0) {
-            if (m_pLowFilterControlObject &&
-                m_pMidFilterControlObject &&
-                m_pHighFilterControlObject) {
-                lowGain = static_cast<CSAMPLE_GAIN>(m_pLowFilterControlObject->get());
-                midGain = static_cast<CSAMPLE_GAIN>(m_pMidFilterControlObject->get());
-                highGain = static_cast<CSAMPLE_GAIN>(m_pHighFilterControlObject->get());
-            }
-
-            lowGain *= static_cast<CSAMPLE_GAIN>(
-                    factory->getVisualGain(WaveformWidgetFactory::Low));
-            midGain *= static_cast<CSAMPLE_GAIN>(
-                    factory->getVisualGain(WaveformWidgetFactory::Mid));
-            highGain *= static_cast<CSAMPLE_GAIN>(
-                    factory->getVisualGain(WaveformWidgetFactory::High));
-
-            if (m_pLowKillControlObject && m_pLowKillControlObject->get() > 0.0) {
-                lowGain = 0;
-            }
-
-            if (m_pMidKillControlObject && m_pMidKillControlObject->get() > 0.0) {
-                midGain = 0;
-            }
-
-            if (m_pHighKillControlObject && m_pHighKillControlObject->get() > 0.0) {
-                highGain = 0;
-            }
-        }
-
-        if (pLowGain != nullptr) {
-            *pLowGain = lowGain;
-        }
-        if (pMidGain != nullptr) {
-            *pMidGain = midGain;
-        }
-        if (pHighGain != nullptr) {
-            *pHighGain = highGain;
-        }
+    const mixxx::waveformgains::Gains gains = mixxx::waveformgains::calculateGains(in);
+    if (pAllGain) {
+        *pAllGain = gains.all;
+    }
+    if (pLowGain) {
+        *pLowGain = gains.low;
+    }
+    if (pMidGain) {
+        *pMidGain = gains.mid;
+    }
+    if (pHighGain) {
+        *pHighGain = gains.high;
     }
 }
 
