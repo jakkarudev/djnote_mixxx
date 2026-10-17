@@ -732,6 +732,7 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/analyzer/analyzersilence.cpp
   src/analyzer/analyzerthread.cpp
   src/analyzer/analyzertrack.cpp
+  src/analyzer/analyzerphosphor.cpp
   src/analyzer/analyzerwaveform.cpp
   src/analyzer/plugins/analyzerqueenmarybeats.cpp
   src/analyzer/plugins/analyzerqueenmarykey.cpp
@@ -1276,6 +1277,9 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/waveform/overviewlayout.cpp
   src/waveform/overviewlinelayout.cpp
   src/waveform/overviewsettings.cpp
+  src/waveform/phosphor/phosphordata.cpp
+  src/waveform/phosphor/phosphorlanecache.cpp
+  src/waveform/phosphor/phosphorlanemodel.cpp
   src/waveform/waveformgains.cpp
   src/waveform/waveformmarklabel.cpp
   src/waveform/waveformwidgetfactory.cpp
@@ -1546,6 +1550,7 @@ if(QOPENGL)
     src/shaders/slipmodeshader.cpp
     src/shaders/patternshader.cpp
     src/shaders/rgbashader.cpp
+    src/shaders/phosphorshader.cpp
     src/shaders/rgbshader.cpp
     src/shaders/shader.cpp
     src/shaders/textureshader.cpp
@@ -1562,6 +1567,7 @@ if(QOPENGL)
     src/waveform/renderers/allshader/waveformrendererfiltered.cpp
     src/waveform/renderers/allshader/waveformrendererhsv.cpp
     src/waveform/renderers/allshader/waveformrendererlrrgb.cpp
+    src/waveform/renderers/allshader/waveformrendererphosphor.cpp
     src/waveform/renderers/allshader/waveformrendererpreroll.cpp
     src/waveform/renderers/allshader/waveformrendererrgb.cpp
     src/waveform/renderers/allshader/waveformrenderertextured.cpp
@@ -1572,6 +1578,7 @@ if(QOPENGL)
     src/waveform/widgets/allshader/filteredwaveformwidget.cpp
     src/waveform/widgets/allshader/hsvwaveformwidget.cpp
     src/waveform/widgets/allshader/lrrgbwaveformwidget.cpp
+    src/waveform/widgets/allshader/phosphorwaveformwidget.cpp
     src/waveform/widgets/allshader/rgbwaveformwidget.cpp
     src/waveform/widgets/allshader/rgbstackedwaveformwidget.cpp
     src/waveform/widgets/allshader/simplewaveformwidget.cpp
@@ -2128,6 +2135,7 @@ endif()
 if(BUILD_TESTING)
   set(
     src-mixxx-test
+    src/test/analyzerphosphortest.cpp
     src/test/analyserwaveformtest.cpp
     src/test/analyzersilence_test.cpp
     src/test/audiotaperpot_test.cpp
@@ -2169,6 +2177,7 @@ if(BUILD_TESTING)
     src/test/overviewlayouttest.cpp
     src/test/overviewlinelayouttest.cpp
     src/test/overviewsettingstest.cpp
+    src/test/phosphorlanemodeltest.cpp
     src/test/waveformgainstest.cpp
     #TODO: write useful tests for refactored effects system
     #src/test/effectchainslottest.cpp

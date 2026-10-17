@@ -212,6 +212,9 @@ class PlayerManager : public PlayerManagerInterface {
 
   private slots:
     void slotAnalyzeTrack(TrackPointer track);
+    // Deck loads additionally build the Phosphor waveform data.
+    void slotAnalyzeDeckTrack(TrackPointer track);
+    void analyzeLoadedTrack(TrackPointer track, AnalyzerTrack::Options options);
 
     void onTrackAnalysisProgress(TrackId trackId, AnalyzerProgress analyzerProgress);
     void onTrackAnalysisFinished();

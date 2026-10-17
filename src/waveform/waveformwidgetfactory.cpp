@@ -27,6 +27,7 @@
 #include "waveform/widgets/allshader/filteredwaveformwidget.h"
 #include "waveform/widgets/allshader/hsvwaveformwidget.h"
 #include "waveform/widgets/allshader/lrrgbwaveformwidget.h"
+#include "waveform/widgets/allshader/phosphorwaveformwidget.h"
 #include "waveform/widgets/allshader/rgbstackedwaveformwidget.h"
 #include "waveform/widgets/allshader/rgbwaveformwidget.h"
 #include "waveform/widgets/allshader/simplewaveformwidget.h"
@@ -612,6 +613,8 @@ bool WaveformWidgetFactory::widgetTypeSupportsUntilMark() const {
         return true;
     case WaveformWidgetType::AllShaderRGBStackedWaveform:
         return true;
+    case WaveformWidgetType::AllShaderPhosphor:
+        return true;
     case WaveformWidgetType::AllShaderTexturedFiltered:
         return true;
     case WaveformWidgetType::AllShaderTexturedRGB:
@@ -1110,6 +1113,13 @@ void WaveformWidgetFactory::evaluateWidgets() {
             setWaveformVarsByType.operator()<allshader::HSVWaveformWidget>();
             break;
 #endif
+        case WaveformWidgetType::AllShaderPhosphor:
+#ifndef MIXXX_USE_QOPENGL
+            continue;
+#else
+            setWaveformVarsByType.operator()<allshader::PhosphorWaveformWidget>();
+            break;
+#endif
         case WaveformWidgetType::AllShaderTexturedFiltered:
 #ifndef MIXXX_USE_QOPENGL
             continue;
@@ -1229,6 +1239,9 @@ WaveformWidgetAbstract* WaveformWidgetFactory::createWaveformWidget(
             break;
         case WaveformWidgetType::AllShaderHSVWaveform:
             widget = new allshader::HSVWaveformWidget(viewer->getGroup(), viewer);
+            break;
+        case WaveformWidgetType::AllShaderPhosphor:
+            widget = new allshader::PhosphorWaveformWidget(viewer->getGroup(), viewer);
             break;
         case WaveformWidgetType::AllShaderTexturedFiltered:
             widget = new allshader::WaveformWidgetTexturedFiltered(viewer->getGroup(), viewer);
