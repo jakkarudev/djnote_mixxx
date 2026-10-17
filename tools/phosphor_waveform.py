@@ -17,6 +17,9 @@ What it does
   --envelope, --compare, ...) still work.
 - --check-fir: FFT vs FIR colour filters on the five reference tracks.
 - --check-tiers: Waveform detail tiers vs Full on the five reference tracks.
+- --fit-overview: render the overview of the five tracks and the test signals
+  and fit them to Traktor's stored stripes (--traktor-dir, read only;
+  --overview-images PNG for a comparison sheet). Model: research section 9.
 - --fixtures DIR: write the deterministic fixtures for the C++ tests
   (format: src/test/phosphor/README.md).
 
