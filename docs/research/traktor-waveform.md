@@ -1,0 +1,465 @@
+# How Traktor forms its waveforms, compared with Mixxx
+
+Research notes for a Traktor-style **scrolling waveform** (and **overview**) renderer in DJNote. Written 2026-10-17 against Traktor Pro 4.0.2 (installed on the user's machine), the public record, and this repo at branch `djnote`.
+
+Traktor is closed source. Every claim below is tagged with its evidence class:
+
+- **[D] Documented**: Native Instruments' own manuals or files that NI ships.
+- **[RE] Reverse-engineered**: from file formats or third-party parsers. Most of the stripe-file findings are **our own byte-level inspection** of the user's Traktor data folders. Nobody else has published them, so treat them as one careful but unreviewed analysis.
+- **[V] Visual inference**: from screenshots or rendered images. Plausible, not proven.
+- **[?] Unknown**: no evidence found.
+
+Glossary terms (`GLOSSARY.md`): **scrolling waveform** is the zoomed deck waveform, **overview** is the whole-track waveform. Traktor calls these the *Waveform* and the *Stripe*.
+
+---
+
+> **Update (test signals, 2026-10-17):** §8 records black-box tests with generated test tones. They settle most of the open questions and **overturn some earlier guesses in this document**. Height is linear, unsmoothed and signed (not a mirrored envelope). The grain is a sample-density ("phosphor") rendering. Colour comes from a smoothed, continuous spectral blend. Where §8 and an earlier section disagree, §8 wins.
+
+## Summary
+
+- **NI documents almost nothing about the algorithm.** The manual says only that the waveform has "color-coded transients; lighter colors represent high frequency content while darker colors represent low frequency content", that the Waveform and Stripe share one Color Mode, and that the four modes are *Ultraviolet, Infrared, X-Ray and Spectrum* [D]. No band count, crossover frequencies, scaling or envelope type is published.
+- **The overview (Stripe) is a stored 1024 × 64 pixel, 4-byte-per-pixel image, not an amplitude list** [RE, our inspection]. Each file is 25 header bytes + 262,144 bytes. Each column has one colour (a smooth blend that varies continuously over the track) and an alpha/brightness that is highest at the centre line and fades towards the edges. That fade is a "glow" or density-like profile, not a solid bar. In 79 % of bright pixels, the 4th byte is within −5 %/+15 % of the Euclidean norm of the other three, so the colour is unit-length (L2) normalised.
+- **The scrolling waveform does not appear to be cached on disk** [RE, inference]. The only per-track caches are `Stripes/` (1024 columns per track, far too coarse for a deck view) and `Transients/` (onset lists). The binary contains `Base\Utils\Waveform\WaveformDataGenerator.cpp`, and the hardware-screen QML asks for waveforms per audio stream (per stem). Our best inference is that Traktor computes the deck waveform from the decoded audio at load time. This is not proven.
+- **Spectrum colour behaves like an additive RGB blend with low ≈ red, mid ≈ green, high ≈ blue** [V]. Kicks look magenta (bass plus click), hats-only intros look cyan or blue, bass/mid sections look orange. That is the same model as Mixxx's RGB renderer. **The big differences are elsewhere:** temporal smoothing, linear-looking dynamics, L2 rather than max colour normalisation, and a per-pixel brightness texture inside each column.
+- **Why Mixxx looks different, from the code:**
+  - Each band byte is the *peak* of a 4th-order Bessel band over a ~2.3 ms slice (441 slices/s).
+  - The high band and the "all" byte are *compressed* with `pow(x, 0.632)`.
+  - The colour is normalised by its *max component*, so balanced slices turn white and single-band slices fully saturated.
+  - The renderer the user has configured (`WaveformType 23`, "RGB (textured)") *point-samples* one slice per framebuffer column with no max or smoothing. It also draws a bright axis line.
+  - The user's config has the "All" visual gain at 1.5×.
+
+  Together these give the comb, confetti and fat-quiet-parts look described in the Visual comparison section.
+- **What is achievable without analyzer changes:** blended colour with L2 normalisation, temporal smoothing (attack/release), linearised highs (Mixxx already ships an `unscale()` table), mirrored mono envelopes, slope-joined columns, and a centre-to-edge brightness gradient. **What needs analyzer changes:** a real density/"grain" texture, RMS envelopes, signed min/max, more or different bands, or different crossovers.
+
+---
+
+## 1. Amplitude and shape formation
+
+| Question | Finding | Class |
+|---|---|---|
+| Peak vs RMS vs other | **Unknown.** NI never says. The stripe shows a brightness *profile* per column: alpha falls from ≈1.0 at the centre to ≈0.36 at the edge, averaged over loud columns in 40 files, and is non-increasing from centre to edge in ~85 % of columns. A solid peak bar would be flat. A gradient like this is what you get when brightness at height *y* encodes *how often* the signal reaches *y* within the column (a coverage/density or survival-function rendering). A purely stylistic fixed gradient is also possible, but the shape of the gradient changes from column to column (steep in quiet intro columns, flat-topped in loud ones), which argues against a fixed ramp. | [RE] data, [V] interpretation |
+| Linear / log / power scaling | **Unknown.** Visually, Traktor's quiet intros are much thinner relative to kicks than Mixxx's, so its scaling is *less compressive* than Mixxx's `pow(x, 0.632)` high band (see §6). It could be linear, or RMS-based (which also widens the loud/quiet ratio compared with peak). A controlled tone test would settle this (see Open questions). | [V] |
+| Symmetric vs asymmetric | Stripe columns are nearly symmetric about row ~30.5 of 64. The top extent is on average 2.0 ± 1.1 rows larger than the bottom, which looks like a constant centre offset, not independent halves. We found no sign that L/R are drawn separately as in Mixxx (L up, R down). | [RE] |
+| Resolution vs zoom | The stripe is fixed at 1024 columns for the whole track, whatever its length (≈0.46 s per column for a 7.9 min track). For the scrolling waveform, at ~55 px/beat (158 BPM, so ≈6.9 ms/px) the screenshot shows independent 1-px columns with per-pixel variation. The internal data rate and its dependence on zoom are **unknown**. | [RE], [V] |
+| Smoothing / interpolation | Visually, Traktor kicks form tapered "lens" shapes across neighbouring columns, and colour changes smoothly over time. That suggests temporal smoothing, a longer analysis window than one pixel, or an envelope follower. **Mechanism unknown.** | [V] |
+| Normalisation / auto-gain | `collection.nml` stores `<LOUDNESS PEAK_DB=… PERCEIVED_DB=… ANALYZED_DB=…>` per track (seen in the user's collection), and the TRAKTOR4 file tag has matching `PKDB`/`PCDB` frames ([hellricer 2021](https://hellricer.github.io/2021/05/05/decoding-traktor4-field.html)). These drive Auto-Gain. Whether the waveform is drawn pre- or post-gain, or normalised per track, is **unknown**. | [RE] fields, [?] usage |
+
+## 2. Frequency bands and colour
+
+**Documented [D]:**
+- Four colour modes: Ultraviolet, Infrared, X-Ray, Spectrum. "Lighter colors represent high frequency content while darker colors represent low frequency content." The Waveform and Stripe share one Color Mode ([NI manual, Basic Usage Tutorials](https://docs.native-instruments.com/online-guides/traktor-pro-manual/en/basic-usage-tutorials); [Preferences](https://docs.native-instruments.com/online-guides/traktor-pro-manual/en/preferences): "Select from four waveforms Ultraviolet, Infrared, X-Ray, and Spectrum").
+- There is **no "Traktor/classic" mode** in the Traktor Pro 3/4 documentation. The four names above are the full list, and they also appear as strings in `Traktor Pro 4.exe` [RE].
+- Settings key: `Wavedisplay.ColorMode` in `Traktor Settings.tsi`. The user's value is `3` in TP 3.5.0, 3.10.0 and 4.0.2. If the index follows the manual's order (U=0, I=1, X=2, S=3), that is **Spectrum**, which matches the rainbow look in the screenshot. The mapping itself is **unverified**.
+
+**Secondary/anecdotal descriptions of the modes (conflicting):**
+- crossfadr (2011): "The rainbow one … is the proper Spectrum view". The others are "X-Ray (grayscale), Infrared (kind of a burnt yellow)" and "Ultraviolet (blue)", "simplified versions of the same thing" ([crossfadr](https://crossfadr.com/2011/06/21/whats-new-in-traktor-pro-2/)).
+- Resident Advisor (TP2 review) says the opposite: monochromatic X-Ray, "full color spectrum spanning (Ultraviolet)", with "Spectrum and Infrared" as single-hue shades ([RA](https://ra.co/reviews/8962)). Given the mode names and the screenshot, crossfadr's description is more likely correct.
+
+**Hardware screens (Kontrol S8/S5/D2), from NI-shipped QML [D]:**
+- The hardware waveform (`T.Waveform`) and stripe (`Traktor.Stripe`) are native components. QML gives them a `colorMatrix` with **two colours per band** (`low1`, `low2`, `mid1`, `mid2`, `high1`, `high2`, each RGBA with alpha 100–190, plus `background` on the stripe). Locations under `C:\Program Files\Native Instruments\Traktor Pro 4\Resources64\qml\`: `Screens/S8/Views/Waveform/SingleWaveform.qml:25-38` and `Screens/S8/Views/Waveform/Stripe.qml:7-23`.
+- The colour table is in `Screens/Defines/Colors.qml:414-497`. The "Default" entry is low `rgba(24,48,80,180)`/`(24,56,96,190)`, mid `(80,160,160,100)`/`(48,112,112,150)`, high `(184,240,232,120)`/`(208,255,248,180)`: dark blue lows, teal mids, near-white highs. There are 16 more entries, one per track or stem colour, each with the same structure (bright low, lighter mid, near-white high).
+- So the hardware renderer does colour per band with alpha, and *recolours at draw time*, since the stripe takes a colour matrix. That implies it gets band-separated data rather than a finished RGB image. The meaning of "1" vs "2" (inner/outer, two layers, or a gradient) is **unknown**.
+- The community fork [kokernutz/traktor-kontrol-screens](https://github.com/kokernutz/traktor-kontrol-screens) (`Screens/Defines/Colors.qml:423-510`) copies this table and adds a non-NI "Spectrum-like colors" entry (low orange-red, mid green, high blue).
+- Loops are tinted by a QML `Colorize` effect (hue 0.33, saturation 0.55), not by the renderer (`Screens/S8/Views/Waveform/WaveformColorize.qml:59-63`).
+
+**Band count and crossovers: unknown [?].** The QML colour matrix suggests **three bands** (low/mid/high), at least on hardware. No crossover frequencies are published.
+
+**Desktop Spectrum colour [RE + V]:**
+- Stripe colour is constant within a column: the normalised colour varies by a median of only 0.04–0.06 between rows. It varies **continuously** between columns: 42–54 distinct colours at 0.1 resolution per track, with smooth transitions. That is a **blended colour per column**, not a dominant-band palette.
+- The three colour channels form a unit-length vector scaled by alpha (§4). A unit-length vector is the signature of L2 normalisation of a (low, mid, high) energy vector. If the bytes are B,G,R,A (Qt premultiplied ARGB32 on little-endian), then "R = low, G = mid, B = high" gives memory order high, mid, low, magnitude, and the colours we rendered match the screenshot: teal/cyan intros, pink/magenta kick sections, orange bass/mid sections.
+
+## 3. Layering and drawing
+
+- **Hardware:** three bands, each with two RGBA colours with partial alpha. This points to overlapping translucent band layers [D for the inputs; layering itself is inference].
+- **Desktop scrolling waveform** (screenshot at native pixels, 6× crop) [V]:
+  - 1-px columns, one hue per column.
+  - Inside each column the **brightness varies pixel by pixel**: a speckled, grainy fill in orange bass/mid sections, smooth bright gradients in magenta kick columns.
+  - No outline and no centre line.
+  - Kicks are tapered blobs that span many columns.
+- **Desktop stripe** [RE]: one silhouette per column (all four channels have the same non-zero extent) with an alpha gradient from the centre outward. There are no separate nested band shapes in the stored image.
+
+So for desktop Spectrum the evidence points to **one blended-colour shape per column with a brightness texture**, not stacked band silhouettes. The hardware screens may differ.
+
+## 4. Stored data
+
+All from the user's `Documents\Native Instruments\Traktor 4.0.2\` (also present in the 3.5.0 and 3.10.0 folders, in the same format). The format has no public documentation that we could find. A 2010 DJ TechTools thread only notes that stripes and transients live outside the audio files ([DJTT](https://forum.djtechtools.com/showthread.php?t=22289)).
+
+### 4.1 `Stripes/NNN/<28-char ID>` (overview) [RE, ours]
+
+All 248 files (TP 4.0.2) are exactly **262,169 bytes**, and all share the same first 21 header bytes. TP 3.5.0 (738 files) and TP 3.10.0 (917 files) use the same format.
+
+| Offset | Size | Value | Interpretation |
+|---|---|---|---|
+| 0 | u8 | `0x06` | unknown |
+| 1 | 4 | `PRTS` | "STRP" reversed. TRAKTOR4 tag frame IDs are also reversed ([hellricer](https://hellricer.github.io/2021/05/05/decoding-traktor4-field.html)) |
+| 5 | u32 LE | 2 | version? |
+| 9 | f32 LE | 3.5 | unknown |
+| 13 | u32 LE | 1024 | image width (columns), and/or block size |
+| 17 | u32 LE | 64 | image height (rows) |
+| 21 | u32 LE | N (e.g. 20439) | **number of 1024-sample blocks in the track**. N·1024/44100 matches the time of the last transient in the same-named `Transients` file: median ratio 0.9994, range 0.916–0.9999, over 248 pairs |
+| 25 | 262,144 | pixels | 1024 columns × 64 rows × 4 bytes, **column-major** |
+
+Evidence for the layout: zero (background) pixels come in runs that repeat every ~64 entries (1025 runs per file), because the bottom gap of column *i* joins the top gap of column *i+1*.
+
+Pixel bytes `(c0, c1, c2, c3)`:
+- `c3` is almost always the largest. `max(c0..c2)/c3 ≤ 0.89` across all files, so the data is valid as premultiplied alpha.
+- `c3 ≈ ‖(c0,c1,c2)‖₂`, within −5 %/+15 %, for 79 % of pixels with `c3 ≥ 60` (2.9 M sampled pixels).
+- The normalised colour `(c0,c1,c2)/c3` is nearly constant down a column.
+- Alpha profile from centre to edge, averaged over 40 files: 0.97, 0.93, 0.89, 0.85, 0.79, 0.74, 0.68, 0.61, 0.51, 0.36.
+
+There are two readings. We cannot yet tell them apart:
+1. A premultiplied BGRA image rendered in the colour mode that was active at analysis time.
+2. Mode-neutral `(band, band, band, magnitude)` data that the renderer recolours. The hardware `colorMatrix` on `Traktor.Stripe` favours this.
+
+The experiment in Open questions (Q1) would settle it.
+
+The ID in the filename is not in `collection.nml`, and its derivation is **unknown**. `Coverart/` uses the same `NNN/ID` scheme, which `COVERARTID` does reference. (Digital DJ Tips states that Traktor also embeds stripe data in audio-file tags ([article](https://www.digitaldjtips.com/dj-software-secrets/)). We have not verified this.)
+
+Minimal reader, for reproducing the findings:
+
+```python
+import struct
+raw = open(path, 'rb').read()
+assert raw[1:5] == b'PRTS' and len(raw) == 25 + 1024 * 64 * 4
+blocks = struct.unpack_from('<I', raw, 21)[0]        # track length / 1024 samples
+px = lambda x, y: raw[25 + 4 * (x * 64 + y): 29 + 4 * (x * 64 + y)]  # (c0, c1, c2, c3)
+```
+
+### 4.2 `Transients/NNN/<same ID>` [RE, ours]
+
+Each file is `u8 version (=5)`, then `u32 count`, then `count × {f64 time_s, f32, f32}`, so its size is exactly `5 + 16·count`. This holds for all 309 files. Times increase monotonically. Example: 3678 onsets over 474 s, about 7.8 per second. The two floats are probably strength or confidence values, but their meaning is unknown. This is onset data, presumably for beat and grid analysis, **not waveform data**.
+
+### 4.3 `collection.nml` [RE, ours]
+
+- `ENTRY@AUDIO_ID`: always 256 bytes of base64 (530 of 530 entries). As 4-bit nibbles it looks like a coarse loudness profile over the track. The name suggests it identifies tracks (finding moved files). It is not display data.
+- `LOUDNESS@PEAK_DB/PERCEIVED_DB/ANALYZED_DB`: loudness values (§1).
+- No waveform data in the NML. Tools such as [traktor-nml-utils](https://github.com/wolkenarchitekt/traktor-nml-utils) parse the NML but not stripes.
+
+### 4.4 Is the scrolling waveform stored or computed?
+
+**Probably computed when the track loads** [inference from RE]:
+- There is no per-track cache other than Stripes, Transients and Coverart. `%LOCALAPPDATA%\Native Instruments\Traktor` holds only streaming and stems temp folders.
+- The binary contains `D:\jws\…\sources\Base\Utils\Waveform\WaveformDataGenerator.cpp`, `onWaveformAnalyseCompleted` and `updateStripeAndTransientsFromTrack`.
+- Hardware `T.Waveform` instances take an `audioStreamKey` per stem stream (`StemWaveforms.qml`), so waveforms exist per decoded audio stream.
+
+The manual only says "Once a track has been analyzed, the Waveform and the Stripe will be displayed" [D]. For contrast, Rekordbox *does* store scrolling waveforms (`PWV5` colour, `PWV7` 3-band), documented by reverse engineering in [crate-digger `rekordbox_anlz.ksy`](https://github.com/Deep-Symmetry/crate-digger/blob/main/src/main/kaitai/rekordbox_anlz.ksy) (lines 384–435).
+
+## 5. Existing reimplementations and related work
+
+- **No public Traktor stripe parser or Traktor-waveform clone found** (GitHub repo and code search, web search). The closest public material:
+  - NI's own QML for the hardware screens, mirrored in [kokernutz/traktor-kontrol-screens](https://github.com/kokernutz/traktor-kontrol-screens) and [ErikMinekus/traktor-kontrol-screens](https://github.com/ErikMinekus/traktor-kontrol-screens). Rendering is native, so the QML only shows the colour inputs.
+  - TRAKTOR4 tag decoding: [hellricer 2021](https://hellricer.github.io/2021/05/05/decoding-traktor4-field.html), Kaitai-based, with no waveform frames identified.
+- **Mixxx work on new waveform styles** (all open unless noted):
+  - [#13075](https://github.com/mixxxdj/mixxx/pull/13075) "3-band waveform with moving average" (closed). Overlapping 3-band layers with adjustable smoothing.
+  - [#14325](https://github.com/mixxxdj/mixxx/pull/14325) "Add RMS signal analysis on Waveform". Adds RMS sampling, which the protobuf already allowed. The author found RMS "provide[s] better visualisation … on electronic music".
+  - [#16963](https://github.com/mixxxdj/mixxx/pull/16963) "Perceptual 3-band waveform mode". New analysis profile: per-band RMS, instant-attack/exponential-release envelopes, per-band transfer LUTs, tuned against Rekordbox. Needs re-analysis.
+  - [#17141](https://github.com/mixxxdj/mixxx/pull/17141) "RGB 3-band". Renderer-only. Mirrored peak envelopes with attack/release, neighbouring pixels joined with slopes, uses existing data.
+  - [#17175](https://github.com/mixxxdj/mixxx/pull/17175) "Use EQ crossover settings for waveforms". Makes the analyzer crossovers configurable.
+  - Also [#17129](https://github.com/mixxxdj/mixxx/pull/17129) (stacked EQ scaling), [#15516](https://github.com/mixxxdj/mixxx/pull/15516) (stacked overview) and [#14998](https://github.com/mixxxdj/mixxx/pull/14998) (disable EQ influence).
+  - Issue [#11833](https://github.com/mixxxdj/mixxx/issues/11833) "Waveforms like RekordBox". A maintainer (uklotzde) ported filtering and colour mapping from the [audio-viz](https://crates.io/crates/audio-viz) crate with "obvious" improvements.
+  - Issue [#6352](https://github.com/mixxxdj/mixxx/issues/6352) explains the high-band `pow` scaling.
+- **No Mixxx issue or PR asks specifically for a "Traktor-like" waveform.** Requests and PRs all target Rekordbox. Searched `mixxxdj/mixxx` issues for "traktor waveform".
+
+## 6. How Mixxx forms its waveform (this repo)
+
+### 6.1 Analysis (`src/analyzer/analyzerwaveform.*`)
+
+- **Bands:** 4th-order Bessel low-pass at 600 Hz, band-pass 600–4000 Hz, high-pass at 4000 Hz (`src/analyzer/analyzerwaveform.cpp:13-15`, `:156-158`). Butterworth-8 is commented out. The gentle slopes mean the bands overlap a lot.
+- **Slice rate:** 441 visual samples per second (`analyzerwaveform.cpp:59`, `src/waveform/waveform.cpp:47-63`), so each slice is 100 frames at 44.1 kHz (~2.27 ms) and 108.8 frames at 48 kHz.
+- **Envelope:** for each slice and each channel (L and R separately), the **max of |x|** for the full signal and for each band ("Take max value, not average", `analyzerwaveform.cpp:196-222`). RMS code exists only as a comment (`:203-212`).
+- **Scaling to bytes:** `byte = min(255, 255·scaleSignal(peak) + 0.5)` (`src/analyzer/analyzerwaveform.h:73-84`). `scaleSignal` is linear for low and mid, but **`pow(x, 0.632)` for high and for "all"** (`analyzerwaveform.h:20-28`). That turns −20 dB (0.1) into 0.23 of full height, and −40 dB into 0.054.
+- **Stored per slice:** `struct {u8 low, mid, high, all}` × 2 channels, interleaved L/R (`src/waveform/waveform.h:14-28`). There is no RMS, no signed min/max, and no distribution.
+- **Overview:** 3840 samples per track (2 × 1920), each the **mean of the slice peaks** in its range (`analyzerwaveform.cpp:61`, `analyzerwaveform.h:96-108`). It can be normalised (`[Waveform] OverviewNormalized`).
+- **Gain at draw time:** height × `total_gain` (pregain × ReplayGain, `src/engine/enginepregain.cpp:118-121`, read at `src/waveform/renderers/waveformwidgetrenderer.cpp:96`) × the "All" visual gain from preferences. Some renderers also apply a ×2 "compensation" (`src/waveform/renderers/waveformwidgetrenderer.h:115-129`). Per-band gain follows the EQ knobs and kills (`src/waveform/renderers/waveformrenderersignalbase.cpp:172-228`).
+
+### 6.2 Renderers (`src/waveform/renderers/allshader/`, `res/shaders/`)
+
+All the vertex renderers take, for each screen pixel, the **max over the slices that fall in that pixel** (e.g. `waveformrendererrgb.cpp:117-150`). They then draw one solid 1-px rectangle per channel: L above the axis, R below.
+
+| Type (pref #) | Height | Colour | Notes |
+|---|---|---|---|
+| RGB (17) | `all` byte (compressed) | `low·Clow + mid·Cmid + high·Chigh`, **normalised by max component** (`waveformrendererrgb.cpp:158-196`) | EQ scales height by the gained/ungained L2 ratio (`:158-178`) |
+| L/R RGB (18) | same, L and R both drawn upward from the axis | same | `waveformrendererlrrgb.cpp:163-192` |
+| Filtered (19) / Stacked (25, `RGBStackedWaveformWidget`) | separate low, mid, high shapes, drawn in that order on top of each other | flat colour per band (stacked uses the RGB skin colours) | `waveformrendererfiltered.cpp:108-186` |
+| HSV (21) | `all` | one skin hue; saturation and value from the high and low shares | `waveformrendererhsv.cpp:138-159` |
+| Simple (20) | `all` | flat signal colour | `waveformrenderersimple.cpp:116-139` |
+| Textured RGB (23) / Filtered (22) / Stacked (24) | RGB: `‖(low,mid,high)‖/√3` (`res/shaders/rgbsignal.frag:69-77`). Stacked: low, low+mid and low+mid+high stacked outward (`stackedsignal.frag:100-135`) | same max-normalised blend (`rgbsignal.frag:81-88`); a second "unscaled" copy at 40 % alpha behind it (`:90-122`) | **One slice per framebuffer column, `floor()` index, `GL_NEAREST`, no max** (`rgbsignal.frag:34-35`, `waveformrenderertextured.cpp:414-415`). Rendered to a 4× oversized framebuffer (`:192`), then drawn with `GL_LINEAR` (`:475-476`). Axis line drawn ±4 framebuffer px around the centre (`rgbsignal.frag:113-116`) |
+
+Mixxx has an `unscale()` table that undoes the `pow` scaling (`src/waveform/renderers/waveformrenderersignalbase.h:30-37`). All renderers leave it commented out (e.g. `waveformrenderersimple.cpp:124-126`).
+
+**The user's setup:** `%LOCALAPPDATA%\Mixxx\mixxx.cfg` has `WaveformType 23` (Textured RGB) and `VisualGain_0 1.5` (All gain ×1.5). This assumes the fork reads the default settings path.
+
+### 6.3 What Mixxx's data supports vs what Traktor seems to do
+
+| Traktor characteristic | Supported by existing Mixxx data? |
+|---|---|
+| 3-band blended colour per column | **Yes**: low/mid/high bytes exist. Needs L2 normalisation instead of max, and probably `unscale()` on the high band |
+| Smooth colour and amplitude over time (lens-shaped kicks) | **Yes, at render time**: attack/release or moving-average filtering over slices, as #17141 and #13075 do, plus slopes between columns |
+| Less compressive dynamics | **Mostly**: undo `pow(0.632)` with `unscale()` and drop the extra ×1.5. Low and mid are already linear peaks. RMS-like contrast needs the analyzer (#14325) |
+| Symmetric mono envelope | **Yes**: take the max of L and R (the RGB renderer already does this for colour) |
+| No axis line | **Yes**: skin `AxesColor` alpha, or remove it in a new renderer |
+| Centre-bright, edge-dim gradient inside the shape | **Yes, approximately**: brightness as a function of \|y\|/height in the renderer |
+| Real per-pixel density or "grain" (how often each height is reached within a column) | **Partly**: at ~3 slices per pixel at deck zoom, the in-pixel distribution of slice peaks is too coarse. A faithful version needs a higher slice rate, per-slice signed min/max, or a stored histogram, i.e. **analyzer changes** |
+| Different crossovers or band count | **No**: needs re-analysis (#17175 makes crossovers configurable) |
+| Stripe-style 1024 × 64 pre-rendered overview | Not needed. Can be drawn from the existing summary |
+
+---
+
+## 7. Visual comparison (user screenshots, 2026-10-17)
+
+Sources:
+- `SCREENSHOTS/waveforms/Screenshot 2026-10-17 203136.png`: Traktor Pro 4, CYK "Gigando", deck B at 04:41, 158.36 BPM (+5.6 %), Spectrum.
+- `…203129.png`: Mixxx/DJNote, the same track at 4:45.5, 147.95 BPM, LateNight, Textured RGB.
+
+Both are at ~55–58 px per beat, so ≈6.9–7.0 ms per screen pixel. That puts **≈3 Mixxx slices in each pixel** (441/s × 7 ms). The 6× native-pixel crops were viewed directly. Everything in this section is **[V]**, except where a Mixxx code reference explains a feature.
+
+1. **Texture.** Traktor's fill is **grainy**: brightness changes pixel by pixel inside a column, with dark speckles in orange sections and smooth bright gradients in magenta kick columns. Mixxx columns are solid, apart from dark tips at the top and bottom of many columns.
+   - Mixxx side: the dark tips are consistent with the textured renderer's 4× framebuffer being minified with `GL_LINEAR`. The 4 sub-columns per pixel have different heights, so the tips blend to partial coverage. The 40 %-alpha "unscaled" layer (`rgbsignal.frag:118-122`) adds to this.
+   - Traktor side: the stored stripe has the same kind of per-pixel brightness gradient (§4.1). A density or coverage rendering (brightness = fraction of sub-windows whose envelope reaches that height) would produce exactly this speckle when there are few sub-windows per pixel. So would a deliberate noise or dither texture. **Which one is unknown.** We found no public source describing a "density", "dotted" or "grainy" Traktor waveform style.
+2. **Envelope coherence.** Traktor kicks are tapered blobs. Mixxx shows independent spikes (a comb).
+   - Mixxx side: each slice is a 2.27 ms peak with no smoothing. The textured renderer **point-samples** one slice per framebuffer column instead of taking a max (`rgbsignal.frag:34-35`), so neighbouring pixels show unrelated slices, and the result flickers while scrolling. The vertex RGB renderer (type 17) takes a max over each pixel and would be noticeably less spiky. Even then, without attack/release smoothing it stays more comb-like than Traktor.
+3. **Dynamic contrast.** Traktor's quiet intro is thin and its kicks tall. Mixxx's intro is fat.
+   - Mixxx side: the textured height is `‖(low,mid,high)‖/√3`, with the high band compressed by `pow(0.632)` (`analyzerwaveform.h:27`). A hats-heavy intro is mostly high band, so it gets the biggest boost. On top of that: ×2 compensation (`getGains(…, true …)`, `waveformrenderertextured.cpp:305`), `VisualGain_0 = 1.5`, and ReplayGain in `total_gain`.
+   - Traktor's scaling: **unknown**, but visibly less compressive.
+4. **Colour.** Traktor's colour drifts smoothly: magenta kicks, orange bass/mid, an intro that goes cyan → blue → green → yellow → orange. Mixxx flickers between columns, with thin bright green and white "confetti" lines and a bright centre line.
+   - Mixxx side: colour comes from per-slice band peaks (2.27 ms, so the high band jumps around), boosted by `pow`, point-sampled, then **normalised by the max component**. A slice where one band briefly dominates becomes fully saturated green, and a balanced slice becomes white.
+   - Traktor side: the stripe's colours are L2-normalised, which keeps balanced mixes muted rather than white. They also change slowly, which is consistent with smoothing.
+   - The hue logic itself (kick = magenta = low + high, hats = blue/cyan) is the **same in both programs**. So the colour difference comes from timing and normalisation, not from the palette.
+   - The centre line is Mixxx's axis, drawn ±4 framebuffer px (`rgbsignal.frag:113-116`).
+
+Caveats: the positions differ by ~4 s and the tempos differ, so the content under the same pixels is not identical. JPEG/PNG scaling was not involved, because the crops are native pixels.
+
+---
+
+## 8. Test-signal results (2026-10-17)
+
+**Method.** `tools/waveform_test_signals.py` generates 44.1 kHz stereo WAVs with known content: tones, a sweep, level steps, sine vs square, clicks and kicks, sine vs noise, and L/R/inverted stereo. The user loaded each file in Traktor Pro 4.0.2 (Spectrum colour mode), screenshotted the deck, and we read the matching `Stripes/` files written during analysis. Screenshots are in `waveform-tests/<test>/`. Evidence here is **[RE]** for the stripe numbers and **[V]** for the screenshots.
+
+Caveats:
+- The zoom was not constant across tests: about 115 px/s for Q2a and 234–243 px/s for Q5 and Q6.
+- Only one 33 s stripe exists for the three Q3 files. Its colour matches 8 kHz, so it is Q3c's. Traktor seems to key stripes on something the three files share; all three start with identical silence.
+- The gain test (Q8) was not done: the only gain change visible is on the empty deck B.
+
+### 8.1 Shape and height
+
+| Finding | Evidence |
+|---|---|
+| **Height is linear in peak amplitude.** | Stripe rows for 8 kHz steps at 0/−6/−12/−18/−24 dBFS: 62, 32, 16, 8, 4 (halves per −6 dB). The deck view halves likewise (Q3a/Q3b screenshots). |
+| **Peak, not RMS.** | 100 Hz and 1 kHz squares are the same height as sines at equal peak level (stripe: 32 rows each; deck: equal). White noise with peak −10.2 dBFS gives 20 rows, matching linear peak (32 · 10^(−4.2/20) ≈ 19.7). |
+| **Signed, not mirrored; positive is drawn downward.** | A single positive-sample click draws on **one side** of the centre line only, the lower one (confirmed in the Q5 deck screenshot and on 4 of 5 real tracks, 2026-10-18), in both the stripe (rows 30–58) and the deck. At ~240 px/s the deck draws the 60 Hz kick's individual cycles, up and down, like an oscilloscope. |
+| **No smoothing of height.** | A 50 ms kick occupies ~3 stripe columns (≈105 ms) and ~12 deck px at 234 px/s. Tone blocks have vertical edges. There is no attack/release on the shape. |
+| **Mono sum (L+R).** | L-only and R-only at −6 dBFS draw half height (16 rows). Both draw 32. L = −R draws **nothing** (centre line only). |
+| **Full scale.** | 0 dBFS fills the stripe's 64 rows and the deck lane. |
+
+### 8.2 The grain: sample-density ("phosphor") rendering
+
+Brightness inside a column is proportional to **how many samples (or sample-to-sample line segments) pass through that pixel**, with each RGB channel clipped at full scale. The evidence:
+
+- **Square waves are hollow boxes.** A 100 Hz square in the deck view is a dark, nearly empty box with bright **yellow** top and bottom edges, and the stripe shows the same outline. A square wave sits at ±peak almost all the time, so all the hits land on the edges.
+- **The 1 kHz square is solid with brighter edges.** Its body is blue and its edges are **cyan**. With about 8 transitions per column, the interior gets some hits and the edges get many.
+- **Sines have bright edges and a darker middle** at low frequencies (100 Hz, 160 Hz, the 60 Hz kick). A sine spends most of its time near its peaks. At 1 kHz the body is uniformly bright, because enough samples per pixel saturate it.
+- **Some sines produce horizontal lines.** 630 Hz (exactly 70 samples per cycle) shows horizontal bands, while 1 kHz (44.1 samples per cycle, so the phase drifts) does not. A periodic sample grid hits only a few heights.
+- **White noise is uniformly filled** with ragged edges. Its sample values are spread evenly.
+- **Denser means lighter, not just brighter.** Orange saturates to yellow and blue to cyan. That is what you get from adding `colour × hits` and clipping each channel at 1. It explains the yellow/orange speckle in real bass-heavy music.
+
+The low-frequency "grain" in the original screenshots is therefore real signal structure: within a ~4–9 ms column, bass covers only part of a cycle, so the hits are uneven. It is not a decorative texture.
+
+### 8.3 Colour
+
+- **Continuous with frequency.** It is not three flat blocks. Stripe unit colour (R,G,B)/‖·‖ for tones at −6 dBFS:
+
+  | Hz | 21 | 40 | 100 | 200 | 400 | 1k | 2k | 4k | 8k | 18.5k |
+  |---|---|---|---|---|---|---|---|---|---|---|
+  | R | .92 | .88 | .80 | .67 | .49 | .29 | .18 | .12 | .07 | .05 |
+  | G | .39 | .46 | .58 | .71 | .80 | .79 | .68 | .53 | .41 | .32 |
+  | B | .07 | .09 | .16 | .23 | .34 | .53 | .71 | .84 | .91 | .94 |
+  | hue° | 23 | 28 | 40 | 65 | 100 | 149 | 183 | 205 | 216 | 222 |
+
+  The hue rises smoothly with log-frequency and flattens at both ends, as gentle overlapping band responses would.
+- **Additive blend, not a lookup from a single "centroid" frequency.** Mixtures land **off** the pure-tone curve. White noise is (0.30, 0.43, 0.85), bluer *and* redder than any pure tone. The 100 Hz square is desaturated (0.66, 0.57, 0.48).
+- **Brightness in the stripe:**
+  - It rises with frequency at equal level: ‖rgb‖ is 72 at 40 Hz and 227 at 16 kHz.
+  - It scales with level roughly as **amplitude^0.25**: for 8 kHz, ‖rgb‖ is 227 at 0 dB, 187 at −6, 157 at −12, 134 at −18, 115 at −24 and 56 at −48. That is ×0.84 per −6 dB, and 0.5^0.25 = 0.84.
+  - The hue does not change with level.
+  - In the deck view, low tones are bright, e.g. a vivid red-orange at 40 Hz. So the deck's brightness rule differs from the stripe's.
+- **The colour is smoothed in time; the shape is not.**
+  - After a click or kick ends, the 1-px centre line keeps the sound's colour and decays.
+  - In the stripe, the decay is ×0.67 per 35 ms column after a click (high band, τ ≈ 90 ms) and ×0.905 per column after a 60 Hz kick (low band, τ ≈ 350 ms). So release time is longer for lower bands.
+  - The colour also builds up over ~1–2 columns after onset, while the height is instant.
+  - In the deck view, a kick's coloured centre line also extends ~250–450 ms *before* the onset, as if the low band were analysed with a centred (non-causal) window. Clicks show no pre-onset line.
+- **Silence:**
+  - True digital silence draws a 1-px **black** centre line, darker than the background.
+  - Low-level residue draws a 1-px line in the residual colour.
+
+### 8.4 Mixxx vs Traktor, revised
+
+| Aspect | Traktor (measured) | Mixxx today |
+|---|---|---|
+| Height | Linear signed min..max of the mono sum, per column | Per-band abs peak, high band `pow 0.632`, 441 slices/s, L/R halves |
+| Detail | Sample-level: individual cycles visible at ~240 px/s | ≥2.3 ms slices, no sub-slice information |
+| Body brightness | Sample density with additive clipping (hollow squares, bright sine edges, grain) | Solid fill |
+| Colour | Smoothed (τ ≈ 90–350 ms, band-dependent) continuous spectral blend | Per-slice, unsmoothed, max-normalised |
+| Silence | Black 1-px line | Axis line drawn always |
+
+### 8.5 Prototype check against a real track (2026-10-17)
+
+**Method.** `tools/PROTOTYPE_traktor_waveform.py` (throwaway, outside the build) renders the §8 model from the decoded FLAC. It draws signed min..max of (L+R)/2, sample-density brightness with per-channel clipping, and a smoothed colour from three zero-phase filters fitted to the §8.3 table. The target is the deck B lane of `SCREENSHOTS/waveforms/Screenshot 2026-10-17 203136.png` (CYK "Gigando", 04:41). The result is `SCREENSHOTS/waveforms/PROTOTYPE_gigando_comparison.png`. Fits are per-column outlines and per-region mean colours measured against the screenshot. Evidence is **[V]** plus those fits.
+
+- **NML `CUE_V2 START` is in milliseconds.** Gigando's AutoGrid starts at 1.16 ms, so bar 176 is at 281.60 s. Fitting the outlines independently puts the playhead at 281.59 s.
+- **Zoom:** 136.1 px per track second (217.4 px per bar at 150 BPM), i.e. 7.35 ms per column.
+- **Each column's min..max covers more than its own time.** A window centred on the column fits best at 16–30 ms (outline correlation 0.70, against 0.57 for the column's own 7.4 ms). By eye, 12 ms best matches the per-column streaks. This covers a whole kick cycle, so kicks look like filled, symmetric blobs. This refines §8.1's "no smoothing": the onset and offset stay sharp, but the window is wider than one column. Whether the window depends on zoom is **unknown**: at ~240 px/s individual 60 Hz cycles were visible.
+- **Height:** full scale ≈ 0.8 × half the lane for this track. Its NML loudness is `PEAK_DB=0.30 PERCEIVED_DB=1.73`, so Auto-Gain could explain this (Q8 is still open).
+- **The deck's colours are much more saturated than the stripe's.** Using the stripe's unit colour as-is renders near-white. A good match needed:
+  - the unit colour raised to the 5th power and renormalised to max = 1;
+  - blue ×1.8 and green ×0.85;
+  - level compression `amplitude^0.35`;
+  - colour attack 5 ms and high-band release 40 ms (the stripe gives 90 ms), with low and mid releases left at 350 and 180 ms.
+- **Density light added to the background looked better on this screenshot.** This was **wrong** for Traktor's drawing: see the calibration below, which shows opaque pixels.
+- **Result:** outline correlation 0.91, and mean height 31.2 vs 31.8 rows. The colour runs cyan → deep blue → green → yellow → orange through the breakdown, with orange bass and magenta kicks in the drop. Per-region mean colour is within ~10–25 levels.
+- **Remaining gaps:** snares look less violet than Traktor's, and the breakdown is slightly too bright and green.
+- **Caveat:** all tuned values come from this one screenshot and may be overfitted.
+
+**Calibration against the test-signal screenshots** (`waveform-tests/`; the scripts were throwaway):
+
+- **Deck colour of −6 dBFS tones (Q2a, 115 px/s)**, as the median of each tone's body (0–255; channels at 255 are clipped):
+
+  | Hz | 40 | 63 | 100 | 160 | 250 | 400 | 630 | 1k | 1.6k | 2.5k | 4k | 6.3k | 10k |
+  |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+  | R | 79 | 124 | 126 | 99 | 70 | 43 | 24 | 21 | 15 | 8 | 4 | 1 | 0 |
+  | G | 24 | 33 | 50 | 79 | 125 | 192 | 175 | 255 | 255 | 212 | 130 | 71 | 36 |
+  | B | 15 | 13 | 13 | 14 | 20 | 24 | 28 | 79 | 191 | 255 | 255 | 255 | 255 |
+
+  - This is a near fully saturated rainbow, far more saturated than the stripe's §8.3 colours.
+  - Low tones are dim, while high tones clip.
+- **Traktor draws covered pixels opaque.** The 40 Hz body has B = 15 and its edge rows are (11, 9, 0), both below the background's 24.
+- **Height model confirmed at a second zoom:** the prototype gives 35 rows for a −6 dBFS tone at 115 px/s, against Traktor's 36.
+- **Level compression on the deck is γ ≈ 0.87, not the stripe's 0.25** (Q3a, 100 Hz).
+  - The body gets slightly *brighter* as the level falls: max channel 138, 143, 156, 171 and 200 at 0, −6, −12, −18 and −24 dBFS.
+  - With density ∝ 1/amplitude, brightness ∝ A^(γ−1). The −6 vs −18 dB pair gives γ ≈ 0.87.
+  - On the deck, a tone's brightness is therefore almost independent of its level.
+- **Pure tones and music disagree under an additive band model.**
+  - Filters fitted to the deck table above reproduce all 13 tones to within ~3 levels per channel.
+  - On Gigando, the same model renders the drop yellow/beige: G ≈ 120–155 against Traktor's 66, and the intro is not blue enough.
+  - An RMS colour envelope helps, and the strongest-STFT-bin envelope fixes the green, but blue stays too low.
+  - The screenshot-tuned stripe model (above) still looks closest on music, even though its tones are ~30 levels off.
+  - So in mixtures the dominant band wins more than adding tone colours predicts. **The mixing rule is still unknown.**
+  - The variants are compared in `SCREENSHOTS/waveforms/PROTOTYPE_gigando_variants.png`.
+
+**Second round (2026-10-18): two-tone mixtures (Q9) and four more tracks.** Source screenshots: `waveform-tests/Q9 two-tone mixtures/`, `SCREENSHOTS/traktor_screenshots/`.
+
+- **Gain does not change the scrolling waveform** (user observation in Traktor).
+  - There is no per-track normalisation either. All five tracks peak at 0.97–1.0 and their `PERCEIVED_DB` ranges from −2.3 to +14.5, yet the fitted full scale stays at ≈ 0.7–0.8 × half the lane.
+  - So the height scale is fixed lane geometry, not gain.
+- **Zoom is set per beat:** 217.4 px per bar for every track, whatever the BPM.
+- **The height window scales with zoom.** At 513 px/s (Q9), Traktor draws the individual 100 Hz cycles as a zigzag, which a fixed 12 ms window cannot do. About 2–3 columns fits both zooms.
+- **Q9 mixture colours** (median, 0–255):
+
+  | segment | R | G | B |
+  |---|---|---|---|
+  | 100 Hz −12 | 216 | 79 | 8 |
+  | 4 kHz −12 | 2 | 122 | 255 |
+  | 100 + 4k, both −12 | 186 | 112 | 255 |
+  | 100 −12, 4k −24 | 231 | 90 | 118 |
+  | 100 −24, 4k −12 | 66 | 114 | 255 |
+  | 100 + 1k, both −12 | 163 | 196 | 51 |
+  | 1k + 4k, both −12 | 11 | 206 | 255 |
+
+  - Green in a mix is close to the larger of the two tones' greens, not their sum. Simple addition would give ~200 for 100 + 4k.
+  - Scaling one tone by −12 dB scales its own channels by ≈ 0.25^0.87 (R 216 → 66), which confirms the 0.87 level exponent.
+  - No model tried (additive deck table, RMS, max-bin, stripe + saturation) fits all seven; the best is ~28 levels per channel. The exact mixing rule is still open.
+- **Fix: split the level exponent.** The hue mix uses `levels^0.35` (from the screenshot fit), while brightness follows `level^0.87` (Q3).
+  - With a single exponent of 0.35, quiet passages near the centre line blew out to white/yellow on every new track.
+  - Scored on all five tracks (per-94-px mean colour plus centre-row brightness), the combined error fell from 30.2 to 16.7.
+- **Polarity: the prototype had the waveform upside down.** Traktor draws positive samples *below* the centre line (Q5 click). The prototype now does the same.
+- **Saturation, checked per pixel.** Median HSV saturation, the share of vivid pixels (S > 0.8) and median brightness were compared on all five tracks. Saturation 4 / gain 0.6 was too pale and too dark (−0.05 S, −0.08 vivid share, −0.11 V). Saturation 5 / gain 0.7 matches (+0.02, +0.01, −0.02), with the block-colour score almost unchanged (17.0 vs 16.7).
+- **Current defaults:** stripe table, saturation 5, RGB gains 1/0.85/1.8, gamma 0.35, brightness gamma 0.87, density gain 0.7, additive blend, 12 ms window, height ×0.8, positive downward.
+  - These look right on all five tracks without per-track tuning. Body colour error is 7–12 levels and centre-line error 9–20.
+  - Remaining visible gap: yellow/white centre blobs between the kicks on dense tracks (*Progress Paradox*), where Traktor stays pink.
+  - Sheets: `SCREENSHOTS/traktor_screenshots/PROTOTYPE_*_comparison.png`.
+
+## Implications for a Traktor-style renderer in Mixxx
+
+> **Superseded in part by §8.** The list below was written before the tests. Its smoothed, mirrored envelope (items 2–3) and fixed gradient (item 5) do **not** match Traktor. See "Revised plan" at the end of this section.
+
+**Achievable now (renderer only, no re-analysis).** Build a new allshader renderer (base it on `waveformrendererrgb.cpp`, not the textured one):
+
+1. Per pixel, gather all slices in range. Use `unscale()` on high (and on all, if used) to get back to linear peaks.
+2. **Smooth over time:** per band, instant attack with exponential release, or a short moving average over neighbouring slices. #16963 and #17141 both found attack/release essential.
+3. **Height:** symmetric `max(L, R)` envelope, no ×2 compensation, and a user-tunable curve (start linear).
+4. **Colour:** `rgb = (low·Clow + mid·Cmid + high·Chigh) / ‖(low,mid,high)‖₂` with Clow = red, Cmid = green, Chigh = blue for a "Spectrum" preset. Smooth the colour too.
+5. **Brightness gradient:** alpha falls from ~1.0 at the centre to ~0.35 at the envelope edge, matching the stripe profile in §4.1. Optionally modulate it by how many of the pixel's slices reach each height, which gives a cheap version of the grain.
+6. No axis line. Draw one smooth shape (triangle strip) rather than per-pixel rectangles.
+
+**Needs analyzer changes (new waveform version, re-analysis):**
+- RMS per band alongside peak (#14325) for Traktor-like loud/quiet contrast.
+- A higher slice rate, signed min/max, or a small per-slice amplitude histogram for a true density texture.
+- Configurable or sharper crossovers (#17175), if visual tests show Traktor's bands sit elsewhere.
+- Removing the `pow` from storage altogether, which is cleaner than undoing it at render time.
+
+**Open questions the user can settle visually** (generate test files, analyse them in Traktor, and compare its screen with our stripe parser):
+
+- **Q1, colours vs bands in stripes:** analyse one track in Spectrum, copy its stripe file, switch to X-Ray, force re-analysis, and diff the files. If they are identical, the stripe holds band data and the renderer recolours it. If they differ, the stripe is a rendered image.
+- **Q2, crossovers:** sine sweep 20 Hz–20 kHz, or stepped tones at 50, 100, 200, 400, 800 Hz and 1.6, 3.2, 6.4, 12.8 kHz. Note where the hue changes from red to green to blue, and where it is mixed.
+- **Q3, amplitude scaling:** a 1 kHz tone stepped through 0, −6, −12, −18, −24, −36 dBFS. Measure the waveform height (or the stripe's non-zero rows) per step. A linear scale halves the height per −6 dB, a log scale steps it evenly, a sqrt scale drops it by ~0.71 per step.
+- **Q4, peak vs RMS:** a square wave and a sine at equal peak level. They look the same height if Traktor draws peaks, and the square looks ~1.41× taller if it draws RMS.
+- **Q5, smoothing:** an isolated click every beat. Measure how many pixels the blob extends before and after the click at a known zoom (attack/release time).
+- **Q6, grain:** pure sine (steady) vs white noise at equal level. A density rendering would show a smooth gradient for the sine (arcsine-like distribution) and speckle for the noise. A fixed dither texture would look the same on both.
+- **Q7, symmetry and stereo:** a hard-panned L-only signal. It shows whether Traktor's halves are L/R or mirrored mono.
+- **Q8, gain:** move the gain knob and Auto-Gain and check whether the scrolling waveform height changes.
+
+Q2–Q7 were answered on 2026-10-17 (§8). Q1 and Q8 are still open.
+
+**Revised plan (after §8).**
+1. **Shape and density need sample-level data that Mixxx's waveform does not keep.**
+   - Two options: (a) build a mono sample buffer (or a high-rate min/max + histogram summary) at track load, like Traktor's apparent load-time `WaveformDataGenerator`; or (b) add a new analysis representation, for example 1 ms sub-slices with signed min/max and a small amplitude histogram.
+   - Either way, the renderer draws per column the signed min..max of the mono sum, with brightness `clamp(colour · k · hits)` per channel.
+2. **Colour is a separate, low-rate, smoothed signal.**
+   - Band envelopes come from gentle overlapping filters (Mixxx's existing low/mid/high would do as a start).
+   - Smooth them with band-dependent release (~90 ms high, ~350 ms low) and a short attack.
+   - Blend additively into RGB, fitted to the §8.3 table, and keep brightness modest.
+   - This part could start from Mixxx's existing 441 Hz band data.
+3. **Details:** black 1-px centre line in silence, no axis line, linear scale with full scale = lane height.
+4. **From the prototype (§8.5):**
+   - Take min..max and density over a window of ~2–3 columns centred on each column, not over the column's own time.
+   - Make the deck's colour saturation, per-channel gains and band release times tunable rather than copying the stripe's numbers.
+   - Keep separate level exponents for hue (~0.35) and brightness (~0.87).
+   - Leave the waveform height independent of gain and of track loudness.
+
+---
+
+## Sources
+
+**Native Instruments (primary)**
+- Traktor Pro manual, Basic Usage Tutorials: https://docs.native-instruments.com/online-guides/traktor-pro-manual/en/basic-usage-tutorials
+- Traktor Pro manual, Preferences: https://docs.native-instruments.com/online-guides/traktor-pro-manual/en/preferences
+- NI-shipped QML in the local install, `C:\Program Files\Native Instruments\Traktor Pro 4\Resources64\qml\`: `Screens/Defines/Colors.qml:414-497`, `Screens/S8/Views/Waveform/SingleWaveform.qml:25-38`, `Screens/S8/Views/Waveform/Stripe.qml:7-23`, `Screens/S8/Views/Waveform/WaveformColorize.qml:59-63`, `Screens/S8/Views/Waveform/StemWaveforms.qml`, `CSI/Common/Pioneer/Waveform.qml:19`
+- Strings in `Traktor Pro 4.exe` (4.0.2): mode names; `Base\Utils\Waveform\WaveformDataGenerator.cpp`; `updateStripeAndTransientsFromTrack`; `onWaveformAnalyseCompleted`. Only plain strings were read. Nothing was disassembled.
+
+**Reverse engineering / data inspection**
+- Our inspection of `Documents\Native Instruments\Traktor 4.0.2\{Stripes,Transients,collection.nml,Traktor Settings.tsi}` (plus the 3.5.0 and 3.10.0 folders), using throwaway Python scripts. The method and minimal reader are in §4.1.
+- hellricer, "Decoding the TRAKTOR4 field" (2021): https://hellricer.github.io/2021/05/05/decoding-traktor4-field.html
+- kokernutz/traktor-kontrol-screens: https://github.com/kokernutz/traktor-kontrol-screens (`Screens/Defines/Colors.qml`)
+- ErikMinekus/traktor-kontrol-screens: https://github.com/ErikMinekus/traktor-kontrol-screens
+- wolkenarchitekt/traktor-nml-utils: https://github.com/wolkenarchitekt/traktor-nml-utils
+- Deep-Symmetry crate-digger, Rekordbox ANLZ spec: https://github.com/Deep-Symmetry/crate-digger/blob/main/src/main/kaitai/rekordbox_anlz.ksy
+
+**Mixxx (this repo, `djnote` branch)**
+- `src/analyzer/analyzerwaveform.cpp:13-15, 59-61, 156-158, 196-234`
+- `src/analyzer/analyzerwaveform.h:20-39, 73-108`
+- `src/waveform/waveform.h:14-28`; `src/waveform/waveform.cpp:44-63`
+- `src/waveform/renderers/allshader/waveformrendererrgb.cpp:78, 117-199`; `waveformrendererfiltered.cpp:64, 108-186`; `waveformrendererhsv.cpp:138-159`; `waveformrenderersimple.cpp:68, 116-139`; `waveformrendererlrrgb.cpp:163-192`; `waveformrenderertextured.cpp:192, 305, 414-415, 475-476`
+- `res/shaders/rgbsignal.frag:34-122`; `res/shaders/stackedsignal.frag:65-145`
+- `src/waveform/renderers/waveformrenderersignalbase.h:30-37`; `waveformrenderersignalbase.cpp:172-228`
+- `src/waveform/renderers/waveformwidgetrenderer.h:115-129`; `waveformwidgetrenderer.cpp:96`; `src/engine/enginepregain.cpp:118-121`
+- `src/waveform/widgets/waveformwidgettype.h` (type numbers); `res/skins/LateNight/skin.xml:187-189, 327-330` (RGB band colours)
+
+**Mixxx GitHub**
+- PRs: #13075 https://github.com/mixxxdj/mixxx/pull/13075 · #14325 https://github.com/mixxxdj/mixxx/pull/14325 · #16963 https://github.com/mixxxdj/mixxx/pull/16963 · #17141 https://github.com/mixxxdj/mixxx/pull/17141 · #17175 https://github.com/mixxxdj/mixxx/pull/17175 · #17129 https://github.com/mixxxdj/mixxx/pull/17129 · #15516 https://github.com/mixxxdj/mixxx/pull/15516 · #14998 https://github.com/mixxxdj/mixxx/pull/14998
+- Issues: #11833 https://github.com/mixxxdj/mixxx/issues/11833 · #6352 https://github.com/mixxxdj/mixxx/issues/6352
+- audio-viz crate: https://crates.io/crates/audio-viz
+
+**Secondary / anecdotal (labelled as such above)**
+- crossfadr, "What's new in Traktor Pro 2" (2011): https://crossfadr.com/2011/06/21/whats-new-in-traktor-pro-2/
+- Resident Advisor, Traktor Pro 2 review: https://ra.co/reviews/8962
+- DJ TechTools forum, "Read traktor stripe files" (2010): https://forum.djtechtools.com/showthread.php?t=22289
+- Digital DJ Tips, "DJ Software Secrets": https://www.digitaldjtips.com/dj-software-secrets/
