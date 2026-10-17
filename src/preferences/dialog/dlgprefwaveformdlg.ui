@@ -304,6 +304,31 @@ Select from different types of displays for the waveform, which differ primarily
       </widget>
      </item>
 
+     <item row="8" column="1" colspan="3">
+      <layout class="QHBoxLayout" name="followsLayout">
+       <item>
+        <widget class="QCheckBox" name="followsGainCheckBox">
+         <property name="toolTip">
+          <string>The scrolling waveform changes with the deck's gain (gain knob and ReplayGain). Turn off to show the track as recorded.</string>
+         </property>
+         <property name="text">
+          <string>Follows gain</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="followsEqCheckBox">
+         <property name="toolTip">
+          <string>The scrolling waveform changes with the deck's EQ knobs and kills. Turn off to show the track as recorded.</string>
+         </property>
+         <property name="text">
+          <string>Follows EQ</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+
      <item row="9" column="1">
       <widget class="QCheckBox" name="normalizeOverviewCheckBox">
        <property name="text">
@@ -898,6 +923,8 @@ Select from different types of displays for the waveform, which differ primarily
   <tabstop>playMarkerPositionSlider</tabstop>
   <tabstop>defaultZoomComboBox</tabstop>
   <tabstop>synchronizeZoomCheckBox</tabstop>
+  <tabstop>followsGainCheckBox</tabstop>
+  <tabstop>followsEqCheckBox</tabstop>
   <tabstop>normalizeOverviewCheckBox</tabstop>
   <tabstop>allVisualGain</tabstop>
   <tabstop>lowVisualGain</tabstop>

@@ -146,6 +146,16 @@ class WaveformWidgetFactory : public QObject, public Singleton<WaveformWidgetFac
     void setVisualGain(FilterIndex index, double gain);
     double getVisualGain(FilterIndex index) const;
 
+    // Whether the scrolling waveforms follow the deck's gain / EQ.
+    void setFollowsGain(bool follows);
+    bool followsGain() const {
+        return m_followsGain;
+    }
+    void setFollowsEq(bool follows);
+    bool followsEq() const {
+        return m_followsEq;
+    }
+
     void setOverviewNormalized(bool normalize);
     int isOverviewNormalized() const { return m_overviewNormalized;}
 
@@ -244,6 +254,8 @@ class WaveformWidgetFactory : public QObject, public Singleton<WaveformWidgetFac
     double m_defaultZoom;
     bool m_zoomSync;
     double m_visualGain[FilterCount];
+    bool m_followsGain;
+    bool m_followsEq;
     bool m_overviewNormalized;
     mixxx::overviewlayout::LineSettings m_overviewLineSettings;
     void saveOverviewLineSettings();

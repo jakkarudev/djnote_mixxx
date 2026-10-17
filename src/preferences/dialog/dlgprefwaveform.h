@@ -38,6 +38,8 @@ class DlgPrefWaveform : public DlgPreferencePage, public Ui::DlgPrefWaveformDlg 
     void slotSetVisualGainLow(double gain);
     void slotSetVisualGainMid(double gain);
     void slotSetVisualGainHigh(double gain);
+    void slotSetFollowsGain(bool follows);
+    void slotSetFollowsEq(bool follows);
     void slotSetNormalizeOverview(bool normalize);
     void slotSetOverviewLinesMode(int index);
     void slotSetOverviewPhraseBars(int index);

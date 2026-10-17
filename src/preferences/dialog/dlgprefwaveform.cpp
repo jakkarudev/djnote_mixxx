@@ -195,6 +195,14 @@ DlgPrefWaveform::DlgPrefWaveform(
             QOverload<double>::of(&QDoubleSpinBox::valueChanged),
             this,
             &DlgPrefWaveform::slotSetVisualGainHigh);
+    connect(followsGainCheckBox,
+            &QCheckBox::toggled,
+            this,
+            &DlgPrefWaveform::slotSetFollowsGain);
+    connect(followsEqCheckBox,
+            &QCheckBox::toggled,
+            this,
+            &DlgPrefWaveform::slotSetFollowsEq);
     connect(normalizeOverviewCheckBox,
             &QCheckBox::toggled,
             this,
@@ -321,6 +329,8 @@ void DlgPrefWaveform::slotUpdate() {
     lowVisualGain->setValue(factory->getVisualGain(WaveformWidgetFactory::Low));
     midVisualGain->setValue(factory->getVisualGain(WaveformWidgetFactory::Mid));
     highVisualGain->setValue(factory->getVisualGain(WaveformWidgetFactory::High));
+    followsGainCheckBox->setChecked(factory->followsGain());
+    followsEqCheckBox->setChecked(factory->followsEq());
     normalizeOverviewCheckBox->setChecked(factory->isOverviewNormalized());
     overviewLinesComboBox->setCurrentIndex(overviewLinesComboBox->findData(
             static_cast<int>(factory->getOverviewLineSettings().mode)));
@@ -393,6 +403,10 @@ void DlgPrefWaveform::slotResetToDefaults() {
     // RGB overview.
     waveformOverviewComboBox->setCurrentIndex(
             waveformOverviewComboBox->findData(QVariant::fromValue(WOverview::Type::RGB)));
+
+    // Waveforms follow the deck's gain and EQ.
+    followsGainCheckBox->setChecked(true);
+    followsEqCheckBox->setChecked(true);
 
     // Don't normalize overview.
     normalizeOverviewCheckBox->setChecked(false);
@@ -521,6 +535,14 @@ void DlgPrefWaveform::slotSetVisualGainMid(double gain) {
 
 void DlgPrefWaveform::slotSetVisualGainHigh(double gain) {
     WaveformWidgetFactory::instance()->setVisualGain(WaveformWidgetFactory::High,gain);
+}
+
+void DlgPrefWaveform::slotSetFollowsGain(bool follows) {
+    WaveformWidgetFactory::instance()->setFollowsGain(follows);
+}
+
+void DlgPrefWaveform::slotSetFollowsEq(bool follows) {
+    WaveformWidgetFactory::instance()->setFollowsEq(follows);
 }
 
 void DlgPrefWaveform::slotSetNormalizeOverview(bool normalize) {
