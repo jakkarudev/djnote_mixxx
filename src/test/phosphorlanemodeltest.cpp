@@ -148,43 +148,44 @@ TEST_F(PhosphorLaneModelTest, DecimatedTierColumnsMatchTheReferenceFixtures) {
     EXPECT_GE(casesChecked, 4);
 }
 
-// A tier keeps the outline: where a column spans several blocks, every tier's
-// outline rows are those of Full, give or take one row. The only difference is
-// at a column's window edge, where a block's extreme can lie just outside the
-// window of points (hard square edges can lose more, so they are left out).
-TEST_F(PhosphorLaneModelTest, OutlineRowsAtEveryTierStayWithinOneRowOfFull) {
+// A tier never changes the outline (user story 22). A window of 32 frames or
+// more snaps its edges outward to blocks of 16 frames in every tier, so all
+// tiers see the same whole blocks and their outline rows are exactly those of
+// Full, hard square edges included.
+TEST_F(PhosphorLaneModelTest, OutlineRowsAreIdenticalAtEveryTierWhenTheWindowIs32FramesOrMore) {
     int columnsChecked = 0;
-    for (const char* name : {"q4_sine", "q6_noise", "q5_kick"}) {
+    for (const char* name : {"q4_square", "q4_sine", "q6_noise", "q5_kick", "q5_click"}) {
         const auto f = load(name);
         const auto pFull = dataFromFixture(f, 1);
         for (const int n : {4, 8, 16}) {
             const auto pTier = dataFromFixture(f, n);
-            for (const auto& lane : f.lanes) {
-                LaneParams params;
-                params.framesPerColumn = framesPerColumn(f.rate, lane.pxPerBar, lane.bpm);
-                params.height = static_cast<int>(lane.height);
-                params.windowColumns = lane.windowMilliColumns / 1000.0;
-                // Only views where a column spans several blocks.
-                if (params.framesPerColumn < 2.0 * n) {
-                    continue;
-                }
-                for (uint32_t x = 0; x < lane.width; ++x) {
-                    const double centre = lane.position +
-                            (x + 0.5 - lane.playheadX) * params.framesPerColumn;
-                    const LaneColumn full = computeColumn(*pFull, params, centre);
-                    const LaneColumn tier = computeColumn(*pTier, params, centre);
-                    ASSERT_EQ(full.status, tier.status) << name << " N=" << n << " x=" << x;
-                    if (full.status == ColumnStatus::Outside) {
-                        continue;
+            // 16 is one block per column at a 2 column window, 17 and 20.5
+            // give windows of 34 and 41 frames, 101.43 is the fixtures' zoom.
+            for (const double fpc : {16.0, 17.0, 20.5, 40.3, 101.43}) {
+                for (const double position : {1000.3, 2999.5, 4410.0}) {
+                    LaneParams params;
+                    params.framesPerColumn = fpc;
+                    params.height = 41;
+                    params.windowColumns = 2.0;
+                    for (int x = 0; x < 40; ++x) {
+                        const double centre = position + (x - 20 + 0.5) * fpc;
+                        const LaneColumn full = computeColumn(*pFull, params, centre);
+                        const LaneColumn tier = computeColumn(*pTier, params, centre);
+                        ASSERT_EQ(full.status, tier.status) << name << " N=" << n << " x=" << x;
+                        if (full.status == ColumnStatus::Outside) {
+                            continue;
+                        }
+                        ++columnsChecked;
+                        ASSERT_EQ(full.rowMin, tier.rowMin)
+                                << name << " N=" << n << " fpc=" << fpc << " x=" << x;
+                        ASSERT_EQ(full.rowMax, tier.rowMax)
+                                << name << " N=" << n << " fpc=" << fpc << " x=" << x;
                     }
-                    ++columnsChecked;
-                    ASSERT_NEAR(full.rowMin, tier.rowMin, 1) << name << " N=" << n << " x=" << x;
-                    ASSERT_NEAR(full.rowMax, tier.rowMax, 1) << name << " N=" << n << " x=" << x;
                 }
             }
         }
     }
-    EXPECT_GT(columnsChecked, 100);
+    EXPECT_GT(columnsChecked, 1000);
 }
 
 TEST_F(PhosphorLaneModelTest, DigitalSilenceIsFlagged) {
