@@ -79,7 +79,7 @@ Four consecutive beats of the beat grid, counted from the grid's first beat. DJN
 _Avoid_: measure
 
 **jkr**:
-DJNote's beat detection, offered next to Mixxx's original detectors. A Mixxx detector finds the tempo, then jkr places the beat grid on the kicks with its first beat on a downbeat.
+DJNote's beat detection, offered next to Mixxx's original detectors. A Mixxx detector finds the tempo, then jkr places the beat grid on the kicks with its first beat on a downbeat. The JKR-Parallel skin is unrelated.
 _Avoid_: DJNote detector, refined analyzer
 
 **Downbeat**:
@@ -93,3 +93,9 @@ _Avoid_: section, block
 **Until Mark**:
 An existing readout at the play marker that counts beats from the play position to the next cue or marker. It is not the hover readout.
 _Avoid_: beat countdown
+
+## Skins
+
+**JKR-Parallel**:
+DJNote's skin modeled on Traktor's two-deck screen, with both decks' scrolling waveforms stacked full-width at the top. It is a skin, not the jkr beat detection.
+_Avoid_: Traktor skin, TRKTR skin, jkr skin
