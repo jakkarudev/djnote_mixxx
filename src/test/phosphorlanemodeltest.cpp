@@ -108,6 +108,54 @@ TEST(PhosphorLaneModelPlainTest, FramesPerColumnUsesBarsAndFallsBackToBpm120) {
     EXPECT_NEAR(framesPerColumn(44100, 217.4, 120.0) / 2, framesPerColumn(44100, 217.4, 240.0), 1e-9);
 }
 
+TEST(PhosphorLaneModelPlainTest, PixelsPerBarFollowTheZoomValue) {
+    EXPECT_NEAR(217.4, pxPerBarForZoom(4.0), 1e-9);
+    EXPECT_NEAR(86.96, pxPerBarForZoom(10.0), 1e-9);
+    EXPECT_NEAR(869.6, pxPerBarForZoom(1.0), 1e-9);
+}
+
+TEST(PhosphorLaneModelPlainTest, ZoomedOutLimitIsTenAndDeepestIsAboutOneFramePerColumn) {
+    EXPECT_DOUBLE_EQ(10.0, kPhosphorMaxZoom);
+    // 120 BPM (the fallback) at 44.1 kHz: the deepest zoom is at most one
+    // audio frame per physical column, and not absurdly deeper.
+    const double fpc = framesPerColumn(44100, pxPerBarForZoom(kPhosphorMinZoom), 0.0);
+    EXPECT_LE(fpc, 1.0);
+    EXPECT_GE(fpc, 0.25);
+    // Reachable from the default zoom with a few dozen wheel notches.
+    const double notches = std::log(4.0 / kPhosphorMinZoom) / std::log(kPhosphorWheelStep);
+    EXPECT_LT(notches, 60);
+    EXPECT_DOUBLE_EQ(1.15, kPhosphorWheelStep);
+}
+
+TEST(PhosphorLaneModelPlainTest, ZoomDoesNotDependOnRateRatioAndMatchesBarsAtAnyBpm) {
+    // The view scale in visual samples (441 per second) per logical pixel
+    // takes no rate ratio: it is a function of zoom and BPM only.
+    EXPECT_NEAR(441.0 * 2.0 / 217.4, visualSamplePerPixelForZoom(4.0, 120.0), 1e-9);
+    EXPECT_DOUBLE_EQ(visualSamplePerPixelForZoom(4.0, 120.0), visualSamplePerPixelForZoom(4.0, 0.0));
+    // At 128 BPM a bar is 1.875 s: px per second = pxPerBar * bpm / 240.
+    const double pxPerSecond128 = 441.0 / visualSamplePerPixelForZoom(4.0, 128.0);
+    EXPECT_NEAR(217.4 * 128.0 / 240.0, pxPerSecond128, 1e-6);
+}
+
+TEST_F(PhosphorLaneModelTest, DeepestZoomDrawsAConnectedSampleToSampleLine) {
+    const auto f = load("q4_sine");
+    const auto pData = dataFromFixture(f);
+    LaneParams params;
+    params.framesPerColumn = framesPerColumn(f.rate, pxPerBarForZoom(kPhosphorMinZoom), 120.0);
+    params.height = 201;
+    ASSERT_LE(params.framesPerColumn, 1.0);
+    // Every neighbouring pair of columns overlaps or touches in rows, so the
+    // samples read as one connected line.
+    LaneColumn previous = computeColumn(*pData, params, 3000.5);
+    for (int k = 1; k < 200; ++k) {
+        const LaneColumn col = computeColumn(*pData, params, 3000.5 + k * params.framesPerColumn);
+        ASSERT_EQ(ColumnStatus::Signal, col.status);
+        EXPECT_LE(col.rowMin, previous.rowMax + 1) << k;
+        EXPECT_GE(col.rowMax, previous.rowMin - 1) << k;
+        previous = col;
+    }
+}
+
 TEST(PhosphorLaneModelPlainTest, ColumnsOutsideTheTrackAreOutside) {
     PhosphorData data(44100, 1000);
     const std::vector<int16_t> s(1000, 1000);
