@@ -406,7 +406,7 @@ The worst difference is 0.66 levels, under the 2-level criterion. The FIR filter
 
 Comparison images (Full above the four tiers, 4x around the play marker, per track): `docs/research/phosphor-detail-tiers/*.png`.
 
-- The outline is identical by construction, as the images show. What changes is the texture inside the shape: single pixels flip between dim and bright, hence the large maxima.
+- The outline is identical by construction, as the images show. This holds because a shape window of 32 frames or more snaps its edges outward to multiples of 16 frames (the coarsest kept tier's block) in every tier, Full included, so all tiers see the same whole blocks; below 32 frames (deepest zoom) there is no snapping and tiers may differ. What changes is the texture inside the shape: single pixels flip between dim and bright, hence the large maxima.
 - **High** and **Medium** look the same as Full at normal viewing size. Medium's texture is slightly grainier.
 - **Low** has visibly more speckle on dense tracks (*Progress Paradox*, *Spiritual*). It is borderline.
 - **Lowest** is visibly different: white speckle pixels in the density and a coarser texture. **Proposal: drop Lowest** (N = 32) from the list. Keep Full, High, Medium and Low. If Low looks wrong in the user's final manual check, drop it too.

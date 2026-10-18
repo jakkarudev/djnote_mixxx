@@ -27,8 +27,16 @@ const char* const kFixtures[] = {
     "q7_inverted",
 };
 
-std::unique_ptr<PhosphorData> dataFromFixture(const phosphorfixture::Fixture& f) {
-    auto pData = std::make_unique<PhosphorData>(static_cast<int>(f.rate), f.frames);
+// Fixtures that carry decimated-tier lane cases.
+const char* const kTierFixtures[] = {
+    "q4_square",
+    "q4_sine",
+    "q6_noise",
+    "q5_kick",
+};
+
+std::unique_ptr<PhosphorData> dataFromFixture(const phosphorfixture::Fixture& f, int blockSize = 1) {
+    auto pData = std::make_unique<PhosphorData>(static_cast<int>(f.rate), f.frames, blockSize);
     std::vector<int16_t> mono(f.frames);
     for (uint32_t i = 0; i < f.frames; ++i) {
         const int l = f.input[i * f.channels];
@@ -97,6 +105,87 @@ TEST_F(PhosphorLaneModelTest, FullDetailColumnsMatchTheReferenceFixtures) {
     // hollow square, sine (x2), noise, 630 Hz, clicks (x2), kick is tier 4
     // only, digital silence, L = -R
     EXPECT_GE(casesChecked, 9);
+}
+
+// The lane cases of the decimated tiers: the outline rows and the status are
+// exact and the density is within 1/255, against the reference script.
+TEST_F(PhosphorLaneModelTest, DecimatedTierColumnsMatchTheReferenceFixtures) {
+    int casesChecked = 0;
+    for (const char* name : kTierFixtures) {
+        const auto f = load(name);
+        for (const auto& lane : f.lanes) {
+            if (lane.tierN == 1) {
+                continue;
+            }
+            ++casesChecked;
+            const auto pData = dataFromFixture(f, static_cast<int>(lane.tierN));
+            LaneParams params;
+            params.framesPerColumn = framesPerColumn(f.rate, lane.pxPerBar, lane.bpm);
+            params.height = static_cast<int>(lane.height);
+            params.windowColumns = lane.windowMilliColumns / 1000.0;
+            for (uint32_t x = 0; x < lane.width; ++x) {
+                const double centre = lane.position +
+                        (x + 0.5 - lane.playheadX) * params.framesPerColumn;
+                const LaneColumn col = computeColumn(*pData, params, centre);
+                const QString where = QStringLiteral("%1 / %2 / column %3")
+                                              .arg(name, lane.name)
+                                              .arg(x);
+                ASSERT_EQ(lane.status[x], static_cast<uint8_t>(col.status)) << where.toStdString();
+                if (col.status == ColumnStatus::Outside) {
+                    continue;
+                }
+                ASSERT_EQ(lane.rowMin[x], col.rowMin) << where.toStdString();
+                ASSERT_EQ(lane.rowMax[x], col.rowMax) << where.toStdString();
+                for (uint32_t row = 0; row < lane.height; ++row) {
+                    ASSERT_NEAR(lane.density[static_cast<size_t>(x) * lane.height + row],
+                            col.density[row],
+                            1.0 / 255.0)
+                            << where.toStdString() << " / row " << row;
+                }
+            }
+        }
+    }
+    EXPECT_GE(casesChecked, 4);
+}
+
+// A tier never changes the outline (user story 22). A window of 32 frames or
+// more snaps its edges outward to blocks of 16 frames in every tier, so all
+// tiers see the same whole blocks and their outline rows are exactly those of
+// Full, hard square edges included.
+TEST_F(PhosphorLaneModelTest, OutlineRowsAreIdenticalAtEveryTierWhenTheWindowIs32FramesOrMore) {
+    int columnsChecked = 0;
+    for (const char* name : {"q4_square", "q4_sine", "q6_noise", "q5_kick", "q5_click"}) {
+        const auto f = load(name);
+        const auto pFull = dataFromFixture(f, 1);
+        for (const int n : {4, 8, 16}) {
+            const auto pTier = dataFromFixture(f, n);
+            // 16 is one block per column at a 2 column window, 17 and 20.5
+            // give windows of 34 and 41 frames, 101.43 is the fixtures' zoom.
+            for (const double fpc : {16.0, 17.0, 20.5, 40.3, 101.43}) {
+                for (const double position : {1000.3, 2999.5, 4410.0}) {
+                    LaneParams params;
+                    params.framesPerColumn = fpc;
+                    params.height = 41;
+                    params.windowColumns = 2.0;
+                    for (int x = 0; x < 40; ++x) {
+                        const double centre = position + (x - 20 + 0.5) * fpc;
+                        const LaneColumn full = computeColumn(*pFull, params, centre);
+                        const LaneColumn tier = computeColumn(*pTier, params, centre);
+                        ASSERT_EQ(full.status, tier.status) << name << " N=" << n << " x=" << x;
+                        if (full.status == ColumnStatus::Outside) {
+                            continue;
+                        }
+                        ++columnsChecked;
+                        ASSERT_EQ(full.rowMin, tier.rowMin)
+                                << name << " N=" << n << " fpc=" << fpc << " x=" << x;
+                        ASSERT_EQ(full.rowMax, tier.rowMax)
+                                << name << " N=" << n << " fpc=" << fpc << " x=" << x;
+                    }
+                }
+            }
+        }
+    }
+    EXPECT_GT(columnsChecked, 1000);
 }
 
 TEST_F(PhosphorLaneModelTest, DigitalSilenceIsFlagged) {

@@ -344,6 +344,12 @@ class Lane:
     levels: np.ndarray       # (width, 3) in 0..1, interpolated between 1 ms blocks
 
 
+# A window of at least SNAP_MIN_WINDOW frames snaps its edges outward to
+# multiples of SNAP_BLOCK frames (the coarsest kept tier's block), in every tier.
+SNAP_BLOCK = 16
+SNAP_MIN_WINDOW = 32
+
+
 def lane_columns(times, values, view, colour_u16=None, block=44):
     """The Phosphor lane model for one view, from a detail tier's points."""
     h, w = view.height, view.width
@@ -357,8 +363,16 @@ def lane_columns(times, values, view, colour_u16=None, block=44):
     row_max = np.zeros(w, np.int32)
     density = np.zeros((h, w))
     for x, c in enumerate(cs):
-        lo = np.searchsorted(times, c - span, "left")
-        hi = np.searchsorted(times, c + span, "right") - 1
+        if 2 * span >= SNAP_MIN_WINDOW:
+            # Snap the window outward to whole blocks of SNAP_BLOCK frames, so
+            # that every detail tier sees the same whole blocks.
+            a = np.floor((c - span) / SNAP_BLOCK) * SNAP_BLOCK
+            b = np.ceil((c + span) / SNAP_BLOCK) * SNAP_BLOCK
+            lo = np.searchsorted(times, a, "left")
+            hi = np.searchsorted(times, b, "left") - 1
+        else:
+            lo = np.searchsorted(times, c - span, "left")
+            hi = np.searchsorted(times, c + span, "right") - 1
         i0 = np.searchsorted(times, c, "right") - 1
         lo, hi = max(min(lo, i0), 0), min(max(hi, i0 + 1), n - 1)
         if hi - lo < 1:

@@ -6,6 +6,7 @@
 #include "analyzer/constants.h"
 #include "track/track.h"
 #include "util/logger.h"
+#include "waveform/phosphor/phosphorsettings.h"
 
 namespace {
 
@@ -40,7 +41,12 @@ bool AnalyzerPhosphor::initialize(const AnalyzerTrack& track,
         return false;
     }
     m_pTrack = track.getTrack();
-    m_pData = std::make_shared<mixxx::phosphor::PhosphorData>(sampleRate.value(), frameLength);
+    // The tier is read per track, so a change applies from the next load. It
+    // is a floor: a long input drops to a lower tier to stay under the cap.
+    const auto detail = mixxx::phosphor::effectiveDetail(
+            mixxx::phosphor::loadSettings(m_pConfig).detail, frameLength);
+    m_pData = std::make_shared<mixxx::phosphor::PhosphorData>(
+            sampleRate.value(), frameLength, mixxx::phosphor::blockSizeOf(detail));
     m_stored = false;
     m_pColour = std::make_unique<mixxx::phosphor::ColourTrackBuilder>(sampleRate.value());
     // From now on other threads can touch it.

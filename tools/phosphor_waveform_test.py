@@ -79,14 +79,29 @@ class LaneModel(unittest.TestCase):
         self.assertEqual(lane.status[0], pw.OUTSIDE)
         self.assertEqual(lane.status[4], pw.SIGNAL)
 
-    def test_decimated_tier_keeps_the_outline(self):
+    def test_outline_is_identical_at_every_tier_when_the_window_is_32_frames_or_more(self):
         rng = np.random.default_rng(1)
-        mono = (rng.uniform(-1, 1, 4000) * 20000).astype(np.int16)
-        a = self.lane(mono, 40.0, 2000, tier=1, width=20, window=2.0)
-        b = self.lane(mono, 40.0, 2000, tier=8, width=20, window=2.0)
-        # Window edges fall inside blocks, so allow a row of slack at the ends.
-        self.assertLessEqual(np.abs(a.row_min - b.row_min).max(), 2)
-        self.assertLessEqual(np.abs(a.row_max - b.row_max).max(), 2)
+        noise = (rng.uniform(-1, 1, 4000) * 20000).astype(np.int16)
+        square = np.where((np.arange(4000) // 37) % 2, 15000, -15000).astype(np.int16)
+        # spp 40 and 17 (odd, windows of 80 and 34 frames), fractional positions.
+        for mono in (noise, square):
+            for spp, pos in ((40.0, 2000.3), (17.0, 1999.7), (16.0, 2103.0)):
+                full = self.lane(mono, spp, pos, tier=1, width=20)
+                for tier in (4, 8, 16):
+                    t = self.lane(mono, spp, pos, tier=tier, width=20)
+                    np.testing.assert_array_equal(full.status, t.status)
+                    np.testing.assert_array_equal(full.row_min, t.row_min)
+                    np.testing.assert_array_equal(full.row_max, t.row_max)
+
+    def test_window_snaps_outward_to_blocks_of_16_frames(self):
+        # A single spike at frame 70; a window of 40 frames around 50 reaches
+        # frames 30..70 and so snaps to 16..80 and sees the spike at 70, and a
+        # spike at 79 is seen too, while one at 80 is not.
+        for spike, seen in ((70, True), (79, True), (80, False), (15, False), (16, True)):
+            mono = np.zeros(200, np.int16)
+            mono[spike] = 20000
+            lane = self.lane(mono, 20.0, 50.0, width=1, window=2.0)
+            self.assertEqual(lane.row_max[0] > (self.H - 1) / 2 + 1, seen, spike)
 
     def test_density_of_a_sine_is_bright_at_the_edges(self):
         n = np.arange(8000)

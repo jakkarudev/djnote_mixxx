@@ -81,6 +81,11 @@ Definitions (the C++ lane model must match):
 - Window: points whose time lies in `[c - w*spc/2, c + w*spc/2]` (w = window columns), widened to
   always include the point at or before `c` and the next one. Clipped to the buffer. Fewer than 2
   points: status 0, all outputs 0.
+- Window snapping: when the window is at least 32 frames wide (`w*spc >= 32`), its edges snap
+  outward to multiples of 16 frames, `[floor((c - w*spc/2) / 16) * 16, ceil((c + w*spc/2) / 16) * 16)`
+  (upper edge exclusive), in every tier, Full included. Blocks are aligned to the frame index from
+  the start of the track, so every tier sees the same whole blocks and the outline is identical
+  at all tiers. Below 32 frames (deepest zoom) the window is not snapped and tiers may differ.
 - Rows: `rowOf(v) = clip(floor(centre + v / 32768 * half + 0.5), 0, height - 1)`,
   `centre = (height - 1) / 2`, `half = 0.8 * height / 2` (positive values go down). Use `double`.
   `row_min`/`row_max` are the extremes over the window's points. Status 2 if every point is 0.
