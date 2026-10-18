@@ -18,10 +18,6 @@ constexpr double kTableRgb[3][kTableSize] = {
     {.07, .09, .16, .23, .34, .53, .71, .84, .91, .94},
 };
 
-constexpr double kGamma = 0.35;
-constexpr double kAttackSeconds = 0.005;
-constexpr double kReleaseSeconds[3] = {0.350, 0.180, 0.040};
-constexpr double kLookAheadSeconds = 0.120;
 // Blocks the backward follower looks ahead before a block is final: 10 time
 // constants of the look-ahead, so the cut-off error is below 5e-5.
 constexpr size_t kBackwardMemoryBlocks = 1200;
@@ -44,6 +40,9 @@ double interpolate(const double* pTable, double logHz) {
 }
 
 inline double followerCoefficient(double dtSeconds, double tau) {
+    if (tau <= 0.0) {
+        return 1.0; // no smoothing
+    }
     return 1.0 - std::exp(-dtSeconds / tau);
 }
 
@@ -61,7 +60,7 @@ int colourBlockFrames(int sampleRate) {
     return std::max(1, static_cast<int>(std::lround(sampleRate / 1000.0)));
 }
 
-std::array<std::vector<double>, 3> designColourFilters(int sampleRate) {
+std::array<std::vector<double>, 3> designColourFilters(int sampleRate, double mixExponent) {
     const int m = colourFirLength(sampleRate);
     const int half = m / 2;
     // Response on the rfft grid of m points.
@@ -81,7 +80,7 @@ std::array<std::vector<double>, 3> designColourFilters(int sampleRate) {
         }
         norm = std::sqrt(norm);
         for (int c = 0; c < 3; ++c) {
-            g[c][static_cast<size_t>(k)] = std::pow(rgb[c] / norm, 1.0 / kGamma);
+            g[c][static_cast<size_t>(k)] = std::pow(rgb[c] / norm, 1.0 / mixExponent);
         }
     }
     // irfft of a real, even spectrum, rolled by m/2 and Hann-windowed.
@@ -118,8 +117,9 @@ struct ColourTrackBuilder::Impl {
         }
     };
 
-    explicit Impl(int sampleRate)
-            : blockFrames(colourBlockFrames(sampleRate)),
+    Impl(int sampleRate, const ColourTrackParams& colourParams)
+            : mixExponent(colourParams.mixExponent),
+              blockFrames(colourBlockFrames(sampleRate)),
               firLength(colourFirLength(sampleRate)),
               chunk(kFftSize - firLength + 1),
               fft(kFftSize),
@@ -127,14 +127,14 @@ struct ColourTrackBuilder::Impl {
               lookAheadCoefficient(0),
               skipOutput(firLength / 2) {
         const double dt = static_cast<double>(blockFrames) / sampleRate;
-        attackCoefficient = followerCoefficient(dt, kAttackSeconds);
-        lookAheadCoefficient = followerCoefficient(dt, kLookAheadSeconds);
+        attackCoefficient = followerCoefficient(dt, colourParams.attackMs / 1000.0);
+        lookAheadCoefficient = followerCoefficient(dt, colourParams.lookAheadMs / 1000.0);
         for (int c = 0; c < 3; ++c) {
-            releaseCoefficient[c] = followerCoefficient(dt, kReleaseSeconds[c]);
+            releaseCoefficient[c] = followerCoefficient(dt, colourParams.releaseMs[c] / 1000.0);
         }
         // Spectra of the taps. Red and green share one inverse FFT (red in
         // the real part, green in the imaginary part), blue has its own.
-        const auto taps = designColourFilters(sampleRate);
+        const auto taps = designColourFilters(sampleRate, mixExponent);
         Spectrum tap;
         Spectrum spectrum;
         for (int c = 0; c < 3; ++c) {
@@ -217,7 +217,7 @@ struct ColourTrackBuilder::Impl {
                 for (int i = 0; i < blockFrames; ++i) {
                     peak = std::max(peak, std::abs(p[i]));
                 }
-                const double level = std::pow(peak / 32768.0, kGamma);
+                const double level = std::pow(peak / 32768.0, mixExponent);
                 raw.push_back(level);
                 const double coefficient =
                         level > forwardState[c] ? attackCoefficient : releaseCoefficient[c];
@@ -255,6 +255,7 @@ struct ColourTrackBuilder::Impl {
         smoothed.erase(smoothed.begin(), smoothed.begin() + static_cast<std::ptrdiff_t>(end * 3));
     }
 
+    const double mixExponent;
     const int blockFrames;
     const int firLength;
     const int chunk;
@@ -279,8 +280,8 @@ struct ColourTrackBuilder::Impl {
     std::vector<double> backward;
 };
 
-ColourTrackBuilder::ColourTrackBuilder(int sampleRate)
-        : m_pImpl(std::make_unique<Impl>(sampleRate)) {
+ColourTrackBuilder::ColourTrackBuilder(int sampleRate, const ColourTrackParams& params)
+        : m_pImpl(std::make_unique<Impl>(sampleRate, params)) {
 }
 
 ColourTrackBuilder::~ColourTrackBuilder() = default;

@@ -43,12 +43,15 @@ bool AnalyzerPhosphor::initialize(const AnalyzerTrack& track,
     m_pTrack = track.getTrack();
     // The tier is read per track, so a change applies from the next load. It
     // is a floor: a long input drops to a lower tier to stay under the cap.
-    const auto detail = mixxx::phosphor::effectiveDetail(
-            mixxx::phosphor::loadSettings(m_pConfig).detail, frameLength);
+    const auto settings = mixxx::phosphor::loadSettings(m_pConfig);
+    const auto detail = mixxx::phosphor::effectiveDetail(settings.detail, frameLength);
     m_pData = std::make_shared<mixxx::phosphor::PhosphorData>(
             sampleRate.value(), frameLength, mixxx::phosphor::blockSizeOf(detail));
     m_stored = false;
-    m_pColour = std::make_unique<mixxx::phosphor::ColourTrackBuilder>(sampleRate.value());
+    // The colour settings are read per track too: they apply from the next load.
+    m_pData->setColourMixExponent(settings.colour.mixExponent);
+    m_pColour = std::make_unique<mixxx::phosphor::ColourTrackBuilder>(
+            sampleRate.value(), settings.colour);
     // From now on other threads can touch it.
     m_pTrack->setPhosphorData(m_pData);
     return true;

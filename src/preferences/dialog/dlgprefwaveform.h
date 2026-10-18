@@ -8,6 +8,11 @@
 #include "preferences/usersettings.h"
 
 class ControlPushButton;
+class QCheckBox;
+class QComboBox;
+class QDoubleSpinBox;
+class QPushButton;
+class QWidget;
 class Library;
 
 namespace mixxx::overviewlayout {
@@ -43,6 +48,8 @@ class DlgPrefWaveform : public DlgPreferencePage, public Ui::DlgPrefWaveformDlg 
     void slotSetFollowsEq(bool follows);
     void slotSetNormalizeOverview(bool normalize);
     void slotSetPhosphorDetail(int index);
+    void slotPhosphorAdvancedChanged();
+    void slotResetPhosphorAdvanced();
     void slotSetOverviewLinesMode(int index);
     void slotSetOverviewPhraseBars(int index);
     void slotSetOverviewLineOpacity(int percent);
@@ -59,6 +66,7 @@ class DlgPrefWaveform : public DlgPreferencePage, public Ui::DlgPrefWaveformDlg 
 
   private:
     void initWaveformControl();
+    void buildPhosphorAdvanced();
     void showPhosphorSettings(const mixxx::phosphor::PhosphorSettings& settings);
     void showHoverReadoutControls(const mixxx::overviewlayout::HoverReadoutSettings& settings);
     void calculateCachedWaveformDiskUsage();
@@ -66,6 +74,21 @@ class DlgPrefWaveform : public DlgPreferencePage, public Ui::DlgPrefWaveformDlg 
     void updateEnableUntilMark();
 
     std::unique_ptr<ControlPushButton> m_pTypeControl;
+
+    // Phosphor advanced settings (built in code, see buildPhosphorAdvanced).
+    QCheckBox* m_pPhosphorAdvancedCheckBox = nullptr;
+    QWidget* m_pPhosphorAdvancedWidget = nullptr;
+    QDoubleSpinBox* m_pPhosphorSaturation = nullptr;
+    QDoubleSpinBox* m_pPhosphorGain[3] = {};
+    QDoubleSpinBox* m_pPhosphorBrightnessExponent = nullptr;
+    QDoubleSpinBox* m_pPhosphorDensityBrightness = nullptr;
+    QComboBox* m_pPhosphorBlend = nullptr;
+    QDoubleSpinBox* m_pPhosphorShapeWindow = nullptr;
+    QDoubleSpinBox* m_pPhosphorMixExponent = nullptr;
+    QDoubleSpinBox* m_pPhosphorAttack = nullptr;
+    QDoubleSpinBox* m_pPhosphorRelease[3] = {};
+    QDoubleSpinBox* m_pPhosphorLookAhead = nullptr;
+    QPushButton* m_pPhosphorResetButton = nullptr;
 
     UserSettingsPointer m_pConfig;
     std::shared_ptr<Library> m_pLibrary;

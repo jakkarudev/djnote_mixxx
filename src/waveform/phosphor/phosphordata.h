@@ -83,6 +83,16 @@ class PhosphorData {
         return m_colour[static_cast<size_t>(block) * 3 + static_cast<size_t>(channel)];
     }
 
+    /// The exponent the levels were built with (level = peak^exponent); the
+    /// shader needs it to turn levels back into a brightness. Set before the
+    /// data is shared.
+    double colourMixExponent() const {
+        return m_colourMixExponent;
+    }
+    void setColourMixExponent(double exponent) {
+        m_colourMixExponent = exponent;
+    }
+
     /// Writer side. Appends blocks of (R, G, B) levels; extra blocks beyond
     /// the capacity are dropped.
     void appendColour(const uint16_t* pLevels, SINT blockCount);
@@ -110,6 +120,7 @@ class PhosphorData {
     int m_blockMinAt;
     int m_blockMaxAt;
     std::atomic<SINT> m_completed;
+    double m_colourMixExponent = 0.35;
     const SINT m_colourBlockFrames;
     std::vector<uint16_t> m_colour;
     SINT m_colourWritten; // writer thread only

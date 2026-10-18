@@ -26,7 +26,6 @@ constexpr int64_t kNoColumn = INT64_MIN;
 // Ticket #12: Mixxx's existing zoom mapping. The deck's zoom is in visual
 // samples (441 per second at the file's rate) per logical pixel.
 constexpr double kVisualSamplesPerSecond = 441.0;
-constexpr double kWindowColumns = 2.0;
 } // namespace
 
 WaveformRendererPhosphor::WaveformRendererPhosphor(WaveformWidgetRenderer* waveformWidget,
@@ -97,7 +96,7 @@ LaneParams WaveformRendererPhosphor::desiredParams(const PhosphorData& data) con
             data.sampleRate() / kVisualSamplesPerSecond;
     params.framesPerColumn = std::max(framesPerLogicalPixel / dpr, 1e-3);
     params.height = std::max(static_cast<int>(m_waveformRenderer->getBreadth() * dpr), 1);
-    params.windowColumns = kWindowColumns;
+    params.windowColumns = WaveformWidgetFactory::instance()->phosphorSettings().shapeWindow;
     // The slip overlay is the full shape at half scale in the top half.
     return m_isSlipRenderer ? slipOverlayParams(params) : params;
 }
@@ -317,6 +316,8 @@ void WaveformRendererPhosphor::paintGL() {
     const int ringOffset = static_cast<int>(
             ((firstColumn % m_textureSlotCount) + m_textureSlotCount) % m_textureSlotCount);
 
+    // The advanced settings: live, from the next frame on every deck.
+    const PhosphorSettings& settings = WaveformWidgetFactory::instance()->phosphorSettings();
     glEnable(GL_BLEND);
     // Premultiplied: the colour is added (alpha 0), silence replaces (alpha 1).
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
@@ -337,6 +338,18 @@ void WaveformRendererPhosphor::paintGL() {
     m_shader.setUniformValue(m_shader.eqGainsLocation(),
             QVector3D(gains.eq[0], gains.eq[1], gains.eq[2]));
     m_shader.setUniformValue(m_shader.heightGainLocation(), gains.height);
+    m_shader.setUniformValue(m_shader.saturationLocation(), static_cast<float>(settings.saturation));
+    // Levels are peak^mix, the brightness follows peak^brightnessExponent.
+    m_shader.setUniformValue(m_shader.brightnessExponentLocation(),
+            static_cast<float>(settings.brightnessExponent / pData->colourMixExponent() - 1.0));
+    m_shader.setUniformValue(m_shader.channelGainsLocation(),
+            QVector3D(static_cast<float>(settings.channelGains[0]),
+                    static_cast<float>(settings.channelGains[1]),
+                    static_cast<float>(settings.channelGains[2])));
+    m_shader.setUniformValue(m_shader.densityBrightnessLocation(),
+            static_cast<float>(settings.densityBrightness));
+    m_shader.setUniformValue(m_shader.opaqueLocation(),
+            settings.blend == LightBlend::Opaque ? 1.f : 0.f);
     m_shader.setAttributeArray(m_shader.positionLocation(), GL_FLOAT, m_vertices.constData(), 2);
 
     glDrawArrays(GL_TRIANGLES, 0, m_vertices.size());

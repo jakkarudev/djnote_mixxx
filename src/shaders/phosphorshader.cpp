@@ -4,14 +4,6 @@
 
 using namespace mixxx;
 
-namespace {
-// Ticket #14: the calibrated colour constants (research 8.3 / 8.5).
-constexpr double kSaturation = 5.0;
-constexpr double kLevelGamma = 0.87; // brightness follows level^0.87
-constexpr double kBrightnessGamma = 0.35; // levels are peak^0.35
-constexpr double kChannelGains[3] = {1.0, 0.85, 1.8};
-constexpr double kBrightness = 0.7;
-} // namespace
 
 void PhosphorShader::init() {
     // The texture has one texel per lane row along x and one column slot per
@@ -35,6 +27,12 @@ uniform sampler2D colourMap; // see phosphortexelcodec.h
 uniform highp vec3 visualGains; // Low, Mid, High: EQ x visual gains, for the colour
 uniform highp vec3 eqGains; // Low, Mid, High: knobs and kills only, for the height
 uniform highp float heightGain; // All visual gain x total gain
+// The advanced settings (phosphorsettings.h), live.
+uniform highp float saturation;
+uniform highp float brightnessExponent; // brightness / mix exponent - 1
+uniform highp vec3 channelGains;
+uniform highp float densityBrightness;
+uniform highp float lightOpaque; // 0: the light is added, 1: it replaces what is behind
 varying highp vec2 vLanePixel;
 void main()
 {
@@ -62,7 +60,7 @@ void main()
     highp float sourceY = halfLane + (vLanePixel.y - halfLane) / max(g, 1e-6);
     if (g <= 1e-6 || sourceY < 0.0 || sourceY >= mapSize.x) {
         // Clipped at the lane edge, or no height at all.
-        gl_FragColor = vec4(0.0);
+        gl_FragColor = vec4(0.0, 0.0, 0.0, lightOpaque);
         return;
     }
     texel = texture2D(densityMap,
@@ -73,28 +71,17 @@ void main()
     highp vec3 colour = vec3(0.0);
     if (norm > 1e-6) {
         // Raise the unit colour to the saturation and keep its length.
-        highp vec3 hue = pow(levels / norm, vec3(SATURATION));
+        highp vec3 hue = pow(levels / norm, vec3(saturation));
         hue /= max(length(hue), 1e-6);
-        colour = hue * norm * pow(norm, BRIGHTNESS_EXPONENT);
+        colour = hue * norm * pow(norm, brightnessExponent);
     }
-    colour *= vec3(CHANNEL_GAINS);
-    // Alpha 0: the colour is added to what is behind.
-    gl_FragColor = vec4(clamp(colour * (BRIGHTNESS * density), 0.0, 1.0), 0.0);
+    colour *= channelGains;
+    // Alpha 0: the colour is added to what is behind (alpha 1: replaces it).
+    gl_FragColor = vec4(clamp(colour * (densityBrightness * density), 0.0, 1.0), lightOpaque);
 }
 )--")
                                      .replace(QStringLiteral("DENSITY_MAX"),
-                                                     QString::number(phosphor::kTexelDensityMax, 'f', 3))
-                                     .replace(QStringLiteral("SATURATION"),
-                                             QString::number(kSaturation, 'f', 3))
-                                     .replace(QStringLiteral("BRIGHTNESS_EXPONENT"),
-                                             QString::number(kLevelGamma / kBrightnessGamma - 1, 'f', 5))
-                                     .replace(QStringLiteral("CHANNEL_GAINS"),
-                                             QStringLiteral("%1, %2, %3")
-                                                     .arg(kChannelGains[0], 0, 'f', 3)
-                                                     .arg(kChannelGains[1], 0, 'f', 3)
-                                                     .arg(kChannelGains[2], 0, 'f', 3))
-                                     .replace(QStringLiteral("BRIGHTNESS"),
-                                             QString::number(kBrightness, 'f', 3));
+                                                     QString::number(phosphor::kTexelDensityMax, 'f', 3));
 
     load(vertexShaderCode, fragmentShaderCode);
 
@@ -107,4 +94,9 @@ void main()
     m_visualGainsLocation = uniformLocation("visualGains");
     m_eqGainsLocation = uniformLocation("eqGains");
     m_heightGainLocation = uniformLocation("heightGain");
+    m_saturationLocation = uniformLocation("saturation");
+    m_brightnessExponentLocation = uniformLocation("brightnessExponent");
+    m_channelGainsLocation = uniformLocation("channelGains");
+    m_densityBrightnessLocation = uniformLocation("densityBrightness");
+    m_opaqueLocation = uniformLocation("lightOpaque");
 }
