@@ -144,4 +144,10 @@ LaneColumn computeColumn(const PhosphorData& data,
     return column;
 }
 
+LaneParams slipOverlayParams(const LaneParams& lane) {
+    LaneParams overlay = lane;
+    overlay.height = std::max(lane.height / 2, 1);
+    return overlay;
+}
+
 } // namespace mixxx::phosphor

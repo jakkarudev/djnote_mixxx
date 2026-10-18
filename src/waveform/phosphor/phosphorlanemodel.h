@@ -31,6 +31,11 @@ struct LaneParams {
     bool operator==(const LaneParams& other) const = default;
 };
 
+/// The params of the slip-mode overlay lane: the same view, half as many
+/// rows, so the full signed shape is drawn at scale 0.5 in the top half of
+/// the lane.
+LaneParams slipOverlayParams(const LaneParams& lane);
+
 /// The calibrated full scale: 0.8 of half the lane.
 constexpr double kFullScale = 0.8;
 
