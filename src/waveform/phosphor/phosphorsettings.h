@@ -53,7 +53,7 @@ SINT dataBytes(WaveformDetail detail, SINT frames);
 /// used. Never lower than kLowestDetail.
 WaveformDetail effectiveDetail(WaveformDetail chosen, SINT frames);
 
-/// How the colour is put on the lane. Stored in the config, never reorder.
+/// How the color is put on the lane. Stored in the config, never reorder.
 enum class LightBlend {
     Add = 0, // the light is added to what is behind (the calibrated look)
     Opaque = 1, // the light replaces what is behind
@@ -62,9 +62,9 @@ enum class LightBlend {
 /// A config value as a blend; anything unknown gives Add.
 LightBlend blendFromInt(int value);
 
-/// The settings that shape the colour track. They are read when a track is
+/// The settings that shape the color track. They are read when a track is
 /// analyzed, so a change applies from the next loaded track.
-struct ColourTrackParams {
+struct ColorTrackParams {
     /// Levels are peak^mixExponent (how sounds of different bands mix).
     double mixExponent = 0.35;
     double attackMs = 5.0;
@@ -103,7 +103,7 @@ struct PhosphorSettings {
     // Advanced settings: after a recompute of the lane.
     double shapeWindow = 2.0;
     // Advanced settings: from the next loaded track.
-    ColourTrackParams colour;
+    ColorTrackParams color;
 };
 
 /// The settings with every value pulled into its range.

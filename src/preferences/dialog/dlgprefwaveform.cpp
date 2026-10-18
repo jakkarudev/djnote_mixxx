@@ -655,11 +655,11 @@ void DlgPrefWaveform::buildPhosphorAdvanced() {
     m_pPhosphorSaturation = changed(makeSpinBox(kMinSaturation, kMaxSaturation, 0.1, 1, QString()));
     addSetting(tr("Saturation"),
             {m_pPhosphorSaturation},
-            tr("How vivid the colours are. Higher values make mixed sounds look more like "
+            tr("How vivid the colors are. Higher values make mixed sounds look more like "
                "their dominant band."));
 
     const QString gainText = tr(
-            "How strong each colour is: red is the bass, green the mids, blue the highs. "
+            "How strong each color is: red is the bass, green the mids, blue the highs. "
             "Turn one up to make that part of the music stand out, or down to calm it.");
     const QString gainNames[3] = {tr("Red"), tr("Green"), tr("Blue")};
     QList<QWidget*> gainWidgets;
@@ -668,7 +668,7 @@ void DlgPrefWaveform::buildPhosphorAdvanced() {
         m_pPhosphorGain[c]->setToolTip(gainText);
         gainWidgets.append(labelled(gainNames[c], m_pPhosphorGain[c]));
     }
-    addSetting(tr("Colour strength"), gainWidgets, gainText);
+    addSetting(tr("Color strength"), gainWidgets, gainText);
 
     m_pPhosphorBrightnessExponent = changed(makeSpinBox(
             kMinBrightnessExponent, kMaxBrightnessExponent, 0.01, 2, QString()));
@@ -706,23 +706,23 @@ void DlgPrefWaveform::buildPhosphorAdvanced() {
 
     m_pPhosphorMixExponent = changed(makeSpinBox(
             kMinMixExponent, kMaxMixExponent, 0.01, 2, QString()));
-    addSetting(tr("Colour mix"),
+    addSetting(tr("Color mix"),
             {m_pPhosphorMixExponent},
-            tr("How much quiet sounds colour the waveform compared to loud ones. Lower values let "
-               "quiet sounds tint the colour as much as loud ones; higher values let the loudest "
+            tr("How much quiet sounds color the waveform compared to loud ones. Lower values let "
+               "quiet sounds tint the color as much as loud ones; higher values let the loudest "
                "band take over. ") +
                     kNextLoad);
 
     m_pPhosphorAttack = changed(makeSpinBox(0.0, kMaxAttackMs, 1.0, 0, tr(" ms")));
-    addSetting(tr("Colour attack"),
+    addSetting(tr("Color attack"),
             {m_pPhosphorAttack},
-            tr("How quickly a colour appears when a sound starts. 0 shows it instantly; higher "
+            tr("How quickly a color appears when a sound starts. 0 shows it instantly; higher "
                "values fade it in. ") +
                     kNextLoad);
 
     const QString releaseText = tr(
-            "How long each colour lingers after its sound has ended. Longer values give "
-            "smoother colours, shorter values give sharper changes. ") +
+            "How long each color lingers after its sound has ended. Longer values give "
+            "smoother colors, shorter values give sharper changes. ") +
             kNextLoad;
     const QString releaseNames[3] = {tr("Low"), tr("Mid"), tr("High")};
     QList<QWidget*> releaseWidgets;
@@ -731,12 +731,12 @@ void DlgPrefWaveform::buildPhosphorAdvanced() {
         m_pPhosphorRelease[c]->setToolTip(releaseText);
         releaseWidgets.append(labelled(releaseNames[c], m_pPhosphorRelease[c]));
     }
-    addSetting(tr("Colour release"), releaseWidgets, releaseText);
+    addSetting(tr("Color release"), releaseWidgets, releaseText);
 
     m_pPhosphorLookAhead = changed(makeSpinBox(0.0, kMaxLookAheadMs, 10.0, 0, tr(" ms")));
     addSetting(tr("Red look-ahead"),
             {m_pPhosphorLookAhead},
-            tr("How early the red (bass) colour starts to show before a kick or bass note, so "
+            tr("How early the red (bass) color starts to show before a kick or bass note, so "
                "you can see it coming. 0 turns it off. ") +
                     kNextLoad);
 
@@ -761,7 +761,7 @@ void DlgPrefWaveform::showPhosphorSettings(const mixxx::phosphor::PhosphorSettin
     set(m_pPhosphorSaturation, settings.saturation);
     for (int c = 0; c < 3; ++c) {
         set(m_pPhosphorGain[c], settings.channelGains[c]);
-        set(m_pPhosphorRelease[c], settings.colour.releaseMs[c]);
+        set(m_pPhosphorRelease[c], settings.color.releaseMs[c]);
     }
     set(m_pPhosphorBrightnessExponent, settings.brightnessExponent);
     set(m_pPhosphorDensityBrightness, settings.densityBrightness);
@@ -771,9 +771,9 @@ void DlgPrefWaveform::showPhosphorSettings(const mixxx::phosphor::PhosphorSettin
                 m_pPhosphorBlend->findData(static_cast<int>(settings.blend)));
     }
     set(m_pPhosphorShapeWindow, settings.shapeWindow);
-    set(m_pPhosphorMixExponent, settings.colour.mixExponent);
-    set(m_pPhosphorAttack, settings.colour.attackMs);
-    set(m_pPhosphorLookAhead, settings.colour.lookAheadMs);
+    set(m_pPhosphorMixExponent, settings.color.mixExponent);
+    set(m_pPhosphorAttack, settings.color.attackMs);
+    set(m_pPhosphorLookAhead, settings.color.lookAheadMs);
 }
 
 void DlgPrefWaveform::slotSetPhosphorDetail(int index) {
@@ -789,15 +789,15 @@ void DlgPrefWaveform::slotPhosphorAdvancedChanged() {
     settings.saturation = m_pPhosphorSaturation->value();
     for (int c = 0; c < 3; ++c) {
         settings.channelGains[c] = m_pPhosphorGain[c]->value();
-        settings.colour.releaseMs[c] = m_pPhosphorRelease[c]->value();
+        settings.color.releaseMs[c] = m_pPhosphorRelease[c]->value();
     }
     settings.brightnessExponent = m_pPhosphorBrightnessExponent->value();
     settings.densityBrightness = m_pPhosphorDensityBrightness->value();
     settings.blend = mixxx::phosphor::blendFromInt(m_pPhosphorBlend->currentData().toInt());
     settings.shapeWindow = m_pPhosphorShapeWindow->value();
-    settings.colour.mixExponent = m_pPhosphorMixExponent->value();
-    settings.colour.attackMs = m_pPhosphorAttack->value();
-    settings.colour.lookAheadMs = m_pPhosphorLookAhead->value();
+    settings.color.mixExponent = m_pPhosphorMixExponent->value();
+    settings.color.attackMs = m_pPhosphorAttack->value();
+    settings.color.lookAheadMs = m_pPhosphorLookAhead->value();
     pFactory->setPhosphorSettings(settings);
 }
 

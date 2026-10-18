@@ -62,7 +62,7 @@ SINT upperBound(const PhosphorData& data, SINT n, double t) {
 
 // Points whose time lies in [c - span, c + span] (snapped, see above), widened to always include
 // the point at or before c and the next one, clipped to the track.
-Window windowOf(const PhosphorData& data, const LaneParams& params, double centre) {
+Window windowOf(const PhosphorData& data, const LaneParams& params, double center) {
     const SINT n = data.pointCount();
     if (n <= 0) {
         return {0, -1};
@@ -73,15 +73,15 @@ Window windowOf(const PhosphorData& data, const LaneParams& params, double centr
     if (2 * span >= kSnapMinWindow) {
         // Snap the edges outward to whole blocks of kSnapBlock frames, in
         // every tier, so that all tiers see the same whole blocks.
-        const double from = std::floor((centre - span) / kSnapBlock) * kSnapBlock;
-        const double to = std::ceil((centre + span) / kSnapBlock) * kSnapBlock;
+        const double from = std::floor((center - span) / kSnapBlock) * kSnapBlock;
+        const double to = std::ceil((center + span) / kSnapBlock) * kSnapBlock;
         lo = lowerBound(data, n, from);
         hi = lowerBound(data, n, to) - 1;
     } else {
-        lo = lowerBound(data, n, centre - span);
-        hi = upperBound(data, n, centre + span) - 1;
+        lo = lowerBound(data, n, center - span);
+        hi = upperBound(data, n, center + span) - 1;
     }
-    const SINT i0 = upperBound(data, n, centre) - 1;
+    const SINT i0 = upperBound(data, n, center) - 1;
     lo = std::max(std::min(lo, i0), SINT{0});
     hi = std::min(std::max(hi, i0 + 1), n - 1);
     return {lo, hi};
@@ -105,24 +105,24 @@ double framesPerColumn(double sampleRate, double pxPerBar, double bpm) {
 }
 
 int rowOfValue(double value, int height) {
-    const double centre = (height - 1) / 2.0;
+    const double center = (height - 1) / 2.0;
     const double half = kFullScale * height / 2.0;
-    const double row = std::floor(centre + value / 32768.0 * half + 0.5);
+    const double row = std::floor(center + value / 32768.0 * half + 0.5);
     return static_cast<int>(std::clamp(row, 0.0, static_cast<double>(height - 1)));
 }
 
 namespace {
 
-// The two colour blocks around a column centre and the weight of the second.
-struct ColourBlocks {
+// The two color blocks around a column center and the weight of the second.
+struct ColorBlocks {
     SINT lo;
     SINT hi;
     double t;
 };
 
-ColourBlocks colourBlocksAt(const PhosphorData& data, double centreFrame) {
-    const double u = centreFrame / data.colourBlockFrames() - 0.5;
-    const SINT last = std::max<SINT>(data.totalFrames() / data.colourBlockFrames() - 1, 0);
+ColorBlocks colorBlocksAt(const PhosphorData& data, double centerFrame) {
+    const double u = centerFrame / data.colorBlockFrames() - 0.5;
+    const SINT last = std::max<SINT>(data.totalFrames() / data.colorBlockFrames() - 1, 0);
     const double clamped = std::clamp(u, 0.0, static_cast<double>(last));
     const SINT lo = static_cast<SINT>(std::floor(clamped));
     return {lo, std::min(lo + 1, last), clamped - lo};
@@ -130,28 +130,28 @@ ColourBlocks colourBlocksAt(const PhosphorData& data, double centreFrame) {
 
 } // namespace
 
-bool isColumnReady(const PhosphorData& data, const LaneParams& params, double centreFrame) {
-    const Window w = windowOf(data, params, centreFrame);
+bool isColumnReady(const PhosphorData& data, const LaneParams& params, double centerFrame) {
+    const Window w = windowOf(data, params, centerFrame);
     if (w.isEmpty()) {
         return true;
     }
     if (w.hi >= data.pointsCompleted()) {
         return false;
     }
-    // The colour track trails the samples.
+    // The color track trails the samples.
     return data.isFinished() ||
-            colourBlocksAt(data, centreFrame).hi < data.colourBlocksCompleted();
+            colorBlocksAt(data, centerFrame).hi < data.colorBlocksCompleted();
 }
 
 LaneColumn computeColumn(const PhosphorData& data,
         const LaneParams& params,
-        double centreFrame) {
+        double centerFrame) {
     LaneColumn column;
     const int height = params.height;
     if (height < 1) {
         return column;
     }
-    const Window w = windowOf(data, params, centreFrame);
+    const Window w = windowOf(data, params, centerFrame);
     if (w.isEmpty()) {
         return column;
     }
@@ -194,11 +194,11 @@ LaneColumn computeColumn(const PhosphorData& data,
     }
     column.rowMin = rowMin;
     column.rowMax = rowMax;
-    if (data.colourBlocksCompleted() > 0) {
-        const ColourBlocks blocks = colourBlocksAt(data, centreFrame);
+    if (data.colorBlocksCompleted() > 0) {
+        const ColorBlocks blocks = colorBlocksAt(data, centerFrame);
         for (int c = 0; c < 3; ++c) {
-            const double lo = data.colourLevel(blocks.lo, c);
-            const double hi = data.colourLevel(blocks.hi, c);
+            const double lo = data.colorLevel(blocks.lo, c);
+            const double hi = data.colorLevel(blocks.hi, c);
             column.levels[c] = static_cast<float>((lo + (hi - lo) * blocks.t) / 65535.0);
         }
     }

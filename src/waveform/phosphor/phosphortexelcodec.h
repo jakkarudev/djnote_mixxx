@@ -36,7 +36,7 @@ inline void encodeColumn(const LaneColumn* pColumn, int height, uint8_t* pOut) {
         texel[3] = 255;
     }
     if (pColumn->status == ColumnStatus::Silence) {
-        // A thin black centre line, no axis.
+        // A thin black center line, no axis.
         pOut[static_cast<size_t>(rowOfValue(0, height)) * kBytesPerTexel + 1] = 255;
     }
 }
@@ -45,7 +45,7 @@ inline void encodeColumn(const LaneColumn* pColumn, int height, uint8_t* pOut) {
 /// one texel per column slot in two rows: row 0 holds the high bytes of the
 /// R, G, B levels (16-bit fixed point, 0..1), row 1 the low bytes (A = 255).
 /// An outside column is all zero.
-constexpr int kColourRows = 2;
+constexpr int kColorRows = 2;
 
 inline void encodeColumnLevels(const LaneColumn* pColumn, uint8_t* pHigh, uint8_t* pLow) {
     for (int c = 0; c < 4; ++c) {

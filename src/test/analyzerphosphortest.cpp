@@ -323,10 +323,10 @@ TEST_F(AnalyzerPhosphorTest, ChosenTierIsAFloorLongInputsDropToALowerOne) {
     EXPECT_EQ(8, blockSizeFor(WaveformDetail::High, 44100, 3600 * 44100));
 }
 
-// The colour track through the analyzer, against the reference script's
+// The color track through the analyzer, against the reference script's
 // fixtures. Level = u16 / 65535; the error is absolute, relative to the
 // loudest level of that channel in the fixture.
-TEST_F(AnalyzerPhosphorTest, ColourTrackMatchesReferenceFixtures) {
+TEST_F(AnalyzerPhosphorTest, ColorTrackMatchesReferenceFixtures) {
     const char* const names[] = {"q2a_630hz",
             "q2b_sweep",
             "q3a_100hz_step",
@@ -349,24 +349,24 @@ TEST_F(AnalyzerPhosphorTest, ColourTrackMatchesReferenceFixtures) {
         analyzer.cleanup();
         const auto pData = pTrack->getPhosphorData();
         ASSERT_TRUE(pData);
-        ASSERT_EQ(static_cast<SINT>(f.colourBlockFrames), pData->colourBlockFrames()) << name;
-        const size_t blocks = f.colour.size() / 3;
-        ASSERT_EQ(static_cast<SINT>(blocks), pData->colourBlocksCompleted()) << name;
+        ASSERT_EQ(static_cast<SINT>(f.colorBlockFrames), pData->colorBlockFrames()) << name;
+        const size_t blocks = f.color.size() / 3;
+        ASSERT_EQ(static_cast<SINT>(blocks), pData->colorBlocksCompleted()) << name;
         for (int c = 0; c < 3; ++c) {
             double peak = 1e-9;
             for (size_t b = 0; b < blocks; ++b) {
-                peak = std::max(peak, f.colour[b * 3 + c] / 65535.0);
+                peak = std::max(peak, f.color[b * 3 + c] / 65535.0);
             }
             for (size_t b = 0; b < blocks; ++b) {
-                const double expected = f.colour[b * 3 + c] / 65535.0;
-                const double actual = pData->colourLevel(static_cast<SINT>(b), c) / 65535.0;
+                const double expected = f.color[b * 3 + c] / 65535.0;
+                const double actual = pData->colorLevel(static_cast<SINT>(b), c) / 65535.0;
                 const double err = std::abs(expected - actual) / peak;
                 worst = std::max(worst, err);
                 ASSERT_LE(err, 0.01) << name << " channel " << c << " block " << b;
             }
         }
     }
-    std::cout << "colour track worst error vs fixtures (relative to channel peak): " << worst
+    std::cout << "color track worst error vs fixtures (relative to channel peak): " << worst
               << std::endl;
 }
 
@@ -392,10 +392,10 @@ TEST_F(AnalyzerPhosphorTest, AnalyzerCostPerMinuteOfAudio) {
                             .count();
     analyzer.cleanup();
     std::cout << "Phosphor analyzer: " << ms << " ms per minute of audio" << std::endl;
-    EXPECT_EQ(frames / 44, pTrack->getPhosphorData()->colourBlocksCompleted());
+    EXPECT_EQ(frames / 44, pTrack->getPhosphorData()->colorBlocksCompleted());
 }
 
-TEST_F(AnalyzerPhosphorTest, ColourTrackFillsProgressively) {
+TEST_F(AnalyzerPhosphorTest, ColorTrackFillsProgressively) {
     const int rate = 44100;
     const SINT frames = 3 * rate;
     TrackPointer pTrack = Track::newTemporary();
@@ -414,7 +414,7 @@ TEST_F(AnalyzerPhosphorTest, ColourTrackFillsProgressively) {
         ASSERT_TRUE(analyzer.processSamples(
                 stereo.data() + pos, std::min<SINT>(2 * 4096, 2 * frames - pos)));
         if (pos == 2 * 4096 * 20) {
-            midBlocks = pData->colourBlocksCompleted();
+            midBlocks = pData->colorBlocksCompleted();
         }
     }
     // Blocks appear while decoding, behind the samples.
@@ -422,9 +422,9 @@ TEST_F(AnalyzerPhosphorTest, ColourTrackFillsProgressively) {
     EXPECT_LT(midBlocks, 20 * 4096 / 44);
     analyzer.storeResults(pTrack);
     analyzer.cleanup();
-    EXPECT_EQ(frames / 44, pData->colourBlocksCompleted());
+    EXPECT_EQ(frames / 44, pData->colorBlocksCompleted());
     // A 100 Hz tone is red, not blue.
-    EXPECT_GT(pData->colourLevel(1500, 0), 3 * pData->colourLevel(1500, 2));
+    EXPECT_GT(pData->colorLevel(1500, 0), 3 * pData->colorLevel(1500, 2));
 }
 
 } // namespace

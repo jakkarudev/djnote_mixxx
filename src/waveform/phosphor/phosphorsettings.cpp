@@ -66,8 +66,8 @@ PhosphorSettings clampSettings(const PhosphorSettings& in) {
     s.saturation = clamped(in.saturation, kMinSaturation, kMaxSaturation, d.saturation);
     for (int c = 0; c < 3; ++c) {
         s.channelGains[c] = clamped(in.channelGains[c], 0.0, kMaxChannelGain, d.channelGains[c]);
-        s.colour.releaseMs[c] =
-                clamped(in.colour.releaseMs[c], 0.0, kMaxReleaseMs, d.colour.releaseMs[c]);
+        s.color.releaseMs[c] =
+                clamped(in.color.releaseMs[c], 0.0, kMaxReleaseMs, d.color.releaseMs[c]);
     }
     s.brightnessExponent = clamped(in.brightnessExponent,
             kMinBrightnessExponent,
@@ -78,11 +78,11 @@ PhosphorSettings clampSettings(const PhosphorSettings& in) {
             kMaxDensityBrightness,
             d.densityBrightness);
     s.shapeWindow = clamped(in.shapeWindow, kMinShapeWindow, kMaxShapeWindow, d.shapeWindow);
-    s.colour.mixExponent = clamped(
-            in.colour.mixExponent, kMinMixExponent, kMaxMixExponent, d.colour.mixExponent);
-    s.colour.attackMs = clamped(in.colour.attackMs, 0.0, kMaxAttackMs, d.colour.attackMs);
-    s.colour.lookAheadMs =
-            clamped(in.colour.lookAheadMs, 0.0, kMaxLookAheadMs, d.colour.lookAheadMs);
+    s.color.mixExponent = clamped(
+            in.color.mixExponent, kMinMixExponent, kMaxMixExponent, d.color.mixExponent);
+    s.color.attackMs = clamped(in.color.attackMs, 0.0, kMaxAttackMs, d.color.attackMs);
+    s.color.lookAheadMs =
+            clamped(in.color.lookAheadMs, 0.0, kMaxLookAheadMs, d.color.lookAheadMs);
     return s;
 }
 
@@ -121,8 +121,8 @@ PhosphorSettings loadSettings(const UserSettingsPointer& pConfig) {
     for (int c = 0; c < 3; ++c) {
         s.channelGains[c] = readClamped(
                 pConfig, kGainCfgKeys[c], 0.0, kMaxChannelGain, d.channelGains[c]);
-        s.colour.releaseMs[c] = readClamped(
-                pConfig, kReleaseCfgKeys[c], 0.0, kMaxReleaseMs, d.colour.releaseMs[c]);
+        s.color.releaseMs[c] = readClamped(
+                pConfig, kReleaseCfgKeys[c], 0.0, kMaxReleaseMs, d.color.releaseMs[c]);
     }
     s.brightnessExponent = readClamped(pConfig,
             kBrightnessExponentCfgKey,
@@ -137,14 +137,14 @@ PhosphorSettings loadSettings(const UserSettingsPointer& pConfig) {
     s.blend = blendFromInt(pConfig->getValue(kBlendCfgKey, static_cast<int>(d.blend)));
     s.shapeWindow = readClamped(
             pConfig, kShapeWindowCfgKey, kMinShapeWindow, kMaxShapeWindow, d.shapeWindow);
-    s.colour.mixExponent = readClamped(pConfig,
+    s.color.mixExponent = readClamped(pConfig,
             kMixExponentCfgKey,
             kMinMixExponent,
             kMaxMixExponent,
-            d.colour.mixExponent);
-    s.colour.attackMs = readClamped(pConfig, kAttackCfgKey, 0.0, kMaxAttackMs, d.colour.attackMs);
-    s.colour.lookAheadMs = readClamped(
-            pConfig, kLookAheadCfgKey, 0.0, kMaxLookAheadMs, d.colour.lookAheadMs);
+            d.color.mixExponent);
+    s.color.attackMs = readClamped(pConfig, kAttackCfgKey, 0.0, kMaxAttackMs, d.color.attackMs);
+    s.color.lookAheadMs = readClamped(
+            pConfig, kLookAheadCfgKey, 0.0, kMaxLookAheadMs, d.color.lookAheadMs);
     return s;
 }
 
@@ -154,15 +154,15 @@ void saveSettings(const UserSettingsPointer& pConfig, const PhosphorSettings& se
     pConfig->setValue(kSaturationCfgKey, s.saturation);
     for (int c = 0; c < 3; ++c) {
         pConfig->setValue(kGainCfgKeys[c], s.channelGains[c]);
-        pConfig->setValue(kReleaseCfgKeys[c], s.colour.releaseMs[c]);
+        pConfig->setValue(kReleaseCfgKeys[c], s.color.releaseMs[c]);
     }
     pConfig->setValue(kBrightnessExponentCfgKey, s.brightnessExponent);
     pConfig->setValue(kDensityBrightnessCfgKey, s.densityBrightness);
     pConfig->setValue(kBlendCfgKey, static_cast<int>(s.blend));
     pConfig->setValue(kShapeWindowCfgKey, s.shapeWindow);
-    pConfig->setValue(kMixExponentCfgKey, s.colour.mixExponent);
-    pConfig->setValue(kAttackCfgKey, s.colour.attackMs);
-    pConfig->setValue(kLookAheadCfgKey, s.colour.lookAheadMs);
+    pConfig->setValue(kMixExponentCfgKey, s.color.mixExponent);
+    pConfig->setValue(kAttackCfgKey, s.color.attackMs);
+    pConfig->setValue(kLookAheadCfgKey, s.color.lookAheadMs);
 }
 
 } // namespace mixxx::phosphor

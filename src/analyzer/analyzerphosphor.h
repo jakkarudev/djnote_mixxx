@@ -6,7 +6,7 @@
 #include "analyzer/analyzer.h"
 #include "preferences/usersettings.h"
 #include "track/track_decl.h"
-#include "waveform/phosphor/phosphorcolourtrack.h"
+#include "waveform/phosphor/phosphorcolortrack.h"
 #include "waveform/phosphor/phosphordata.h"
 
 /// Builds the Phosphor waveform data of a track while it is decoded: the mono
@@ -32,7 +32,7 @@ class AnalyzerPhosphor : public Analyzer {
     TrackPointer m_pTrack;
     std::shared_ptr<mixxx::phosphor::PhosphorData> m_pData;
     std::vector<int16_t> m_mono;
-    std::unique_ptr<mixxx::phosphor::ColourTrackBuilder> m_pColour;
-    std::vector<uint16_t> m_colourOut;
+    std::unique_ptr<mixxx::phosphor::ColorTrackBuilder> m_pColor;
+    std::vector<uint16_t> m_colorOut;
     bool m_stored;
 };

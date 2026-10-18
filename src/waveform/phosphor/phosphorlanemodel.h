@@ -32,8 +32,8 @@ double visualSamplePerPixelForZoom(double zoom, double bpm);
 /// Audio frames per screen column for a zoom set in pixels per bar.
 double framesPerColumn(double sampleRate, double pxPerBar, double bpm);
 
-/// Everything besides the data and the column's centre that decides what a
-/// column looks like. Two columns of the same data, params and centre are
+/// Everything besides the data and the column's center that decides what a
+/// column looks like. Two columns of the same data, params and center are
 /// identical, whatever was computed before.
 struct LaneParams {
     /// Audio frames per column. Lower bound 1e-3, to stay finite.
@@ -59,7 +59,7 @@ constexpr double kFullScale = 0.8;
 enum class ColumnStatus : uint8_t {
     Outside = 0, // no data there (outside of the track, or not decoded yet)
     Signal = 1,
-    Silence = 2, // digital silence: the renderer draws a black centre row
+    Silence = 2, // digital silence: the renderer draws a black center row
 };
 
 struct LaneColumn {
@@ -70,7 +70,7 @@ struct LaneColumn {
     /// Per row: hits / samples in the window * height / 2. Empty when the
     /// column is outside.
     std::vector<float> density;
-    /// The band levels (0..1) of the colour track at the column centre,
+    /// The band levels (0..1) of the color track at the column center,
     /// interpolated between blocks: R = Low, G = Mid, B = High. Zero when
     /// the column is outside.
     float levels[3] = {0.f, 0.f, 0.f};
@@ -79,14 +79,14 @@ struct LaneColumn {
 /// The row of a value (int16 units). Positive values go down.
 int rowOfValue(double value, int height);
 
-/// Whether the data decoded so far is enough to compute the column centred on
+/// Whether the data decoded so far is enough to compute the column centered on
 /// the given frame. False for columns whose window reaches data that was not
 /// decoded yet; those must not be drawn or cached.
-bool isColumnReady(const PhosphorData& data, const LaneParams& params, double centreFrame);
+bool isColumnReady(const PhosphorData& data, const LaneParams& params, double centerFrame);
 
-/// The column centred on a frame of the track.
+/// The column centered on a frame of the track.
 LaneColumn computeColumn(const PhosphorData& data,
         const LaneParams& params,
-        double centreFrame);
+        double centerFrame);
 
 } // namespace mixxx::phosphor

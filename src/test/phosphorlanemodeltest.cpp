@@ -44,8 +44,8 @@ std::unique_ptr<PhosphorData> dataFromFixture(const phosphorfixture::Fixture& f,
         mono[i] = static_cast<int16_t>(std::floor((l + r) / 2.0 + 0.5));
     }
     pData->append(mono.data(), static_cast<SINT>(mono.size()));
-    // The fixture's own colour track: the lane model is tested on its own.
-    pData->appendColour(f.colour.data(), static_cast<SINT>(f.colour.size() / 3));
+    // The fixture's own color track: the lane model is tested on its own.
+    pData->appendColor(f.color.data(), static_cast<SINT>(f.color.size() / 3));
     pData->finish();
     return pData;
 }
@@ -76,9 +76,9 @@ TEST_F(PhosphorLaneModelTest, FullDetailColumnsMatchTheReferenceFixtures) {
             params.height = static_cast<int>(lane.height);
             params.windowColumns = lane.windowMilliColumns / 1000.0;
             for (uint32_t x = 0; x < lane.width; ++x) {
-                const double centre = lane.position +
+                const double center = lane.position +
                         (x + 0.5 - lane.playheadX) * params.framesPerColumn;
-                const LaneColumn col = computeColumn(data, params, centre);
+                const LaneColumn col = computeColumn(data, params, center);
                 const QString where = QStringLiteral("%1 / %2 / column %3")
                                               .arg(name, lane.name)
                                               .arg(x);
@@ -124,9 +124,9 @@ TEST_F(PhosphorLaneModelTest, DecimatedTierColumnsMatchTheReferenceFixtures) {
             params.height = static_cast<int>(lane.height);
             params.windowColumns = lane.windowMilliColumns / 1000.0;
             for (uint32_t x = 0; x < lane.width; ++x) {
-                const double centre = lane.position +
+                const double center = lane.position +
                         (x + 0.5 - lane.playheadX) * params.framesPerColumn;
-                const LaneColumn col = computeColumn(*pData, params, centre);
+                const LaneColumn col = computeColumn(*pData, params, center);
                 const QString where = QStringLiteral("%1 / %2 / column %3")
                                               .arg(name, lane.name)
                                               .arg(x);
@@ -168,9 +168,9 @@ TEST_F(PhosphorLaneModelTest, OutlineRowsAreIdenticalAtEveryTierWhenTheWindowIs3
                     params.height = 41;
                     params.windowColumns = 2.0;
                     for (int x = 0; x < 40; ++x) {
-                        const double centre = position + (x - 20 + 0.5) * fpc;
-                        const LaneColumn full = computeColumn(*pFull, params, centre);
-                        const LaneColumn tier = computeColumn(*pTier, params, centre);
+                        const double center = position + (x - 20 + 0.5) * fpc;
+                        const LaneColumn full = computeColumn(*pFull, params, center);
+                        const LaneColumn tier = computeColumn(*pTier, params, center);
                         ASSERT_EQ(full.status, tier.status) << name << " N=" << n << " x=" << x;
                         if (full.status == ColumnStatus::Outside) {
                             continue;
@@ -268,8 +268,8 @@ TEST(PhosphorLaneModelPlainTest, ColumnsNeedDecodedData) {
     PhosphorData data(44100, 1000);
     const std::vector<int16_t> s(400, 1000);
     data.append(s.data(), 400);
-    const std::vector<uint16_t> colour(3 * 30, 0);
-    data.appendColour(colour.data(), 9); // the colour track follows the samples
+    const std::vector<uint16_t> color(3 * 30, 0);
+    data.appendColor(color.data(), 9); // the color track follows the samples
     LaneParams params;
     params.framesPerColumn = 10;
     params.height = 21;
@@ -278,14 +278,14 @@ TEST(PhosphorLaneModelPlainTest, ColumnsNeedDecodedData) {
     EXPECT_FALSE(isColumnReady(data, params, 700));
     data.append(s.data(), 400);
     data.append(s.data(), 200);
-    data.appendColour(colour.data(), 5); // 14 of the 22 blocks: still behind
-    // The colour track trails the samples: not ready until it caught up.
+    data.appendColor(color.data(), 5); // 14 of the 22 blocks: still behind
+    // The color track trails the samples: not ready until it caught up.
     EXPECT_FALSE(isColumnReady(data, params, 999));
     data.finish();
     EXPECT_TRUE(isColumnReady(data, params, 999));
 }
 
-TEST(PhosphorTexelCodecTest, DensityRoundTripsAndSilenceMarksTheCentreRow) {
+TEST(PhosphorTexelCodecTest, DensityRoundTripsAndSilenceMarksTheCenterRow) {
     LaneColumn column;
     column.status = ColumnStatus::Signal;
     column.density = {0.0f, 0.25f, 1.0f, 3.9f, 7.0f};
@@ -401,13 +401,13 @@ TEST(PhosphorLaneCachePlainTest, ColumnsComputedWhileDecodingEqualThoseOfTheFini
     params.height = 41;
     PhosphorLaneCache cache(data, params);
     EXPECT_EQ(nullptr, cache.column(100)); // nothing decoded yet
-    const std::vector<uint16_t> colour(3 * 454, 1000);
+    const std::vector<uint16_t> color(3 * 454, 1000);
     data->append(s.data(), 5000);
-    data->appendColour(colour.data(), 113);
+    data->appendColor(color.data(), 113);
     ASSERT_NE(nullptr, cache.column(100));
     EXPECT_EQ(nullptr, cache.column(499)); // window reaches undecoded data
     data->append(s.data() + 5000, 15000);
-    data->appendColour(colour.data(), 454 - 113);
+    data->appendColor(color.data(), 454 - 113);
     data->finish();
     PhosphorLaneCache fresh(data, params);
     for (int64_t k : {100, 499, 1000, 1999}) {

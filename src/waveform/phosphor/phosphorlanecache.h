@@ -10,7 +10,7 @@ namespace mixxx::phosphor {
 
 /// Columns of the lane model, cached by their position along the track.
 ///
-/// Column k is centred on frame (k + 0.5) * framesPerColumn, so a column
+/// Column k is centered on frame (k + 0.5) * framesPerColumn, so a column
 /// keeps its index while the view scrolls. Only columns that are asked for
 /// are computed. What a column looks like never depends on what was cached
 /// before: the cache is only a memo of computeColumn(), invalidated as a whole
@@ -32,7 +32,7 @@ class PhosphorLaneCache {
 
     /// The column index of the column that contains a frame.
     int64_t columnAtFrame(double frame) const;
-    double centreOfColumn(int64_t k) const;
+    double centerOfColumn(int64_t k) const;
 
     /// Drops the columns outside [first, last], with some margin kept for
     /// scrolling.

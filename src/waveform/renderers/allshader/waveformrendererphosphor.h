@@ -16,7 +16,7 @@ class WaveformRendererPhosphor;
 
 /// The Phosphor signal layer. The lane model (CPU) turns the track's Phosphor
 /// data into density columns; this layer only uploads the columns that
-/// entered the view into a ring texture and lets the shader colour them.
+/// entered the view into a ring texture and lets the shader color them.
 class allshader::WaveformRendererPhosphor final : public allshader::WaveformRendererSignalBase {
   public:
     explicit WaveformRendererPhosphor(WaveformWidgetRenderer* waveformWidget,
@@ -60,8 +60,8 @@ class allshader::WaveformRendererPhosphor final : public allshader::WaveformRend
     // y, so that a run of columns is a contiguous block of the CPU copy.
     GLuint m_texture;
     // Band levels, one texel per column slot in two rows (phosphortexelcodec.h).
-    GLuint m_colourTexture;
-    std::vector<uint8_t> m_colourTexels;
+    GLuint m_colorTexture;
+    std::vector<uint8_t> m_colorTexels;
     int m_textureRows;
     int m_textureSlotCount;
     std::vector<uint8_t> m_texels;

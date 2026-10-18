@@ -8,9 +8,9 @@ ShaderGains shaderGains(const waveformgains::Inputs& in) {
     ShaderGains out;
     const waveformgains::Gains full = waveformgains::calculateGains(in);
     out.height = full.all;
-    out.colour[0] = full.low;
-    out.colour[1] = full.mid;
-    out.colour[2] = full.high;
+    out.color[0] = full.low;
+    out.color[1] = full.mid;
+    out.color[2] = full.high;
 
     // The same rules with neutral visual gains leave the EQ alone.
     waveformgains::Inputs eqOnly = in;
@@ -46,8 +46,8 @@ int stretchSourceRow(int pixelRow, int height, float g) {
     if (g <= 1e-6f || height < 1) {
         return -1;
     }
-    const double centre = height / 2.0;
-    const double source = centre + (pixelRow + 0.5 - centre) / g;
+    const double center = height / 2.0;
+    const double source = center + (pixelRow + 0.5 - center) / g;
     if (source < 0.0 || source >= height) {
         return -1;
     }

@@ -28,7 +28,7 @@ int64_t PhosphorLaneCache::columnAtFrame(double frame) const {
     return static_cast<int64_t>(std::floor(frame / m_params.framesPerColumn));
 }
 
-double PhosphorLaneCache::centreOfColumn(int64_t k) const {
+double PhosphorLaneCache::centerOfColumn(int64_t k) const {
     return (static_cast<double>(k) + 0.5) * m_params.framesPerColumn;
 }
 
@@ -61,11 +61,11 @@ const LaneColumn* PhosphorLaneCache::column(int64_t k) {
     if (it != m_columns.end()) {
         return &it->second;
     }
-    const double centre = centreOfColumn(k);
-    if (!isColumnReady(*m_pData, m_params, centre)) {
+    const double center = centerOfColumn(k);
+    if (!isColumnReady(*m_pData, m_params, center)) {
         return nullptr;
     }
-    return &m_columns.emplace(k, computeColumn(*m_pData, m_params, centre)).first->second;
+    return &m_columns.emplace(k, computeColumn(*m_pData, m_params, center)).first->second;
 }
 
 } // namespace mixxx::phosphor

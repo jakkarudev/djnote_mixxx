@@ -23,8 +23,8 @@ void main()
 uniform sampler2D densityMap;
 uniform highp vec2 mapSize;
 uniform highp float ringOffset;
-uniform sampler2D colourMap; // see phosphortexelcodec.h
-uniform highp vec3 visualGains; // Low, Mid, High: EQ x visual gains, for the colour
+uniform sampler2D colorMap; // see phosphortexelcodec.h
+uniform highp vec3 visualGains; // Low, Mid, High: EQ x visual gains, for the color
 uniform highp vec3 eqGains; // Low, Mid, High: knobs and kills only, for the height
 uniform highp float heightGain; // All visual gain x total gain
 // The advanced settings (phosphorsettings.h), live.
@@ -46,10 +46,10 @@ void main()
         return;
     }
     // Band levels of this column (R = Low, G = Mid, B = High).
-    highp vec4 levelHigh = texture2D(colourMap, vec2((slot + 0.5) / mapSize.y, 0.25));
-    highp vec4 levelLow = texture2D(colourMap, vec2((slot + 0.5) / mapSize.y, 0.75));
+    highp vec4 levelHigh = texture2D(colorMap, vec2((slot + 0.5) / mapSize.y, 0.25));
+    highp vec4 levelLow = texture2D(colorMap, vec2((slot + 0.5) / mapSize.y, 0.75));
     highp vec3 rawLevels = (levelHigh.rgb * 256.0 + levelLow.rgb) * (255.0 / 65535.0);
-    // The column's height factor g: the gains stretch it about the lane centre
+    // The column's height factor g: the gains stretch it about the lane center
     // (see phosphorheight.h, which tests the same maths).
     highp float rawNorm = length(rawLevels);
     highp float g = heightGain;
@@ -68,16 +68,16 @@ void main()
     highp float density = (texel.r * 256.0 + texel.b) * (255.0 / 65535.0) * DENSITY_MAX / g;
     highp vec3 levels = rawLevels * visualGains;
     highp float norm = length(levels);
-    highp vec3 colour = vec3(0.0);
+    highp vec3 color = vec3(0.0);
     if (norm > 1e-6) {
-        // Raise the unit colour to the saturation and keep its length.
+        // Raise the unit color to the saturation and keep its length.
         highp vec3 hue = pow(levels / norm, vec3(saturation));
         hue /= max(length(hue), 1e-6);
-        colour = hue * norm * pow(norm, brightnessExponent);
+        color = hue * norm * pow(norm, brightnessExponent);
     }
-    colour *= channelGains;
-    // Alpha 0: the colour is added to what is behind (alpha 1: replaces it).
-    gl_FragColor = vec4(clamp(colour * (densityBrightness * density), 0.0, 1.0), lightOpaque);
+    color *= channelGains;
+    // Alpha 0: the color is added to what is behind (alpha 1: replaces it).
+    gl_FragColor = vec4(clamp(color * (densityBrightness * density), 0.0, 1.0), lightOpaque);
 }
 )--")
                                      .replace(QStringLiteral("DENSITY_MAX"),
@@ -90,7 +90,7 @@ void main()
     m_textureLocation = uniformLocation("densityMap");
     m_mapSizeLocation = uniformLocation("mapSize");
     m_ringOffsetLocation = uniformLocation("ringOffset");
-    m_colourTextureLocation = uniformLocation("colourMap");
+    m_colorTextureLocation = uniformLocation("colorMap");
     m_visualGainsLocation = uniformLocation("visualGains");
     m_eqGainsLocation = uniformLocation("eqGains");
     m_heightGainLocation = uniformLocation("heightGain");

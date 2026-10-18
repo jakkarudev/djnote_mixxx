@@ -10,7 +10,7 @@ synthetic test-signal WAVs, so no real audio is committed. Each file is one exce
 as a complete track starting at frame 0. C++ tests find them through
 `getTestDir().filePath("phosphor/<name>.phfx")` (the test data folder is `src/test`).
 
-Used by the analyzer test (tiers, colour track) and the lane model test (lane cases).
+Used by the analyzer test (tiers, color track) and the lane model test (lane cases).
 
 ## Container
 
@@ -43,7 +43,7 @@ The section order is `INPT`, `TIER` x4, `COLR`, `LANE`*.
 - Point times, used by the lane model: block `k` of length `n` gives its first value the time
   `k*N + n/4` and its second `k*N + 3n/4` (in frames). For N = 1, sample `i` is at time `i`.
 
-### Colour track (`COLR`)
+### Color track (`COLR`)
 
 - `block_frames = round(rate / 1000)` (44 at 44.1 kHz), `block_count = frames / block_frames`
   (rounded down).
@@ -76,7 +76,7 @@ The section order is `INPT`, `TIER` x4, `COLR`, `LANE`*.
 
 Definitions (the C++ lane model must match):
 
-- Samples per column `spc = rate / (px_per_bar * bpm / 240)`. Column `x` is centred on frame
+- Samples per column `spc = rate / (px_per_bar * bpm / 240)`. Column `x` is centered on frame
   `c = position + (x + 0.5 - playhead_x) * spc`.
 - Window: points whose time lies in `[c - w*spc/2, c + w*spc/2]` (w = window columns), widened to
   always include the point at or before `c` and the next one. Clipped to the buffer. Fewer than 2
@@ -86,8 +86,8 @@ Definitions (the C++ lane model must match):
   (upper edge exclusive), in every tier, Full included. Blocks are aligned to the frame index from
   the start of the track, so every tier sees the same whole blocks and the outline is identical
   at all tiers. Below 32 frames (deepest zoom) the window is not snapped and tiers may differ.
-- Rows: `rowOf(v) = clip(floor(centre + v / 32768 * half + 0.5), 0, height - 1)`,
-  `centre = (height - 1) / 2`, `half = 0.8 * height / 2` (positive values go down). Use `double`.
+- Rows: `rowOf(v) = clip(floor(center + v / 32768 * half + 0.5), 0, height - 1)`,
+  `center = (height - 1) / 2`, `half = 0.8 * height / 2` (positive values go down). Use `double`.
   `row_min`/`row_max` are the extremes over the window's points. Status 2 if every point is 0.
 - Density: for each pair of consecutive points the segment crosses the rows between their rows
   (inclusive, `r` rows); each gets `dt / r`, `dt` being the time between the two points. A row's

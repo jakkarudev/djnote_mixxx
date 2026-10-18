@@ -33,7 +33,7 @@ WaveformRendererPhosphor::WaveformRendererPhosphor(WaveformWidgetRenderer* wavef
         : WaveformRendererSignalBase(waveformWidget),
           m_isSlipRenderer(type == ::WaveformRendererAbstract::Slip),
           m_texture(0),
-          m_colourTexture(0),
+          m_colorTexture(0),
           m_textureRows(0),
           m_textureSlotCount(0) {
 }
@@ -72,7 +72,7 @@ void WaveformRendererPhosphor::initializeGL() {
     m_shader.init();
     // A new context: the texture is gone, upload everything again.
     m_texture = 0;
-    m_colourTexture = 0;
+    m_colorTexture = 0;
     m_textureRows = 0;
     m_textureSlotCount = 0;
     m_slotColumn.clear();
@@ -83,10 +83,10 @@ void WaveformRendererPhosphor::deleteTexture() {
         glDeleteTextures(1, &m_texture);
     }
     m_texture = 0;
-    if (m_colourTexture != 0 && QOpenGLContext::currentContext()) {
-        glDeleteTextures(1, &m_colourTexture);
+    if (m_colorTexture != 0 && QOpenGLContext::currentContext()) {
+        glDeleteTextures(1, &m_colorTexture);
     }
-    m_colourTexture = 0;
+    m_colorTexture = 0;
 }
 
 LaneParams WaveformRendererPhosphor::desiredParams(const PhosphorData& data) const {
@@ -158,22 +158,22 @@ void WaveformRendererPhosphor::ensureTexture(int slotCount, int rows) {
             GL_RGBA,
             GL_UNSIGNED_BYTE,
             m_texels.data());
-    glGenTextures(1, &m_colourTexture);
-    glBindTexture(GL_TEXTURE_2D, m_colourTexture);
+    glGenTextures(1, &m_colorTexture);
+    glBindTexture(GL_TEXTURE_2D, m_colorTexture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    m_colourTexels.assign(static_cast<size_t>(slotCount) * kColourRows * kBytesPerTexel, 0);
+    m_colorTexels.assign(static_cast<size_t>(slotCount) * kColorRows * kBytesPerTexel, 0);
     glTexImage2D(GL_TEXTURE_2D,
             0,
             GL_RGBA,
             slotCount,
-            kColourRows,
+            kColorRows,
             0,
             GL_RGBA,
             GL_UNSIGNED_BYTE,
-            m_colourTexels.data());
+            m_colorTexels.data());
     glBindTexture(GL_TEXTURE_2D, m_texture);
     m_slotColumn.assign(static_cast<size_t>(slotCount), kNoColumn);
     m_slotDirty.assign(static_cast<size_t>(slotCount), 0);
@@ -201,10 +201,10 @@ void WaveformRendererPhosphor::uploadColumns(int64_t firstColumn, int64_t lastCo
         // A column that can't be computed yet (data still decoding) is blank
         // and asked for again.
         {
-            uint8_t* pColourTexels = m_colourTexels.data();
+            uint8_t* pColorTexels = m_colorTexels.data();
             encodeColumnLevels(pColumn,
-                    pColourTexels + static_cast<size_t>(slot) * kBytesPerTexel,
-                    pColourTexels +
+                    pColorTexels + static_cast<size_t>(slot) * kBytesPerTexel,
+                    pColorTexels +
                             (static_cast<size_t>(slotCount) + static_cast<size_t>(slot)) *
                                     kBytesPerTexel);
         }
@@ -233,18 +233,18 @@ void WaveformRendererPhosphor::uploadColumns(int64_t firstColumn, int64_t lastCo
                 GL_UNSIGNED_BYTE,
                 m_texels.data() + static_cast<size_t>(slot) * rows * kBytesPerTexel);
         // The levels of the same run, in the second texture.
-        glBindTexture(GL_TEXTURE_2D, m_colourTexture);
-        for (int colourRow = 0; colourRow < kColourRows; ++colourRow) {
+        glBindTexture(GL_TEXTURE_2D, m_colorTexture);
+        for (int colorRow = 0; colorRow < kColorRows; ++colorRow) {
             glTexSubImage2D(GL_TEXTURE_2D,
                     0,
                     slot,
-                    colourRow,
+                    colorRow,
                     end - slot,
                     1,
                     GL_RGBA,
                     GL_UNSIGNED_BYTE,
-                    m_colourTexels.data() +
-                            (static_cast<size_t>(colourRow) * slotCount + slot) *
+                    m_colorTexels.data() +
+                            (static_cast<size_t>(colorRow) * slotCount + slot) *
                                     kBytesPerTexel);
         }
         glBindTexture(GL_TEXTURE_2D, m_texture);
@@ -319,7 +319,7 @@ void WaveformRendererPhosphor::paintGL() {
     // The advanced settings: live, from the next frame on every deck.
     const PhosphorSettings& settings = WaveformWidgetFactory::instance()->phosphorSettings();
     glEnable(GL_BLEND);
-    // Premultiplied: the colour is added (alpha 0), silence replaces (alpha 1).
+    // Premultiplied: the color is added (alpha 0), silence replaces (alpha 1).
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
     m_shader.bind();
@@ -330,18 +330,18 @@ void WaveformRendererPhosphor::paintGL() {
             QVector2D(static_cast<float>(m_textureRows), static_cast<float>(m_textureSlotCount)));
     m_shader.setUniformValue(m_shader.ringOffsetLocation(), static_cast<float>(ringOffset));
     glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, m_colourTexture);
+    glBindTexture(GL_TEXTURE_2D, m_colorTexture);
     glActiveTexture(GL_TEXTURE0);
-    m_shader.setUniformValue(m_shader.colourTextureLocation(), 1);
+    m_shader.setUniformValue(m_shader.colorTextureLocation(), 1);
     m_shader.setUniformValue(m_shader.visualGainsLocation(),
-            QVector3D(gains.colour[0], gains.colour[1], gains.colour[2]));
+            QVector3D(gains.color[0], gains.color[1], gains.color[2]));
     m_shader.setUniformValue(m_shader.eqGainsLocation(),
             QVector3D(gains.eq[0], gains.eq[1], gains.eq[2]));
     m_shader.setUniformValue(m_shader.heightGainLocation(), gains.height);
     m_shader.setUniformValue(m_shader.saturationLocation(), static_cast<float>(settings.saturation));
     // Levels are peak^mix, the brightness follows peak^brightnessExponent.
     m_shader.setUniformValue(m_shader.brightnessExponentLocation(),
-            static_cast<float>(settings.brightnessExponent / pData->colourMixExponent() - 1.0));
+            static_cast<float>(settings.brightnessExponent / pData->colorMixExponent() - 1.0));
     m_shader.setUniformValue(m_shader.channelGainsLocation(),
             QVector3D(static_cast<float>(settings.channelGains[0]),
                     static_cast<float>(settings.channelGains[1]),
