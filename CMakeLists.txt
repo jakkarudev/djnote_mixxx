@@ -2179,6 +2179,7 @@ if(BUILD_TESTING)
     src/test/overviewlinelayouttest.cpp
     src/test/overviewsettingstest.cpp
     src/test/phosphorlanemodeltest.cpp
+    src/test/phosphorslipoverlaytest.cpp
     src/test/waveformgainstest.cpp
     #TODO: write useful tests for refactored effects system
     #src/test/effectchainslottest.cpp

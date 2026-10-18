@@ -99,7 +99,8 @@ LaneParams WaveformRendererPhosphor::desiredParams(const PhosphorData& data, flo
     params.windowColumns = kWindowColumns;
     // The All visual gain scales the height; 1.0 is the calibrated height.
     params.heightGain = allGain;
-    return params;
+    // The slip overlay is the full shape at half scale in the top half.
+    return m_isSlipRenderer ? slipOverlayParams(params) : params;
 }
 
 void WaveformRendererPhosphor::updateCache(const PhosphorDataPointer& pData,
@@ -254,8 +255,7 @@ void WaveformRendererPhosphor::uploadColumns(int64_t firstColumn, int64_t lastCo
 }
 
 void WaveformRendererPhosphor::paintGL() {
-    // The slip copy comes with its own ticket.
-    if (m_isSlipRenderer) {
+    if (m_isSlipRenderer && !m_waveformRenderer->isSlipActive()) {
         return;
     }
     const TrackPointer pTrack = m_waveformRenderer->getTrackInfo();
@@ -288,7 +288,8 @@ void WaveformRendererPhosphor::paintGL() {
     // The play position as a fraction of the track keeps working when the
     // file's rate differs from the engine's.
     const double positionFrame =
-            m_waveformRenderer->getTruePosSample(::WaveformRendererAbstract::Play) /
+            m_waveformRenderer->getTruePosSample(m_isSlipRenderer ? ::WaveformRendererAbstract::Slip
+                                                  : ::WaveformRendererAbstract::Play) /
             trackSamples * pData->totalFrames();
     const double playMarkerX = m_waveformRenderer->getPlayMarkerPosition() * length;
 
@@ -308,7 +309,12 @@ void WaveformRendererPhosphor::paintGL() {
     glBindTexture(GL_TEXTURE_2D, m_texture);
     uploadColumns(firstColumn, lastColumn);
 
-    const float breadth = static_cast<float>(m_waveformRenderer->getBreadth()) * dpr;
+    // The slip overlay covers the top half of the lane (its cache is
+    // half as tall, one texel row per pixel).
+    float breadth = static_cast<float>(m_waveformRenderer->getBreadth()) * dpr;
+    if (m_isSlipRenderer) {
+        breadth = static_cast<float>(drawn.height);
+    }
     m_vertices.clear();
     m_vertices.addRectangle(0.f, 0.f, static_cast<float>(length), breadth);
 

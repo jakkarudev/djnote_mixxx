@@ -14,6 +14,21 @@ namespace mixxx::phosphor {
 /// A bar is 4 beats at the track's BPM; 120 if the track has none.
 constexpr double kFallbackBpm = 120.0;
 
+/// Zoom, like Traktor's: the deck's zoom control value z gives 869.6 / z
+/// pixels per bar (z = 4 is 217.4). Zoomed out at z = 10, as in Mixxx; zoomed
+/// in until a column is under one audio frame (about one frame at 120 BPM).
+constexpr double kPhosphorMinZoom = 0.005;
+constexpr double kPhosphorMaxZoom = 10.0;
+/// The mouse wheel step of this type (the other types use 1.05).
+constexpr double kPhosphorWheelStep = 1.15;
+
+double pxPerBarForZoom(double zoom);
+
+/// The view scale as the shared overlays (beat grid, marks) read it: visual
+/// samples (441 per second) per logical pixel. It depends on the zoom and the
+/// track's BPM only, never on the rate ratio.
+double visualSamplePerPixelForZoom(double zoom, double bpm);
+
 /// Audio frames per screen column for a zoom set in pixels per bar.
 double framesPerColumn(double sampleRate, double pxPerBar, double bpm);
 
@@ -33,6 +48,11 @@ struct LaneParams {
 
     bool operator==(const LaneParams& other) const = default;
 };
+
+/// The params of the slip-mode overlay lane: the same view, half as many
+/// rows, so the full signed shape is drawn at scale 0.5 in the top half of
+/// the lane.
+LaneParams slipOverlayParams(const LaneParams& lane);
 
 /// The calibrated full scale: 0.8 of half the lane.
 constexpr double kFullScale = 0.8;
