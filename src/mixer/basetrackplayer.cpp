@@ -1,4 +1,5 @@
 #include "mixer/basetrackplayer.h"
+#include "waveform/phosphor/phosphorlanemodel.h"
 
 #include <QMessageBox>
 #include <QMetaMethod>
@@ -902,8 +903,10 @@ void BaseTrackPlayerImpl::setupEqControls() {
 }
 
 void BaseTrackPlayerImpl::slotWaveformZoomValueChangeRequest(double v) {
+    // The widest range of any waveform type (Phosphor zooms deeper); the
+    // waveform widget clamps to the range of its own type.
     if (v <= WaveformWidgetRenderer::s_waveformMaxZoom
-            && v >= WaveformWidgetRenderer::s_waveformMinZoom) {
+            && v >= mixxx::phosphor::kPhosphorMinZoom) {
         m_pWaveformZoom->setAndConfirm(v);
     }
 }
@@ -921,7 +924,11 @@ void BaseTrackPlayerImpl::slotWaveformZoomDown(double pressed) {
         return;
     }
 
-    m_pWaveformZoom->set(m_pWaveformZoom->get() - 1.0);
+    // Below 1 (only reachable in the Phosphor type) halve the zoom value.
+    const double zoom = m_pWaveformZoom->get();
+    m_pWaveformZoom->set(zoom - 1.0 >= WaveformWidgetRenderer::s_waveformMinZoom
+                    ? zoom - 1.0
+                    : zoom / 2.0);
 }
 
 void BaseTrackPlayerImpl::slotWaveformZoomSetDefault(double pressed) {

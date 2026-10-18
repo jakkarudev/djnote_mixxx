@@ -14,6 +14,7 @@ namespace allshader {
 
 PhosphorWaveformWidget::PhosphorWaveformWidget(const QString& group, QWidget* parent)
         : WaveformWidget(group, parent) {
+    usePerBarZoom();
     addRenderer<WaveformRenderBackground>();
     addRenderer<WaveformRendererEndOfTrack>();
     addRenderer<WaveformRendererPreroll>();

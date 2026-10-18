@@ -112,6 +112,18 @@ class WaveformWidgetRenderer {
     double getZoomFactor() const {
         return m_zoomFactor;
     }
+    /// The zoom range and the mouse wheel step belong to the waveform type.
+    double getMinZoom() const {
+        return m_minZoom;
+    }
+    double getMaxZoom() const {
+        return m_maxZoom;
+    }
+    double getZoomWheelStep() const {
+        return m_zoomWheelStep;
+    }
+    /// Switches to the per bar zoom of Phosphor: its range and wheel step.
+    void usePerBarZoom();
     double getGain(bool applyCompensation) const {
         // m_gain was always multiplied by 2.0, according to a comment:
         //
@@ -209,6 +221,10 @@ class WaveformWidgetRenderer {
     double m_trackPixelCount;
 
     double m_zoomFactor;
+    double m_minZoom;
+    double m_maxZoom;
+    double m_zoomWheelStep;
+    bool m_perBarZoom;
     double m_visualSamplePerPixel;
     double m_audioSamplePerPixel;
 

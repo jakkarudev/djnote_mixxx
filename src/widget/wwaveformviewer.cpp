@@ -195,9 +195,9 @@ void WWaveformViewer::mouseReleaseEvent(QMouseEvent* /*event*/) {
 void WWaveformViewer::wheelEvent(QWheelEvent* event) {
     if (m_waveformWidget) {
         if (event->angleDelta().y() > 0) {
-            onZoomChange(m_waveformWidget->getZoomFactor() / 1.05);
+            onZoomChange(m_waveformWidget->getZoomFactor() / m_waveformWidget->getZoomWheelStep());
         } else if (event->angleDelta().y() < 0) {
-            onZoomChange(m_waveformWidget->getZoomFactor() * 1.05);
+            onZoomChange(m_waveformWidget->getZoomFactor() * m_waveformWidget->getZoomWheelStep());
         }
     }
 }
@@ -246,6 +246,8 @@ void WWaveformViewer::setZoom(double zoom) {
     //qDebug() << "WaveformWidgetRenderer::setZoom" << zoom;
     if (m_waveformWidget) {
         m_waveformWidget->setZoom(zoom);
+        // The widget clamps to the range of its type.
+        zoom = m_waveformWidget->getZoomFactor();
     }
 
     // If multiple waveform widgets for the same group are created then it's

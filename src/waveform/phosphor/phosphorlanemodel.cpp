@@ -71,6 +71,15 @@ Window windowOf(const PhosphorData& data, const LaneParams& params, double centr
 
 } // namespace
 
+double pxPerBarForZoom(double zoom) {
+    return 869.6 / zoom;
+}
+
+double visualSamplePerPixelForZoom(double zoom, double bpm) {
+    // framesPerColumn() in visual samples; the sample rate cancels out.
+    return framesPerColumn(441.0, pxPerBarForZoom(zoom), bpm);
+}
+
 double framesPerColumn(double sampleRate, double pxPerBar, double bpm) {
     const double usedBpm = bpm > 0 ? bpm : kFallbackBpm;
     // pixels per second = pxPerBar * bpm / 240

@@ -1,4 +1,5 @@
 #include "waveform/renderers/waveformwidgetrenderer.h"
+#include "waveform/phosphor/phosphorlanemodel.h"
 
 #include <QPainter>
 #include <QPainterPath>
@@ -30,6 +31,10 @@ WaveformWidgetRenderer::WaveformWidgetRenderer(const QString& group)
           m_trackPixelCount(0.0),
 
           m_zoomFactor(1.0),
+          m_minZoom(s_waveformMinZoom),
+          m_maxZoom(s_waveformMaxZoom),
+          m_zoomWheelStep(1.05),
+          m_perBarZoom(false),
           m_visualSamplePerPixel(1.0),
           m_audioSamplePerPixel(1.0),
           m_alphaBeatGrid(90),
@@ -132,10 +137,20 @@ void WaveformWidgetRenderer::onPreRender(VSyncThread* vsyncThread) {
     // Allow waveform to spread one visual sample across a hundred pixels
     // NOTE: The hundred pixel limit is totally arbitrary. Theoretically,
     // there should be no limit to how far the waveforms can be zoomed in.
-    double visualSamplePerPixel = m_zoomFactor * rateRatio / m_scaleFactor;
-    m_visualSamplePerPixel = math_max(0.01, visualSamplePerPixel);
-
     TrackPointer pTrack = m_pTrack;
+    if (m_perBarZoom) {
+        // Per bar zoom (Phosphor): the scale follows the zoom and the track's
+        // BPM, never the rate ratio. The shared overlays read the same value,
+        // so they stay on the waveform at any zoom.
+        const double bpm = pTrack ? pTrack->getBpm() : 0.0;
+        m_visualSamplePerPixel = math_max(1e-4,
+                mixxx::phosphor::visualSamplePerPixelForZoom(m_zoomFactor, bpm) /
+                        m_scaleFactor);
+    } else {
+        double visualSamplePerPixel = m_zoomFactor * rateRatio / m_scaleFactor;
+        m_visualSamplePerPixel = math_max(0.01, visualSamplePerPixel);
+    }
+
     if (pTrack) {
         ConstWaveformPointer pWaveform = pTrack->getWaveform();
         if (pWaveform) {
@@ -407,9 +422,17 @@ void WaveformWidgetRenderer::setup(
     m_passthroughLabelColor = m_colors.getPassthroughLabelColor();
 }
 
+void WaveformWidgetRenderer::usePerBarZoom() {
+    m_perBarZoom = true;
+    m_minZoom = mixxx::phosphor::kPhosphorMinZoom;
+    m_maxZoom = mixxx::phosphor::kPhosphorMaxZoom;
+    m_zoomWheelStep = mixxx::phosphor::kPhosphorWheelStep;
+    m_zoomFactor = math_clamp<double>(m_zoomFactor, m_minZoom, m_maxZoom);
+}
+
 void WaveformWidgetRenderer::setZoom(double zoom) {
     //qDebug() << "WaveformWidgetRenderer::setZoom" << zoom;
-    m_zoomFactor = math_clamp<double>(zoom, s_waveformMinZoom, s_waveformMaxZoom);
+    m_zoomFactor = math_clamp<double>(zoom, m_minZoom, m_maxZoom);
 }
 
 void WaveformWidgetRenderer::setDisplayBeatGridAlpha(int alpha) {
