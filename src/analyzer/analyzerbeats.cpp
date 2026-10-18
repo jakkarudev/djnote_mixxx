@@ -7,16 +7,31 @@
 
 #include "analyzer/analyzertrack.h"
 #include "analyzer/constants.h"
+#include "analyzer/plugins/analyzerjkrbeats.h"
 #include "analyzer/plugins/analyzerqueenmarybeats.h"
 #include "analyzer/plugins/analyzersoundtouchbeats.h"
 #include "library/rekordbox/rekordboxconstants.h"
 #include "track/beatfactory.h"
 #include "track/track.h"
 
+namespace {
+
+/// Whether the beat grid is placed by BeatGridRefiner: with a jkr detector,
+/// for constant tempo grids (SoundTouch only finds a constant tempo).
+bool usesGridRefiner(const QString& pluginId, bool bPreferencesFixedTempo) {
+    return mixxx::AnalyzerJkrBeats::isJkr(pluginId) &&
+            (bPreferencesFixedTempo ||
+                    pluginId == mixxx::AnalyzerJkrBeats::soundTouchPluginInfo().id());
+}
+
+} // namespace
+
 // static
 QList<mixxx::AnalyzerPluginInfo> AnalyzerBeats::availablePlugins() {
     QList<mixxx::AnalyzerPluginInfo> plugins;
     // First one below is the default
+    plugins.append(mixxx::AnalyzerJkrBeats::queenMaryPluginInfo());
+    plugins.append(mixxx::AnalyzerJkrBeats::soundTouchPluginInfo());
     plugins.append(mixxx::AnalyzerQueenMaryBeats::pluginInfo());
     plugins.append(mixxx::AnalyzerSoundTouchBeats::pluginInfo());
     return plugins;
@@ -100,10 +115,12 @@ bool AnalyzerBeats::initialize(const AnalyzerTrack& track,
     bool bShouldAnalyze = shouldAnalyze(track.getTrack());
 
     DEBUG_ASSERT(!m_pPlugin);
+    DEBUG_ASSERT(!m_pRefiner);
     if (bShouldAnalyze) {
-        if (m_pluginId == mixxx::AnalyzerQueenMaryBeats::pluginInfo().id()) {
+        const QString tempoPluginId = mixxx::AnalyzerJkrBeats::tempoPluginId(m_pluginId);
+        if (tempoPluginId == mixxx::AnalyzerQueenMaryBeats::pluginInfo().id()) {
             m_pPlugin = std::make_unique<mixxx::AnalyzerQueenMaryBeats>();
-        } else if (m_pluginId == mixxx::AnalyzerSoundTouchBeats::pluginInfo().id()) {
+        } else if (tempoPluginId == mixxx::AnalyzerSoundTouchBeats::pluginInfo().id()) {
             m_pPlugin = std::make_unique<mixxx::AnalyzerSoundTouchBeats>();
         } else {
             // This must not happen, because we have already verified above
@@ -114,6 +131,9 @@ bool AnalyzerBeats::initialize(const AnalyzerTrack& track,
         if (m_pPlugin) {
             if (m_pPlugin->initialize(m_sampleRate)) {
                 qDebug() << "Beat calculation started with plugin" << m_pluginId;
+                if (usesGridRefiner(m_pluginId, m_bPreferencesFixedTempo)) {
+                    m_pRefiner = std::make_unique<mixxx::BeatGridRefiner>(m_sampleRate);
+                }
             } else {
                 qDebug() << "Beat calculation will not start.";
                 m_pPlugin.reset();
@@ -172,7 +192,8 @@ bool AnalyzerBeats::shouldAnalyze(TrackPointer pTrack) const {
     QString version = pBeats->getVersion();
     QHash<QString, QString> extraVersionInfo = getExtraVersionInfo(
             pluginID,
-            m_bPreferencesFastAnalysis);
+            m_bPreferencesFastAnalysis,
+            m_bPreferencesFixedTempo);
     QString newVersion = BeatFactory::getPreferredVersion(
             m_bPreferencesFixedTempo);
     QString newSubVersion = BeatFactory::getPreferredSubVersion(
@@ -204,11 +225,15 @@ bool AnalyzerBeats::processSamples(const CSAMPLE* pIn, SINT count) {
         return true; // silently ignore all remaining samples
     }
 
+    if (m_pRefiner) {
+        m_pRefiner->processStereoSamples(pIn, count);
+    }
     return m_pPlugin->processSamples(pIn, count);
 }
 
 void AnalyzerBeats::cleanup() {
     m_pPlugin.reset();
+    m_pRefiner.reset();
 }
 
 void AnalyzerBeats::storeResults(TrackPointer pTrack) {
@@ -221,11 +246,11 @@ void AnalyzerBeats::storeResults(TrackPointer pTrack) {
         return;
     }
 
+    const QHash<QString, QString> extraVersionInfo = getExtraVersionInfo(
+            m_pluginId, m_bPreferencesFastAnalysis, m_bPreferencesFixedTempo);
     mixxx::BeatsPointer pBeats;
     if (m_pPlugin->supportsBeatTracking()) {
         QVector<mixxx::audio::FramePos> beats = m_pPlugin->getBeats();
-        QHash<QString, QString> extraVersionInfo = getExtraVersionInfo(
-                m_pluginId, m_bPreferencesFastAnalysis);
         pBeats = BeatFactory::makePreferredBeats(
                 beats,
                 extraVersionInfo,
@@ -245,16 +270,36 @@ void AnalyzerBeats::storeResults(TrackPointer pTrack) {
         pBeats = mixxx::Beats::fromConstTempo(m_sampleRate, mixxx::audio::kStartFramePos, bpm);
     }
 
+    if (m_pRefiner && pBeats) {
+        const mixxx::Bpm bpm = pBeats->getLastMarkerBpm();
+        const auto grid = m_pRefiner->refine(bpm);
+        if (grid) {
+            qDebug() << "AnalyzerBeats refined grid:" << bpm << "->" << grid->bpm
+                     << "first beat" << grid->firstBeat;
+            pBeats = mixxx::Beats::fromConstTempo(m_sampleRate,
+                    grid->firstBeat.toNearestFrameBoundary(),
+                    grid->bpm,
+                    BeatFactory::getPreferredSubVersion(extraVersionInfo));
+        } else {
+            qDebug() << "AnalyzerBeats kept the plugin's grid: no pronounced beat";
+        }
+    }
+
     pTrack->trySetBeats(pBeats);
 }
 
 // static
-QHash<QString, QString> AnalyzerBeats::getExtraVersionInfo(
-        const QString& pluginId, bool bPreferencesFastAnalysis) {
+QHash<QString, QString> AnalyzerBeats::getExtraVersionInfo(const QString& pluginId,
+        bool bPreferencesFastAnalysis,
+        bool bPreferencesFixedTempo) {
     QHash<QString, QString> extraVersionInfo;
     extraVersionInfo["vamp_plugin_id"] = pluginId;
     if (bPreferencesFastAnalysis) {
         extraVersionInfo["fast_analysis"] = "1";
+    }
+    if (usesGridRefiner(pluginId, bPreferencesFixedTempo)) {
+        // Bump when BeatGridRefiner places grids differently.
+        extraVersionInfo["grid_refiner"] = "1";
     }
     return extraVersionInfo;
 }

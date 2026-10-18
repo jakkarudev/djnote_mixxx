@@ -78,6 +78,14 @@ _Avoid_: beats apart, beat offset, beats away
 Four consecutive beats of the beat grid, counted from the grid's first beat. DJNote always assumes 4/4.
 _Avoid_: measure
 
+**jkr**:
+DJNote's beat detection, offered next to Mixxx's original detectors. A Mixxx detector finds the tempo, then jkr places the beat grid on the kicks with its first beat on a downbeat.
+_Avoid_: DJNote detector, refined analyzer
+
+**Downbeat**:
+The first beat of a bar. jkr places the beat grid's first beat on the track's first downbeat.
+_Avoid_: one, bar start, grid anchor
+
 **Phrase**:
 A run of consecutive bars of the configured phrase length (8 by default), counted from the grid's first beat.
 _Avoid_: section, block

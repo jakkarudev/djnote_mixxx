@@ -5,6 +5,7 @@
 #include <memory>
 
 #include "analyzer/analyzer.h"
+#include "analyzer/beatgridrefiner.h"
 #include "analyzer/plugins/analyzerplugin.h"
 #include "preferences/beatdetectionsettings.h"
 #include "preferences/usersettings.h"
@@ -28,11 +29,15 @@ class AnalyzerBeats : public Analyzer {
 
   private:
     bool shouldAnalyze(TrackPointer pTrack) const;
-    static QHash<QString, QString> getExtraVersionInfo(
-            const QString& pluginId, bool bPreferencesFastAnalysis);
+    static QHash<QString, QString> getExtraVersionInfo(const QString& pluginId,
+            bool bPreferencesFastAnalysis,
+            bool bPreferencesFixedTempo);
 
     BeatDetectionSettings m_bpmSettings;
     std::unique_ptr<mixxx::AnalyzerBeatsPlugin> m_pPlugin;
+    /// Places constant-tempo grids precisely; only used with the fixed tempo
+    /// assumption.
+    std::unique_ptr<mixxx::BeatGridRefiner> m_pRefiner;
     const bool m_enforceBpmDetection;
     QString m_pluginId;
     bool m_bPreferencesReanalyzeOldBpm;
