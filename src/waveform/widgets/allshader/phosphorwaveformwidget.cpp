@@ -3,6 +3,7 @@
 #include "waveform/renderers/allshader/waveformrenderbackground.h"
 #include "waveform/renderers/allshader/waveformrenderbeat.h"
 #include "waveform/renderers/allshader/waveformrendererendoftrack.h"
+#include "waveform/renderers/allshader/waveformrendererpreroll.h"
 #include "waveform/renderers/allshader/waveformrendererphosphor.h"
 #include "waveform/renderers/allshader/waveformrendererslipmode.h"
 #include "waveform/renderers/allshader/waveformrendermark.h"
@@ -15,16 +16,16 @@ PhosphorWaveformWidget::PhosphorWaveformWidget(const QString& group, QWidget* pa
         : WaveformWidget(group, parent) {
     usePerBarZoom();
     // The light is added to RGB 24 whatever the skin's background is.
-    // No pre-/post-roll triangles: outside the track the lane is plain
-    // background (at the per-bar zoom they read as a stale zigzag waveform).
     addRenderer<WaveformRenderBackground>(QColor(24, 24, 24));
     addRenderer<WaveformRendererEndOfTrack>();
+    addRenderer<WaveformRendererPreroll>();
     addRenderer<WaveformRenderMarkRange>();
     addRenderer<WaveformRendererPhosphor>();
     addRenderer<WaveformRenderBeat>();
     addRenderer<WaveformRenderMark>();
     // The following renderer will add an overlay waveform if a slip is in progress
     addRenderer<WaveformRendererSlipMode>();
+    addRenderer<WaveformRendererPreroll>(::WaveformRendererAbstract::Slip);
     addRenderer<WaveformRendererPhosphor>(::WaveformRendererAbstract::Slip);
     addRenderer<WaveformRenderBeat>(::WaveformRendererAbstract::Slip);
     addRenderer<WaveformRenderMark>(::WaveformRendererAbstract::Slip);
