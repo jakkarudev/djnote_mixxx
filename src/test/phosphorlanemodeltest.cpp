@@ -327,28 +327,6 @@ TEST(PhosphorTexelCodecTest, LevelsRoundTripInTwoBytes) {
     EXPECT_EQ(0, high[0] + low[0] + high[3] + low[3]);
 }
 
-TEST(PhosphorLaneModelPlainTest, HeightGainScalesTheOutlineButNotTheColour) {
-    PhosphorData data(44100, 44100);
-    const std::vector<int16_t> s(44100, 4000);
-    data.append(s.data(), 44100);
-    const std::vector<uint16_t> colour(3 * 1002, 40000);
-    data.appendColour(colour.data(), 1002);
-    data.finish();
-    LaneParams params;
-    params.framesPerColumn = 10;
-    params.height = 101;
-    const LaneColumn base = computeColumn(data, params, 20000);
-    params.heightGain = 2.0;
-    const LaneColumn doubled = computeColumn(data, params, 20000);
-    // 50 + 4000 / 32768 * 0.8 * 101 / 2 = 55 (rounded); twice the value: 60.
-    EXPECT_EQ(55, base.rowMin);
-    EXPECT_EQ(60, doubled.rowMin);
-    for (int c = 0; c < 3; ++c) {
-        EXPECT_FLOAT_EQ(base.levels[c], doubled.levels[c]);
-        EXPECT_NEAR(40000 / 65535.0, base.levels[c], 1e-6);
-    }
-}
-
 // --- cache -----------------------------------------------------------------
 
 std::shared_ptr<PhosphorData> noiseData() {

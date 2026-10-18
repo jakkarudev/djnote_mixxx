@@ -42,9 +42,8 @@ struct LaneParams {
     int height = 1;
     /// Shape window, in columns.
     double windowColumns = 2.0;
-    /// The All visual gain: scales the height of the outline (1.0 = the
-    /// calibrated height). Colour is not affected.
-    double heightGain = 1.0;
+    // No gain here: gains stretch the columns in the shader (phosphorheight.h),
+    // so they never invalidate the cache.
 
     bool operator==(const LaneParams& other) const = default;
 };
@@ -78,7 +77,7 @@ struct LaneColumn {
 };
 
 /// The row of a value (int16 units). Positive values go down.
-int rowOfValue(double value, int height, double heightGain = 1.0);
+int rowOfValue(double value, int height);
 
 /// Whether the data decoded so far is enough to compute the column centred on
 /// the given frame. False for columns whose window reaches data that was not

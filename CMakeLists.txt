@@ -1279,6 +1279,7 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/waveform/overviewsettings.cpp
   src/waveform/phosphor/phosphorcolourtrack.cpp
   src/waveform/phosphor/phosphordata.cpp
+  src/waveform/phosphor/phosphorheight.cpp
   src/waveform/phosphor/phosphorlanecache.cpp
   src/waveform/phosphor/phosphorlanemodel.cpp
   src/waveform/phosphor/phosphorsettings.cpp
@@ -2179,6 +2180,7 @@ if(BUILD_TESTING)
     src/test/overviewlayouttest.cpp
     src/test/overviewlinelayouttest.cpp
     src/test/overviewsettingstest.cpp
+    src/test/phosphorheighttest.cpp
     src/test/phosphorlanemodeltest.cpp
     src/test/phosphorsettingstest.cpp
     src/test/phosphorslipoverlaytest.cpp

@@ -8,6 +8,7 @@
 #include <cmath>
 
 #include "track/track.h"
+#include "waveform/phosphor/phosphorheight.h"
 #include "waveform/phosphor/phosphortexelcodec.h"
 #include "waveform/renderers/allshader/matrixforwidgetgeometry.h"
 #include "waveform/renderers/waveformwidgetrenderer.h"
@@ -89,7 +90,7 @@ void WaveformRendererPhosphor::deleteTexture() {
     m_colourTexture = 0;
 }
 
-LaneParams WaveformRendererPhosphor::desiredParams(const PhosphorData& data, float allGain) const {
+LaneParams WaveformRendererPhosphor::desiredParams(const PhosphorData& data) const {
     const float dpr = m_waveformRenderer->getDevicePixelRatio();
     LaneParams params;
     const double framesPerLogicalPixel = m_waveformRenderer->getVisualSamplePerPixel() *
@@ -97,8 +98,6 @@ LaneParams WaveformRendererPhosphor::desiredParams(const PhosphorData& data, flo
     params.framesPerColumn = std::max(framesPerLogicalPixel / dpr, 1e-3);
     params.height = std::max(static_cast<int>(m_waveformRenderer->getBreadth() * dpr), 1);
     params.windowColumns = kWindowColumns;
-    // The All visual gain scales the height; 1.0 is the calibrated height.
-    params.heightGain = allGain;
     // The slip overlay is the full shape at half scale in the top half.
     return m_isSlipRenderer ? slipOverlayParams(params) : params;
 }
@@ -276,15 +275,11 @@ void WaveformRendererPhosphor::paintGL() {
         return;
     }
 
-    // The visual gains: All is the height, Low/Mid/High only colour. Gain and
-    // EQ following is a separate ticket.
-    const WaveformWidgetFactory* pFactory = WaveformWidgetFactory::instance();
-    const float allGain = static_cast<float>(pFactory->getVisualGain(WaveformWidgetFactory::All));
-    const float lowGain = static_cast<float>(pFactory->getVisualGain(WaveformWidgetFactory::Low));
-    const float midGain = static_cast<float>(pFactory->getVisualGain(WaveformWidgetFactory::Mid));
-    const float highGain = static_cast<float>(pFactory->getVisualGain(WaveformWidgetFactory::High));
+    // Gains (visual, total, EQ) only reach the shader: they stretch the
+    // columns there and never touch the density cache.
+    const ShaderGains gains = shaderGains(gainInputs(false));
 
-    const LaneParams desired = desiredParams(*pData, allGain);
+    const LaneParams desired = desiredParams(*pData);
     // The play position as a fraction of the track keeps working when the
     // file's rate differs from the engine's.
     const double positionFrame =
@@ -337,7 +332,11 @@ void WaveformRendererPhosphor::paintGL() {
     glBindTexture(GL_TEXTURE_2D, m_colourTexture);
     glActiveTexture(GL_TEXTURE0);
     m_shader.setUniformValue(m_shader.colourTextureLocation(), 1);
-    m_shader.setUniformValue(m_shader.visualGainsLocation(), QVector3D(lowGain, midGain, highGain));
+    m_shader.setUniformValue(m_shader.visualGainsLocation(),
+            QVector3D(gains.colour[0], gains.colour[1], gains.colour[2]));
+    m_shader.setUniformValue(m_shader.eqGainsLocation(),
+            QVector3D(gains.eq[0], gains.eq[1], gains.eq[2]));
+    m_shader.setUniformValue(m_shader.heightGainLocation(), gains.height);
     m_shader.setAttributeArray(m_shader.positionLocation(), GL_FLOAT, m_vertices.constData(), 2);
 
     glDrawArrays(GL_TRIANGLES, 0, m_vertices.size());

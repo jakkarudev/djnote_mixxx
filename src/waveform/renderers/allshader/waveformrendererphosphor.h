@@ -35,8 +35,7 @@ class allshader::WaveformRendererPhosphor final : public allshader::WaveformRend
     using Cache = mixxx::phosphor::PhosphorLaneCache;
 
     // The view the lane has to show now.
-    mixxx::phosphor::LaneParams desiredParams(const mixxx::phosphor::PhosphorData& data,
-            float allGain) const;
+    mixxx::phosphor::LaneParams desiredParams(const mixxx::phosphor::PhosphorData& data) const;
     void resetCache();
     void updateCache(const mixxx::phosphor::PhosphorDataPointer& pData,
             const mixxx::phosphor::LaneParams& desired,
