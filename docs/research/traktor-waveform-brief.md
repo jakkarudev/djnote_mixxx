@@ -4,7 +4,7 @@ Handoff for a design (grilling) session, written 2026-10-18 at the end of the re
 
 Read with:
 - `docs/research/traktor-waveform.md`: the full evidence. §8 (test signals) and §8.5 (prototype calibration) supersede the earlier sections where they disagree. The "Revised plan" sits at the end of the Implications section.
-- The prototype, on branch `prototype/traktor-waveform` (`tools/PROTOTYPE_traktor_waveform.py`, plus every screenshot and comparison sheet). The script is also left untracked in the working tree on `djnote`.
+- The prototype, on branch `prototype/traktor-waveform` (`tools/PROTOTYPE_traktor_waveform.py`, plus every screenshot and comparison sheet). It is now `tools/phosphor_waveform.py` on `djnote`.
 - `docs/adr/0001-bars-and-phrases-derived-from-beat-grid.md`: the only ADR so far.
 
 ## Status
@@ -99,8 +99,13 @@ All numbers are prototype defaults. "Measured" means it came from controlled tes
 
 ## Reproducing the prototype
 
-- Needs `uv` and `ffmpeg`. Run from the repo root:
-  - `git show prototype/traktor-waveform:tools/PROTOTYPE_traktor_waveform.py > tools/PROTOTYPE_traktor_waveform.py` (if it is not already in the working tree)
-  - `uv run tools/PROTOTYPE_traktor_waveform.py "G:\Music\DESKTOP MUSIC DJ SETS\UPDATED TRACKLIST\01 - Gigando.flac" --compare "SCREENSHOTS/waveforms/Screenshot 2026-10-17 203136.png"`
-- Other tracks need `--time` (the track time under the play marker; fit values are in the branch's commit message) and `--px-per-sec` (217.4 × BPM / 240).
-- Test signals: `python tools/waveform_test_signals.py` writes Q2–Q9 into `waveform-tests/`.
+The prototype became the maintained **Phosphor reference script**, `tools/phosphor_waveform.py`. Its defaults are the calibrated values. Needs `uv` and `ffmpeg`. Run from the repo root:
+
+- One lane, compared with a Traktor screenshot. The screenshots are on branch `prototype/traktor-waveform`; extract one with `git show "prototype/traktor-waveform:SCREENSHOTS/waveforms/Screenshot 2026-10-17 203136.png" > shot.png`.
+  `uv run tools/phosphor_waveform.py "G:\Music\DESKTOP MUSIC DJ SETS\UPDATED TRACKLIST\01 - Gigando.flac" --time 281.6 --px-per-sec 136.1 --compare shot.png`
+- Zoom is per bar: `--px-per-bar` (217.4, or `--zoom z` for 869.6 / z) and `--bpm` (0 = none, 120) give px/s = px per bar x BPM / 240. `--px-per-sec` overrides it with the fitted values. The fitted `--time` / `--px-per-sec` pairs for the five tracks are in the `TRACKS` table in the script.
+- Other options: `--shape-window` (columns, 2), `--detail full|high|medium|low|lowest`, `--filter fir|fft`, and the prototype's `--table`, `--envelope`, `--saturation` and the rest.
+- Checks on the five reference tracks: `--check-fir` (FFT vs FIR colours) and `--check-tiers` (detail tiers vs Full, writes comparison images to `docs/research/phosphor-detail-tiers/`). Results: research doc section 8.6.
+- C++ test fixtures: `uv run tools/phosphor_waveform.py --fixtures src/test/phosphor --signals-dir waveform-tests` (format: `src/test/phosphor/README.md`). Regeneration is byte-identical.
+- Script tests: `uv run tools/phosphor_waveform_test.py`.
+- Test signals: `python tools/waveform_test_signals.py` writes Q2-Q9 into `waveform-tests/`.

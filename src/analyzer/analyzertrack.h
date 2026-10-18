@@ -10,6 +10,10 @@ class AnalyzerTrack {
     struct Options {
         /// If set, overrides whether the analysis should assume constant BPM.
         std::optional<bool> useFixedTempo;
+
+        /// If set, the Phosphor waveform data is built for this track. Set for
+        /// deck loads only, not for samplers, preview decks or batch analysis.
+        bool buildPhosphor = false;
     };
 
     explicit AnalyzerTrack(TrackPointer track, Options options = Options());

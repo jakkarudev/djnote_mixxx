@@ -107,6 +107,8 @@ Pixel bytes `(c0, c1, c2, c3)`:
 - The normalised colour `(c0,c1,c2)/c3` is nearly constant down a column.
 - Alpha profile from centre to edge, averaged over 40 files: 0.97, 0.93, 0.89, 0.85, 0.79, 0.74, 0.68, 0.61, 0.51, 0.36.
 
+(Correction, §9: `c3` is about 2.0 x `c1`, not the colour's norm, so the premultiplied reading below is doubtful.)
+
 There are two readings. We cannot yet tell them apart:
 1. A premultiplied BGRA image rendered in the colour mode that was active at analysis time.
 2. Mode-neutral `(band, band, band, magnitude)` data that the renderer recolours. The hardware `colorMatrix` on `Traktor.Stripe` favours this.
@@ -303,7 +305,7 @@ The low-frequency "grain" in the original screenshots is therefore real signal s
 
 ### 8.5 Prototype check against a real track (2026-10-17)
 
-**Method.** `tools/PROTOTYPE_traktor_waveform.py` (throwaway, outside the build) renders the §8 model from the decoded FLAC. It draws signed min..max of (L+R)/2, sample-density brightness with per-channel clipping, and a smoothed colour from three zero-phase filters fitted to the §8.3 table. The target is the deck B lane of `SCREENSHOTS/waveforms/Screenshot 2026-10-17 203136.png` (CYK "Gigando", 04:41). The result is `SCREENSHOTS/waveforms/PROTOTYPE_gigando_comparison.png`. Fits are per-column outlines and per-region mean colours measured against the screenshot. Evidence is **[V]** plus those fits.
+**Method.** `tools/PROTOTYPE_traktor_waveform.py` (throwaway, outside the build; now `tools/phosphor_waveform.py`) renders the §8 model from the decoded FLAC. It draws signed min..max of (L+R)/2, sample-density brightness with per-channel clipping, and a smoothed colour from three zero-phase filters fitted to the §8.3 table. The target is the deck B lane of `SCREENSHOTS/waveforms/Screenshot 2026-10-17 203136.png` (CYK "Gigando", 04:41). The result is `SCREENSHOTS/waveforms/PROTOTYPE_gigando_comparison.png`. Fits are per-column outlines and per-region mean colours measured against the screenshot. Evidence is **[V]** plus those fits.
 
 - **NML `CUE_V2 START` is in milliseconds.** Gigando's AutoGrid starts at 1.16 ms, so bar 176 is at 281.60 s. Fitting the outlines independently puts the playhead at 281.59 s.
 - **Zoom:** 136.1 px per track second (217.4 px per bar at 150 BPM), i.e. 7.35 ms per column.
@@ -377,6 +379,107 @@ The low-frequency "grain" in the original screenshots is therefore real signal s
   - Remaining visible gap: yellow/white centre blobs between the kicks on dense tracks (*Progress Paradox*), where Traktor stays pink.
   - Sheets: `SCREENSHOTS/traktor_screenshots/PROTOTYPE_*_comparison.png`.
 
+### 8.6 Reference script checks (2026-10-18)
+
+`tools/phosphor_waveform.py` is the maintained reference script (the prototype promoted, see `docs/research/traktor-waveform-brief.md`, "Reproducing"). It uses the spec's decisions: a 2-column shape window, zoom in px per bar, linear-phase FIR colour filters and detail tiers. Both checks below ran on the five reference tracks (`--check-fir`, `--check-tiers`).
+
+**FFT vs FIR colours.** Whole-track zero-phase FFT filtering vs the 4096-tap FIR (overlap-add, delay-compensated). Difference of the final colour of a density-1 pixel (colour x 0.7, 0-255, unclipped), over the whole track:
+
+| Track | max R | max G | max B | mean R | mean G | mean B |
+|---|---|---|---|---|---|---|
+| Gigando | 0.47 | 0.29 | 0.37 | 0.104 | 0.059 | 0.043 |
+| ren intro meaning | 0.09 | 0.05 | 0.07 | 0.016 | 0.004 | 0.003 |
+| Braindrain intro | 0.31 | 0.20 | 0.12 | 0.073 | 0.020 | 0.010 |
+| Spiritual | 0.66 | 0.42 | 0.39 | 0.113 | 0.064 | 0.046 |
+| Progress Paradox | 0.55 | 0.38 | 0.52 | 0.160 | 0.090 | 0.061 |
+
+The worst difference is 0.66 levels, under the 2-level criterion. The FIR filters keep the defaults.
+
+**Detail tiers.** Pixel difference (0-255 per channel, whole lane) of each tier from Full, at the fitted play marker plus four more positions (20/40/60/80 % of the track): the mean over the five tracks and the largest single-pixel difference. Per-track means range from 0.3 to 13.3.
+
+| Tier | N | Mean diff | Max diff |
+|---|---|---|---|
+| High | 4 | 2.41 | 106 |
+| Medium | 8 | 4.51 | 166 |
+| Low | 16 | 6.85 | 212 |
+| Lowest | 32 | 9.35 | 227 |
+
+Comparison images (Full above the four tiers, 4x around the play marker, per track): `docs/research/phosphor-detail-tiers/*.png`.
+
+- The outline is identical by construction, as the images show. This holds because a shape window of 32 frames or more snaps its edges outward to multiples of 16 frames (the coarsest kept tier's block) in every tier, Full included, so all tiers see the same whole blocks; below 32 frames (deepest zoom) there is no snapping and tiers may differ. What changes is the texture inside the shape: single pixels flip between dim and bright, hence the large maxima.
+- **High** and **Medium** look the same as Full at normal viewing size. Medium's texture is slightly grainier.
+- **Low** has visibly more speckle on dense tracks (*Progress Paradox*, *Spiritual*). It is borderline.
+- **Lowest** is visibly different: white speckle pixels in the density and a coarser texture. **Proposal: drop Lowest** (N = 32) from the list. Keep Full, High, Medium and Low. If Low looks wrong in the user's final manual check, drop it too.
+
+## 9. Overview model fitted to Traktor's stored stripes (2026-10-18)
+
+Ticket #20. `tools/phosphor_waveform.py --fit-overview --signals-dir <waveform-tests>` renders the Phosphor overview of the five reference tracks and the test signals and fits each to its stored stripe (`read_stripe`, `render_overview`, `fit_stripes`; tests in `tools/phosphor_waveform_test.py`). Traktor's folder was only read. The model constants were fitted on the four tracks with a stripe plus Q2a, Q2b, Q3c and Q4; Q6, Q7, Q9 and Q5 are checks.
+
+**Matching a stripe to a track.** The header's block count is `N = ceil(frames / 1024)` of the track at 44.1 kHz, exactly (Gigando 21361, Spiritual 20144, Progress Paradox 20798, Braindrain 4962, and the test signals). **Each of the 1024 columns covers exactly N samples**: column k = samples `[k*N, (k+1)*N)`, and the columns after the end are empty. So stripes can be matched to tracks by N alone. *Ren intro meaning* (N = 4686) has no stripe in the folder (the stripes with N = 5100 are a different length), so it is not fitted. Traktor stored a single stripe for the three Q3 files (N = 1422); it is Q3c's, so Q3a/Q3b are skipped. Q4/Q6/Q7 and Q5/Q9 share a block count; the script assigns them by the best outline correlation.
+
+### The model
+
+| Part | Rule | Evidence |
+|---|---|---|
+| Rows | A sample `v` (mono, -1..1) falls in row `floor(31 v + 31)`, clipped to 0..61, positive downward. The rows from the column's min to its max are present. | Top and bottom extents match the per-column min/max with r = 0.93-0.97 and a mean error of 0.7-0.9 row (Braindrain 2.2) on the four tracks. 0 dBFS gives 62 rows, -6 dB gives 32. |
+| Colour | Unit colour of the column's band levels, taken as the **maximum over the column of the existing 1 ms colour track** (the same FIR filters, `table = stripe`, gamma 0.35 and smoothing as the scrolling waveform). Bytes are B, G, R: R = low band. | Mean distance between unit colours 0.053-0.081 on the tracks (cosine 0.995-0.997). Mean, middle or last block instead of the max is worse (0.10-0.14), so Traktor's column colour is a peak hold of the smoothed band levels. |
+| Magnitude | `norm(rgb) = (W . (r, g, b, b^4)) * norm(levels)^0.7 * d^0.25`, with (r, g, b) the unit colour, W = (83.5, 242.0, -37.4, 606.1) and `d` the row's density (next row). | Per-pixel median error 11 % on the tracks and 10 % on tones. The 0.7 matches amplitude^0.25 for a pure tone (0.35 x 0.7 = 0.245). The `b^4` term lifts bright blue (high-frequency) columns, as pure tones need (a 16 kHz tone is about 3.5 times as bright as a 40 Hz tone). |
+| **Profile** | `d` = the share of the column's samples that fall in the row (sample **density**), raised to 0.25. Rows inside the extent that no sample hit get half a sample. | Within a column, `log norm(rgb)` against `log d`: slope 0.26, R^2 = 0.91, residual 0.12 (67 000 pixels). This is the section 8.2 phosphor effect: Q7's sine is *brighter* at its edges (153 against 128), a square is a hollow box, and music columns are bright at the centre. The earlier "survival function" reading was close for unimodal columns but wrong for sines. |
+| Alpha | `A = 2.0 x G byte` (median 2.02, 5 % error). | Fitted over 120 random stripes. **This corrects section 4.1**: alpha is *not* the norm of the colour (`c3 / norm(c0..c2)` ranges 0.84-1.55), and the premultiplied reading fails (8 kHz tone: c0 = 209 > c3 = 193). |
+
+### Fit (final model)
+
+Colour error is the mean distance between the columns' unit colours (0 = same, 1.41 = orthogonal, so 0.07 is about 4 degrees). Profile error is the mean absolute alpha difference over the pixels either image has (0-255). Outline r is the mean correlation of the first and last row. "Cols" are the columns where both have signal.
+
+| Item | N | Cols | Colour err | Profile err | Outline r |
+|---|---|---|---|---|---|
+| Gigando | 21361 | 1024 | 0.072 | 8.9 | 0.971 |
+| Braindrain intro | 4962 | 1024 | 0.081 | 18.5 | 0.928 |
+| Spiritual | 20144 | 1024 | 0.053 | 9.1 | 0.950 |
+| Progress Paradox | 20798 | 1024 | 0.066 | 6.2 | 0.967 |
+| Ren intro meaning | 4686 | no stripe | | | |
+| Q2a crossover steps | 3058 | 1011 | 0.065 | 36.1 | 0.955 |
+| Q2b sweep | 2671 | 1009 | 0.021 | 29.1 | 0.970 |
+| Q3c 8 kHz steps | 1422 | 994 | 0.143 | 62.7 | 0.995 |
+| Q4 sine vs square | 905 | 978 | 0.070 | 24.5 | 0.987 |
+| Q6 sine vs noise | 905 | 978 | 0.099 | 34.7 | 0.989 |
+| Q7 stereo | 905 | 748 | 0.068 | 13.6 | 0.991 |
+| Q5 clicks and kicks | 1551 | 522 | 0.181 | 79.7 | 0.758 |
+| Q9 two-tone mixtures | 1551 | 997 | 0.079 | 29.7 | 0.983 |
+
+Means over the four tracks: colour 0.068, profile 10.7, outline 0.954. The comparison image is `docs/research/phosphor-overview-fit.png` (Traktor above, ours below, per item; 64 colours to keep it small).
+
+### How it differs from the scrolling waveform
+
+- One column spans **N samples (0.2-0.5 s for a track)**, not a pixel, and there is no shape smoothing across columns.
+- Brightness comes from the **density raised to 0.25**, not linear density added up and clipped. That is why the overview is smooth and the scrolling waveform grainy.
+- Colour is the **peak hold over the column** of the same smoothed band levels; the scrolling waveform samples the levels per pixel.
+- Magnitude depends on hue (blue is brighter) and on `norm(levels)^0.7`; the scrolling waveform's brightness is its own fit (section 8.5).
+- Alpha is a separate channel (2 x the green byte). The Phosphor renderer can use the colour alone.
+
+### Remaining gaps
+
+1. **Colour tails.** After a click or kick Traktor's 1-pixel centre line keeps its colour for several columns (section 8.3). Our peak hold carries a shorter tail. This is most of the Q5 (0.181) and Q3c (0.143) colour error, and Q5's outline correlation is only 0.76. Silent columns in the model draw a 1-row line at row 31, Traktor's is at row 30 (a click of 0.9 reaches row 58 there). Moving the row map by half a row was tried and made the fit slightly worse, so it stays at 31.
+2. **Tone profile.** A 62-row tone has dim edges in Traktor (152 against 193) over about 5 rows; our density model gives a flat or edge-bright profile. Traktor probably draws the segments between samples and anti-aliases the edge (section 8.2). Profile errors on the test signals (14-80) are mostly this and the one-row offset. On music they are 6-9, except Braindrain (18, a heavily compressed master).
+3. **Brightness model.** 11 % median per pixel; the `b^4` term and the negative blue weight are a fit, not a mechanism.
+4. **Ren intro meaning** has no stripe, so the five-track set is four.
+5. **Edge extents** are 0.7-0.9 row wider than min..max on three tracks and 2 rows on Braindrain, perhaps from the line segments.
+
+### Q1: band data or a rendered image?
+
+**Not settled.** Settling it needs the same track analysed in two colour modes. The Traktor folder is read-only, Traktor is not run here, and all three stripe folders were written in mode 3. What the fit adds: a stripe column is exactly {extent, 3 band peak levels, a density profile}, with the colour a fixed function of the band levels and the profile independent of the colour; that is enough to recolour at draw time (reading 2). The alpha is 2 x G, not the colour's norm, which a plain rendered premultiplied image (reading 1) would give. So reading 2 (mode-neutral data plus a renderer) is somewhat more likely, but only the Q1 experiment proves it. Our design does not depend on the answer: it stores band levels and density, not an image.
+
+### Proposed stored format for the overview analysis type (for #21)
+
+Store what the model needs, not an image, so the overview can be redrawn at any width and recoloured. Split the track into **W columns of N = ceil(frames / W) samples** (W = 1024 as Traktor, or more for wide screens; the model is per column). Per column:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `levels[3]` | 3 x u8 (u16 for parity with the scrolling colour track) | peak hold over the column of the 1 ms colour track (low, mid, high), `round(level * 255)` |
+| `density[62]` | 62 x u8 | `round(255 * (d / 0.8)^0.25)` clipped, where d is the share of the column's samples in the row; row 0 = -1.0 .. row 61 = +1.0, positive downward. Zero outside the extent. |
+
+That is 65 bytes per column, **66 560 bytes (65 KB) per track at 1024 columns**, before compression (the density rows are smooth, so zlib should give 2-3 times less). The extent is implied by the first and last non-zero density row; the renderer adds the half-sample floor for gaps inside it. A leaner variant stores `min`, `max` and 8 quantiles of the sample distribution per column (11 bytes, 11 KB per track) and rebuilds the profile from them: exact for unimodal columns, but it loses the hollow-box and edge-bright shapes of tones and clipped masters. Recommendation: the 65-byte version, with the lean one as the fallback if size matters.
+
 ## Implications for a Traktor-style renderer in Mixxx
 
 > **Superseded in part by §8.** The list below was written before the tests. Its smoothed, mirrored envelope (items 2–3) and fixed gradient (item 5) do **not** match Traktor. See "Revised plan" at the end of this section.
@@ -407,7 +510,7 @@ The low-frequency "grain" in the original screenshots is therefore real signal s
 - **Q7, symmetry and stereo:** a hard-panned L-only signal. It shows whether Traktor's halves are L/R or mirrored mono.
 - **Q8, gain:** move the gain knob and Auto-Gain and check whether the scrolling waveform height changes.
 
-Q2–Q7 were answered on 2026-10-17 (§8). Q1 and Q8 are still open.
+Q2–Q7 were answered on 2026-10-17 (§8). Q1 is not settled by the stripe fit (§9) and needs the colour-mode experiment; Q8 is still open.
 
 **Revised plan (after §8).**
 1. **Shape and density need sample-level data that Mixxx's waveform does not keep.**

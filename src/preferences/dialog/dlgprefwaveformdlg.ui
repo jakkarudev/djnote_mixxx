@@ -304,6 +304,31 @@ Select from different types of displays for the waveform, which differ primarily
       </widget>
      </item>
 
+     <item row="8" column="1" colspan="3">
+      <layout class="QHBoxLayout" name="followsLayout">
+       <item>
+        <widget class="QCheckBox" name="followsGainCheckBox">
+         <property name="toolTip">
+          <string>The scrolling waveform changes with the deck's gain (gain knob and ReplayGain). Turn off to show the track as recorded.</string>
+         </property>
+         <property name="text">
+          <string>Follows gain</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="followsEqCheckBox">
+         <property name="toolTip">
+          <string>The scrolling waveform changes with the deck's EQ knobs and kills. Turn off to show the track as recorded.</string>
+         </property>
+         <property name="text">
+          <string>Follows EQ</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+
      <item row="9" column="1">
       <widget class="QCheckBox" name="normalizeOverviewCheckBox">
        <property name="text">
@@ -622,7 +647,35 @@ Select from different types of displays for the waveform, which differ primarily
       </layout>
      </item>
 
+     <!-- Phosphor group -->
      <item row="16" column="0" colspan="4">
+      <widget class="QGroupBox" name="phosphorGroupBox">
+       <property name="title">
+        <string>Phosphor</string>
+       </property>
+       <layout class="QGridLayout" name="phosphorGridLayout">
+        <item row="0" column="0">
+         <widget class="QLabel" name="phosphorDetailLabel">
+          <property name="text">
+           <string>Waveform detail</string>
+          </property>
+          <property name="buddy">
+           <cstring>phosphorDetailComboBox</cstring>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="1">
+         <widget class="QComboBox" name="phosphorDetailComboBox">
+          <property name="toolTip">
+           <string>Lower detail uses less memory and only affects the density inside the shape, never its outline. A very long or high sample rate file is drawn at a lower detail automatically. A change applies from the next track load.</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </item>
+
+     <item row="17" column="0" colspan="4">
       <widget class="QGroupBox" name="overviewLinesGroup">
        <property name="title">
         <string>Overview lines</string>
@@ -696,7 +749,7 @@ Select from different types of displays for the waveform, which differ primarily
       </widget>
      </item>
      <!-- Hover readout group (overview beat distance label) -->
-     <item row="17" column="0" colspan="4">
+     <item row="18" column="0" colspan="4">
       <widget class="QGroupBox" name="hoverReadoutGroupBox">
        <property name="title">
         <string>Hover readout</string>
@@ -810,7 +863,7 @@ Select from different types of displays for the waveform, which differ primarily
       </widget>
      </item>
 
-     <item row="18" column="0" colspan="4">
+     <item row="19" column="0" colspan="4">
       <widget class="QGroupBox" name="openGLStatus">
        <property name="title">
         <string>OpenGL status</string>
@@ -898,6 +951,9 @@ Select from different types of displays for the waveform, which differ primarily
   <tabstop>playMarkerPositionSlider</tabstop>
   <tabstop>defaultZoomComboBox</tabstop>
   <tabstop>synchronizeZoomCheckBox</tabstop>
+  <tabstop>followsGainCheckBox</tabstop>
+  <tabstop>followsEqCheckBox</tabstop>
+  <tabstop>phosphorDetailComboBox</tabstop>
   <tabstop>normalizeOverviewCheckBox</tabstop>
   <tabstop>allVisualGain</tabstop>
   <tabstop>lowVisualGain</tabstop>

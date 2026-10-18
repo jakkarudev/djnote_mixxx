@@ -27,6 +27,7 @@
 #include "waveform/widgets/allshader/filteredwaveformwidget.h"
 #include "waveform/widgets/allshader/hsvwaveformwidget.h"
 #include "waveform/widgets/allshader/lrrgbwaveformwidget.h"
+#include "waveform/widgets/allshader/phosphorwaveformwidget.h"
 #include "waveform/widgets/allshader/rgbstackedwaveformwidget.h"
 #include "waveform/widgets/allshader/rgbwaveformwidget.h"
 #include "waveform/widgets/allshader/simplewaveformwidget.h"
@@ -134,6 +135,8 @@ WaveformWidgetFactory::WaveformWidgetFactory()
           m_endOfTrackWarningTime(30),
           m_defaultZoom(WaveformWidgetRenderer::s_waveformDefaultZoom),
           m_zoomSync(true),
+          m_followsGain(true),
+          m_followsEq(true),
           m_overviewNormalized(false),
           m_untilMarkShowBeats(false),
           m_untilMarkShowTime(false),
@@ -421,6 +424,10 @@ bool WaveformWidgetFactory::setConfig(UserSettingsPointer config) {
         }
     }
 
+    setFollowsGain(m_config->getValue(ConfigKey("[Waveform]", "FollowsGain"), true));
+    setFollowsEq(m_config->getValue(ConfigKey("[Waveform]", "FollowsEq"), true));
+    m_phosphorSettings = mixxx::phosphor::loadSettings(m_config);
+
     int overviewNormalized = m_config->getValueString(ConfigKey("[Waveform]","OverviewNormalized")).toInt(&ok);
     if (ok) {
         setOverviewNormalized(static_cast<bool>(overviewNormalized));
@@ -607,6 +614,8 @@ bool WaveformWidgetFactory::widgetTypeSupportsUntilMark() const {
         return true;
     case WaveformWidgetType::AllShaderRGBStackedWaveform:
         return true;
+    case WaveformWidgetType::AllShaderPhosphor:
+        return true;
     case WaveformWidgetType::AllShaderTexturedFiltered:
         return true;
     case WaveformWidgetType::AllShaderTexturedRGB:
@@ -733,6 +742,27 @@ void WaveformWidgetFactory::setVisualGain(FilterIndex index, double gain) {
 
 double WaveformWidgetFactory::getVisualGain(FilterIndex index) const {
     return m_visualGain[index];
+}
+
+void WaveformWidgetFactory::setFollowsGain(bool follows) {
+    m_followsGain = follows;
+    if (m_config) {
+        m_config->setValue(ConfigKey("[Waveform]", "FollowsGain"), follows);
+    }
+}
+
+void WaveformWidgetFactory::setFollowsEq(bool follows) {
+    m_followsEq = follows;
+    if (m_config) {
+        m_config->setValue(ConfigKey("[Waveform]", "FollowsEq"), follows);
+    }
+}
+
+void WaveformWidgetFactory::setPhosphorSettings(const mixxx::phosphor::PhosphorSettings& settings) {
+    m_phosphorSettings = mixxx::phosphor::clampSettings(settings);
+    if (m_config) {
+        mixxx::phosphor::saveSettings(m_config, m_phosphorSettings);
+    }
 }
 
 void WaveformWidgetFactory::setOverviewNormalized(bool normalize) {
@@ -1091,6 +1121,13 @@ void WaveformWidgetFactory::evaluateWidgets() {
             setWaveformVarsByType.operator()<allshader::HSVWaveformWidget>();
             break;
 #endif
+        case WaveformWidgetType::AllShaderPhosphor:
+#ifndef MIXXX_USE_QOPENGL
+            continue;
+#else
+            setWaveformVarsByType.operator()<allshader::PhosphorWaveformWidget>();
+            break;
+#endif
         case WaveformWidgetType::AllShaderTexturedFiltered:
 #ifndef MIXXX_USE_QOPENGL
             continue;
@@ -1210,6 +1247,9 @@ WaveformWidgetAbstract* WaveformWidgetFactory::createWaveformWidget(
             break;
         case WaveformWidgetType::AllShaderHSVWaveform:
             widget = new allshader::HSVWaveformWidget(viewer->getGroup(), viewer);
+            break;
+        case WaveformWidgetType::AllShaderPhosphor:
+            widget = new allshader::PhosphorWaveformWidget(viewer->getGroup(), viewer);
             break;
         case WaveformWidgetType::AllShaderTexturedFiltered:
             widget = new allshader::WaveformWidgetTexturedFiltered(viewer->getGroup(), viewer);

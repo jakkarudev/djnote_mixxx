@@ -10,6 +10,7 @@
 #include "util/assert.h"
 #include "util/logger.h"
 #include "util/time.h"
+#include "waveform/phosphor/phosphordata.h"
 
 namespace {
 
@@ -934,6 +935,32 @@ ConstWaveformPointer Track::getWaveformSummary() const {
 void Track::setWaveformSummary(ConstWaveformPointer pWaveform) {
     m_waveformSummary = pWaveform;
     emit waveformSummaryUpdated();
+}
+
+mixxx::phosphor::PhosphorDataPointer Track::getPhosphorData() const {
+    const auto locked = lockMutex(&m_phosphorMutex);
+    return m_pPhosphorData;
+}
+
+void Track::setPhosphorData(mixxx::phosphor::PhosphorDataPointer pData) {
+    {
+        const auto locked = lockMutex(&m_phosphorMutex);
+        m_pPhosphorData = std::move(pData);
+    }
+    emit phosphorDataUpdated();
+}
+
+bool Track::replacePhosphorData(const mixxx::phosphor::PhosphorDataPointer& expected,
+        mixxx::phosphor::PhosphorDataPointer pData) {
+    {
+        const auto locked = lockMutex(&m_phosphorMutex);
+        if (m_pPhosphorData != expected) {
+            return false;
+        }
+        m_pPhosphorData = std::move(pData);
+    }
+    emit phosphorDataUpdated();
+    return true;
 }
 
 void Track::setMainCuePosition(mixxx::audio::FramePos position) {

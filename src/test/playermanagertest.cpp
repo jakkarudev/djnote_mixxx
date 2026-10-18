@@ -15,11 +15,13 @@
 #include "mixer/deck.h"
 #include "mixer/playerinfo.h"
 #include "mixer/playermanager.h"
+#include "mixer/sampler.h"
 #include "sources/soundsourceproxy.h"
 #include "test/mixxxdbtest.h"
 #include "test/soundsourceproviderregistration.h"
 #include "track/track.h"
 #include "util/cmdlineargs.h"
+#include "waveform/phosphor/phosphordata.h"
 
 namespace {
 
@@ -241,4 +243,32 @@ TEST_F(PlayerManagerTest, UnReplaceTest) {
     // First track should be reloaded
     ASSERT_NE(nullptr, deck1->getLoadedTrack());
     ASSERT_EQ(testId1, deck1->getLoadedTrack()->getId());
+}
+
+// Only deck loads build the Phosphor waveform data (ticket #12): samplers
+// share the analysis scheduler but must not pay for it.
+TEST_F(PlayerManagerTest, OnlyDeckLoadsBuildPhosphorData) {
+    TrackPointer pDeckTrack = getOrAddTrackByLocation(getTestDir().filePath(kTrackLocationTest1));
+    TrackPointer pSamplerTrack =
+            getOrAddTrackByLocation(getTestDir().filePath(kTrackLocationTest2));
+    ASSERT_TRUE(pDeckTrack && pSamplerTrack);
+    ASSERT_TRUE(pDeckTrack->getId().isValid());
+    ASSERT_TRUE(pSamplerTrack->getId().isValid());
+
+    m_pPlayerManager->getSampler(0)->slotLoadTrack(pSamplerTrack, false);
+    m_pPlayerManager->getDeck(0)->slotLoadTrack(pDeckTrack, false);
+    m_pEngine->process(1024);
+
+    // The analyzer runs on a worker thread; its results arrive through the
+    // event loop.
+    for (int i = 0; i < 200; ++i) {
+        const auto pData = pDeckTrack->getPhosphorData();
+        if (pData && pData->isFinished()) {
+            break;
+        }
+        QTest::qWait(50);
+    }
+    ASSERT_TRUE(pDeckTrack->getPhosphorData());
+    EXPECT_TRUE(pDeckTrack->getPhosphorData()->isFinished());
+    EXPECT_FALSE(pSamplerTrack->getPhosphorData());
 }

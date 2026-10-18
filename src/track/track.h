@@ -5,6 +5,7 @@
 #include <QStack>
 #include <QUrl>
 #include <memory>
+#include <mutex>
 
 #include "audio/streaminfo.h"
 #include "sources/metadatasource.h"
@@ -18,6 +19,11 @@
 #include "util/fileaccess.h"
 #include "util/performancetimer.h"
 #include "waveform/waveform.h"
+
+namespace mixxx::phosphor {
+class PhosphorData;
+using PhosphorDataPointer = std::shared_ptr<const PhosphorData>;
+} // namespace mixxx::phosphor
 
 class Track : public QObject {
     Q_OBJECT
@@ -286,6 +292,16 @@ class Track : public QObject {
     ConstWaveformPointer getWaveformSummary() const;
     void setWaveformSummary(ConstWaveformPointer pWaveform);
 
+    /// The Phosphor waveform data (ADR-0002): built at deck load, never
+    /// stored, shared by every deck that has the track loaded. Null until the
+    /// analyzer started. Safe to call from any thread.
+    mixxx::phosphor::PhosphorDataPointer getPhosphorData() const;
+    void setPhosphorData(mixxx::phosphor::PhosphorDataPointer pData);
+    /// Sets the data only if the track still holds `expected` (null: none).
+    /// Returns false, and changes nothing, if another thread got there first.
+    bool replacePhosphorData(const mixxx::phosphor::PhosphorDataPointer& expected,
+            mixxx::phosphor::PhosphorDataPointer pData);
+
     /// Get the track's main cue point
     mixxx::audio::FramePos getMainCuePosition() const;
     // Set the track's main cue point
@@ -439,6 +455,10 @@ class Track : public QObject {
     void infoChanged();
 
     void waveformUpdated();
+
+    /// The Phosphor data object was set or replaced (progress while it is
+    /// filled is published through the data object itself).
+    void phosphorDataUpdated();
     void waveformSummaryUpdated();
     void coverArtUpdated();
     void beatsUpdated();
@@ -576,6 +596,9 @@ class Track : public QObject {
     // Visual waveform data
     ConstWaveformPointer m_waveform;
     ConstWaveformPointer m_waveformSummary;
+
+    mutable QMutex m_phosphorMutex;
+    mixxx::phosphor::PhosphorDataPointer m_pPhosphorData;
 
     mixxx::BeatsImporterPointer m_pBeatsImporterPending;
     std::unique_ptr<mixxx::CueInfoImporter> m_pCueInfoImporterPending;

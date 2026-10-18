@@ -1,6 +1,14 @@
 #include "preferences/dialog/dlgprefwaveform.h"
 
+#include <QCheckBox>
+#include <QComboBox>
+#include <QDoubleSpinBox>
+#include <QGridLayout>
+#include <QHBoxLayout>
+#include <QLabel>
 #include <QMetaEnum>
+#include <QPushButton>
+#include <QSignalBlocker>
 
 #include "control/controlpushbutton.h"
 #include "library/dao/analysisdao.h"
@@ -9,6 +17,7 @@
 #include "preferences/waveformsettings.h"
 #include "util/db/dbconnectionpooled.h"
 #include "waveform/overviewlinelayout.h"
+#include "waveform/phosphor/phosphorsettings.h"
 #include "waveform/renderers/waveformwidgetrenderer.h"
 #include "waveform/waveformwidgetfactory.h"
 #include "widget/woverview.h"
@@ -125,6 +134,17 @@ DlgPrefWaveform::DlgPrefWaveform(
                 QVariant(static_cast<int>(HoverOverCue::MoveHoverReadout)));
     }
 
+    // slotUpdate() shows the Phosphor settings, so its controls must exist.
+    phosphorDetailComboBox->addItem(
+            tr("Full"), static_cast<int>(mixxx::phosphor::WaveformDetail::Full));
+    phosphorDetailComboBox->addItem(
+            tr("High"), static_cast<int>(mixxx::phosphor::WaveformDetail::High));
+    phosphorDetailComboBox->addItem(
+            tr("Medium"), static_cast<int>(mixxx::phosphor::WaveformDetail::Medium));
+    phosphorDetailComboBox->addItem(
+            tr("Low"), static_cast<int>(mixxx::phosphor::WaveformDetail::Low));
+    buildPhosphorAdvanced();
+
     // The GUI is not fully setup so connecting signals before calling
     // slotUpdate can generate rebootMixxxView calls.
     // TODO(XXX): Improve this awkwardness.
@@ -195,6 +215,20 @@ DlgPrefWaveform::DlgPrefWaveform(
             QOverload<double>::of(&QDoubleSpinBox::valueChanged),
             this,
             &DlgPrefWaveform::slotSetVisualGainHigh);
+    connect(followsGainCheckBox,
+            &QCheckBox::toggled,
+            this,
+            &DlgPrefWaveform::slotSetFollowsGain);
+    connect(followsEqCheckBox,
+            &QCheckBox::toggled,
+            this,
+            &DlgPrefWaveform::slotSetFollowsEq);
+    // Phosphor: the detail applies from the next track load. (Its items and
+    // the advanced controls are created before slotUpdate().)
+    connect(phosphorDetailComboBox,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            &DlgPrefWaveform::slotSetPhosphorDetail);
     connect(normalizeOverviewCheckBox,
             &QCheckBox::toggled,
             this,
@@ -321,6 +355,9 @@ void DlgPrefWaveform::slotUpdate() {
     lowVisualGain->setValue(factory->getVisualGain(WaveformWidgetFactory::Low));
     midVisualGain->setValue(factory->getVisualGain(WaveformWidgetFactory::Mid));
     highVisualGain->setValue(factory->getVisualGain(WaveformWidgetFactory::High));
+    followsGainCheckBox->setChecked(factory->followsGain());
+    followsEqCheckBox->setChecked(factory->followsEq());
+    showPhosphorSettings(factory->phosphorSettings());
     normalizeOverviewCheckBox->setChecked(factory->isOverviewNormalized());
     overviewLinesComboBox->setCurrentIndex(overviewLinesComboBox->findData(
             static_cast<int>(factory->getOverviewLineSettings().mode)));
@@ -393,6 +430,14 @@ void DlgPrefWaveform::slotResetToDefaults() {
     // RGB overview.
     waveformOverviewComboBox->setCurrentIndex(
             waveformOverviewComboBox->findData(QVariant::fromValue(WOverview::Type::RGB)));
+
+    // Waveforms follow the deck's gain and EQ.
+    followsGainCheckBox->setChecked(true);
+    followsEqCheckBox->setChecked(true);
+
+    // Phosphor: the defaults of PhosphorSettings.
+    WaveformWidgetFactory::instance()->setPhosphorSettings(mixxx::phosphor::PhosphorSettings());
+    showPhosphorSettings(mixxx::phosphor::PhosphorSettings());
 
     // Don't normalize overview.
     normalizeOverviewCheckBox->setChecked(false);
@@ -523,6 +568,251 @@ void DlgPrefWaveform::slotSetVisualGainHigh(double gain) {
     WaveformWidgetFactory::instance()->setVisualGain(WaveformWidgetFactory::High,gain);
 }
 
+void DlgPrefWaveform::slotSetFollowsGain(bool follows) {
+    WaveformWidgetFactory::instance()->setFollowsGain(follows);
+}
+
+void DlgPrefWaveform::slotSetFollowsEq(bool follows) {
+    WaveformWidgetFactory::instance()->setFollowsEq(follows);
+}
+
+namespace {
+
+QDoubleSpinBox* makeSpinBox(double min, double max, double step, int decimals, const QString& suffix) {
+    auto* pBox = new QDoubleSpinBox();
+    pBox->setRange(min, max);
+    pBox->setSingleStep(step);
+    pBox->setDecimals(decimals);
+    pBox->setSuffix(suffix);
+    return pBox;
+}
+
+} // namespace
+
+void DlgPrefWaveform::buildPhosphorAdvanced() {
+    using namespace mixxx::phosphor;
+    const QString kNextLoad = tr("Applies from the next track you load.");
+    const QString kAfterRedraw = tr(
+            "Applies after the waveform has been recalculated, a moment after you change it.");
+
+    m_pPhosphorAdvancedCheckBox = new QCheckBox(tr("Show advanced settings"));
+    m_pPhosphorAdvancedCheckBox->setToolTip(
+            tr("Show every calibrated value of the Phosphor waveform. The defaults are "
+               "tuned to look like the reference waveform, so you rarely need to change them."));
+    phosphorGridLayout->addWidget(m_pPhosphorAdvancedCheckBox, 1, 0, 1, 2);
+
+    m_pPhosphorAdvancedWidget = new QWidget();
+    auto* pGrid = new QGridLayout(m_pPhosphorAdvancedWidget);
+    pGrid->setContentsMargins(0, 0, 0, 0);
+    pGrid->setColumnStretch(1, 1);
+    phosphorGridLayout->addWidget(m_pPhosphorAdvancedWidget, 2, 0, 1, 2);
+    m_pPhosphorAdvancedWidget->setVisible(false);
+    connect(m_pPhosphorAdvancedCheckBox,
+            &QCheckBox::toggled,
+            m_pPhosphorAdvancedWidget,
+            &QWidget::setVisible);
+
+    int row = 0;
+    // One setting: a name with its control(s), and the explanation below,
+    // which is also the tooltip of everything on the row.
+    const auto addSetting = [&](const QString& name,
+                                    const QList<QWidget*>& controls,
+                                    const QString& explanation) {
+        auto* pLabel = new QLabel(name);
+        auto* pControls = new QHBoxLayout();
+        pControls->setContentsMargins(0, 0, 0, 0);
+        for (QWidget* pControl : controls) {
+            pControl->setToolTip(explanation);
+            pControls->addWidget(pControl);
+        }
+        pControls->addStretch(1);
+        pLabel->setToolTip(explanation);
+        pGrid->addWidget(pLabel, row, 0);
+        pGrid->addLayout(pControls, row, 1);
+        auto* pExplanation = new QLabel(explanation);
+        pExplanation->setWordWrap(true);
+        pExplanation->setToolTip(explanation);
+        QFont font = pExplanation->font();
+        font.setItalic(true);
+        pExplanation->setFont(font);
+        pGrid->addWidget(pExplanation, row + 1, 0, 1, 2);
+        row += 2;
+    };
+    const auto changed = [this](QDoubleSpinBox* pBox) {
+        connect(pBox,
+                QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+                this,
+                &DlgPrefWaveform::slotPhosphorAdvancedChanged);
+        return pBox;
+    };
+    // A small name in front of a box, for rows with three boxes.
+    const auto labelled = [](const QString& text, QDoubleSpinBox* pBox) {
+        auto* pWidget = new QWidget();
+        auto* pLayout = new QHBoxLayout(pWidget);
+        pLayout->setContentsMargins(0, 0, 0, 0);
+        pLayout->addWidget(new QLabel(text));
+        pLayout->addWidget(pBox);
+        return pWidget;
+    };
+
+    m_pPhosphorSaturation = changed(makeSpinBox(kMinSaturation, kMaxSaturation, 0.1, 1, QString()));
+    addSetting(tr("Saturation"),
+            {m_pPhosphorSaturation},
+            tr("How vivid the colors are. Higher values make mixed sounds look more like "
+               "their dominant band."));
+
+    const QString gainText = tr(
+            "How strong each color is: red is the bass, green the mids, blue the highs. "
+            "Turn one up to make that part of the music stand out, or down to calm it.");
+    const QString gainNames[3] = {tr("Red"), tr("Green"), tr("Blue")};
+    QList<QWidget*> gainWidgets;
+    for (int c = 0; c < 3; ++c) {
+        m_pPhosphorGain[c] = changed(makeSpinBox(0.0, kMaxChannelGain, 0.05, 2, QString()));
+        m_pPhosphorGain[c]->setToolTip(gainText);
+        gainWidgets.append(labelled(gainNames[c], m_pPhosphorGain[c]));
+    }
+    addSetting(tr("Color strength"), gainWidgets, gainText);
+
+    m_pPhosphorBrightnessExponent = changed(makeSpinBox(
+            kMinBrightnessExponent, kMaxBrightnessExponent, 0.01, 2, QString()));
+    addSetting(tr("Brightness curve"),
+            {m_pPhosphorBrightnessExponent},
+            tr("How bright quiet sounds look next to loud ones. Lower values make quiet "
+               "sounds look brighter; higher values keep only the loudest parts bright."));
+
+    m_pPhosphorDensityBrightness = changed(makeSpinBox(
+            kMinDensityBrightness, kMaxDensityBrightness, 0.05, 2, QString()));
+    addSetting(tr("Overall brightness"),
+            {m_pPhosphorDensityBrightness},
+            tr("How bright the whole waveform is. Raise it for a bolder, brighter waveform; "
+               "lower it for a subtler one."));
+
+    m_pPhosphorBlend = new QComboBox();
+    m_pPhosphorBlend->addItem(tr("Add"), static_cast<int>(LightBlend::Add));
+    m_pPhosphorBlend->addItem(tr("Opaque"), static_cast<int>(LightBlend::Opaque));
+    connect(m_pPhosphorBlend,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            &DlgPrefWaveform::slotPhosphorAdvancedChanged);
+    addSetting(tr("Light blend"),
+            {m_pPhosphorBlend},
+            tr("Add puts the waveform on top of what is behind it as light (beat grid, "
+               "background). Opaque paints the waveform over the background instead."));
+
+    m_pPhosphorShapeWindow = changed(makeSpinBox(
+            kMinShapeWindow, kMaxShapeWindow, 0.5, 1, tr(" columns")));
+    addSetting(tr("Outline smoothing"),
+            {m_pPhosphorShapeWindow},
+            tr("How many screen columns the outline of the waveform looks across. Higher values "
+               "smooth out small spikes but blur fine detail. ") +
+                    kAfterRedraw);
+
+    m_pPhosphorMixExponent = changed(makeSpinBox(
+            kMinMixExponent, kMaxMixExponent, 0.01, 2, QString()));
+    addSetting(tr("Color mix"),
+            {m_pPhosphorMixExponent},
+            tr("How much quiet sounds color the waveform compared to loud ones. Lower values let "
+               "quiet sounds tint the color as much as loud ones; higher values let the loudest "
+               "band take over. ") +
+                    kNextLoad);
+
+    m_pPhosphorAttack = changed(makeSpinBox(0.0, kMaxAttackMs, 1.0, 0, tr(" ms")));
+    addSetting(tr("Color attack"),
+            {m_pPhosphorAttack},
+            tr("How quickly a color appears when a sound starts. 0 shows it instantly; higher "
+               "values fade it in. ") +
+                    kNextLoad);
+
+    const QString releaseText = tr(
+            "How long each color lingers after its sound has ended. Longer values give "
+            "smoother colors, shorter values give sharper changes. ") +
+            kNextLoad;
+    const QString releaseNames[3] = {tr("Low"), tr("Mid"), tr("High")};
+    QList<QWidget*> releaseWidgets;
+    for (int c = 0; c < 3; ++c) {
+        m_pPhosphorRelease[c] = changed(makeSpinBox(0.0, kMaxReleaseMs, 10.0, 0, tr(" ms")));
+        m_pPhosphorRelease[c]->setToolTip(releaseText);
+        releaseWidgets.append(labelled(releaseNames[c], m_pPhosphorRelease[c]));
+    }
+    addSetting(tr("Color release"), releaseWidgets, releaseText);
+
+    m_pPhosphorLookAhead = changed(makeSpinBox(0.0, kMaxLookAheadMs, 10.0, 0, tr(" ms")));
+    addSetting(tr("Red look-ahead"),
+            {m_pPhosphorLookAhead},
+            tr("How early the red (bass) color starts to show before a kick or bass note, so "
+               "you can see it coming. 0 turns it off. ") +
+                    kNextLoad);
+
+    m_pPhosphorResetButton = new QPushButton(tr("Reset to calibrated defaults"));
+    m_pPhosphorResetButton->setToolTip(
+            tr("Put every advanced Phosphor setting back to its calibrated value."));
+    connect(m_pPhosphorResetButton,
+            &QPushButton::clicked,
+            this,
+            &DlgPrefWaveform::slotResetPhosphorAdvanced);
+    pGrid->addWidget(m_pPhosphorResetButton, row, 0, 1, 2, Qt::AlignLeft);
+}
+
+void DlgPrefWaveform::showPhosphorSettings(const mixxx::phosphor::PhosphorSettings& settings) {
+    phosphorDetailComboBox->setCurrentIndex(
+            phosphorDetailComboBox->findData(static_cast<int>(settings.detail)));
+    // Showing a value must not save it (or apply it) again.
+    const auto set = [](QDoubleSpinBox* pBox, double value) {
+        const QSignalBlocker blocker(pBox);
+        pBox->setValue(value);
+    };
+    set(m_pPhosphorSaturation, settings.saturation);
+    for (int c = 0; c < 3; ++c) {
+        set(m_pPhosphorGain[c], settings.channelGains[c]);
+        set(m_pPhosphorRelease[c], settings.color.releaseMs[c]);
+    }
+    set(m_pPhosphorBrightnessExponent, settings.brightnessExponent);
+    set(m_pPhosphorDensityBrightness, settings.densityBrightness);
+    {
+        const QSignalBlocker blocker(m_pPhosphorBlend);
+        m_pPhosphorBlend->setCurrentIndex(
+                m_pPhosphorBlend->findData(static_cast<int>(settings.blend)));
+    }
+    set(m_pPhosphorShapeWindow, settings.shapeWindow);
+    set(m_pPhosphorMixExponent, settings.color.mixExponent);
+    set(m_pPhosphorAttack, settings.color.attackMs);
+    set(m_pPhosphorLookAhead, settings.color.lookAheadMs);
+}
+
+void DlgPrefWaveform::slotSetPhosphorDetail(int index) {
+    auto* pFactory = WaveformWidgetFactory::instance();
+    mixxx::phosphor::PhosphorSettings settings = pFactory->phosphorSettings();
+    settings.detail = mixxx::phosphor::detailFromInt(phosphorDetailComboBox->itemData(index).toInt());
+    pFactory->setPhosphorSettings(settings);
+}
+
+void DlgPrefWaveform::slotPhosphorAdvancedChanged() {
+    auto* pFactory = WaveformWidgetFactory::instance();
+    mixxx::phosphor::PhosphorSettings settings = pFactory->phosphorSettings();
+    settings.saturation = m_pPhosphorSaturation->value();
+    for (int c = 0; c < 3; ++c) {
+        settings.channelGains[c] = m_pPhosphorGain[c]->value();
+        settings.color.releaseMs[c] = m_pPhosphorRelease[c]->value();
+    }
+    settings.brightnessExponent = m_pPhosphorBrightnessExponent->value();
+    settings.densityBrightness = m_pPhosphorDensityBrightness->value();
+    settings.blend = mixxx::phosphor::blendFromInt(m_pPhosphorBlend->currentData().toInt());
+    settings.shapeWindow = m_pPhosphorShapeWindow->value();
+    settings.color.mixExponent = m_pPhosphorMixExponent->value();
+    settings.color.attackMs = m_pPhosphorAttack->value();
+    settings.color.lookAheadMs = m_pPhosphorLookAhead->value();
+    pFactory->setPhosphorSettings(settings);
+}
+
+void DlgPrefWaveform::slotResetPhosphorAdvanced() {
+    auto* pFactory = WaveformWidgetFactory::instance();
+    // The waveform detail is not an advanced setting: it stays.
+    mixxx::phosphor::PhosphorSettings settings;
+    settings.detail = pFactory->phosphorSettings().detail;
+    pFactory->setPhosphorSettings(settings);
+    showPhosphorSettings(settings);
+}
+
 void DlgPrefWaveform::slotSetNormalizeOverview(bool normalize) {
     WaveformWidgetFactory::instance()->setOverviewNormalized(normalize);
 }
@@ -592,6 +882,9 @@ void DlgPrefWaveform::slotSetUntilMarkTextHeightLimit(int index) {
 }
 
 void DlgPrefWaveform::calculateCachedWaveformDiskUsage() {
+    if (!m_pLibrary) {
+        return; // no database (dialog built without a library, in tests)
+    }
     AnalysisDao analysisDao(m_pConfig);
     QSqlDatabase dbConnection = mixxx::DbConnectionPooled(m_pLibrary->dbConnectionPool());
     size_t numBytes = analysisDao.getDiskUsageInBytes(dbConnection, AnalysisDao::TYPE_WAVEFORM) +

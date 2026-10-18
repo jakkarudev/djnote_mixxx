@@ -732,6 +732,7 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/analyzer/analyzersilence.cpp
   src/analyzer/analyzerthread.cpp
   src/analyzer/analyzertrack.cpp
+  src/analyzer/analyzerphosphor.cpp
   src/analyzer/analyzerwaveform.cpp
   src/analyzer/plugins/analyzerqueenmarybeats.cpp
   src/analyzer/plugins/analyzerqueenmarykey.cpp
@@ -1276,6 +1277,13 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/waveform/overviewlayout.cpp
   src/waveform/overviewlinelayout.cpp
   src/waveform/overviewsettings.cpp
+  src/waveform/phosphor/phosphorcolortrack.cpp
+  src/waveform/phosphor/phosphordata.cpp
+  src/waveform/phosphor/phosphorheight.cpp
+  src/waveform/phosphor/phosphorlanecache.cpp
+  src/waveform/phosphor/phosphorlanemodel.cpp
+  src/waveform/phosphor/phosphorsettings.cpp
+  src/waveform/waveformgains.cpp
   src/waveform/waveformmarklabel.cpp
   src/waveform/waveformwidgetfactory.cpp
   src/waveform/widgets/emptywaveformwidget.cpp
@@ -1545,6 +1553,7 @@ if(QOPENGL)
     src/shaders/slipmodeshader.cpp
     src/shaders/patternshader.cpp
     src/shaders/rgbashader.cpp
+    src/shaders/phosphorshader.cpp
     src/shaders/rgbshader.cpp
     src/shaders/shader.cpp
     src/shaders/textureshader.cpp
@@ -1561,6 +1570,7 @@ if(QOPENGL)
     src/waveform/renderers/allshader/waveformrendererfiltered.cpp
     src/waveform/renderers/allshader/waveformrendererhsv.cpp
     src/waveform/renderers/allshader/waveformrendererlrrgb.cpp
+    src/waveform/renderers/allshader/waveformrendererphosphor.cpp
     src/waveform/renderers/allshader/waveformrendererpreroll.cpp
     src/waveform/renderers/allshader/waveformrendererrgb.cpp
     src/waveform/renderers/allshader/waveformrenderertextured.cpp
@@ -1571,6 +1581,7 @@ if(QOPENGL)
     src/waveform/widgets/allshader/filteredwaveformwidget.cpp
     src/waveform/widgets/allshader/hsvwaveformwidget.cpp
     src/waveform/widgets/allshader/lrrgbwaveformwidget.cpp
+    src/waveform/widgets/allshader/phosphorwaveformwidget.cpp
     src/waveform/widgets/allshader/rgbwaveformwidget.cpp
     src/waveform/widgets/allshader/rgbstackedwaveformwidget.cpp
     src/waveform/widgets/allshader/simplewaveformwidget.cpp
@@ -2127,6 +2138,7 @@ endif()
 if(BUILD_TESTING)
   set(
     src-mixxx-test
+    src/test/analyzerphosphortest.cpp
     src/test/analyserwaveformtest.cpp
     src/test/analyzersilence_test.cpp
     src/test/audiotaperpot_test.cpp
@@ -2167,7 +2179,13 @@ if(BUILD_TESTING)
     src/test/durationutiltest.cpp
     src/test/overviewlayouttest.cpp
     src/test/overviewlinelayouttest.cpp
-    src/test/overviewsettingstest.cpp
+    src/test/dlgprefwaveformtest.cpp
+  src/test/overviewsettingstest.cpp
+    src/test/phosphorheighttest.cpp
+    src/test/phosphorlanemodeltest.cpp
+    src/test/phosphorsettingstest.cpp
+    src/test/phosphorslipoverlaytest.cpp
+    src/test/waveformgainstest.cpp
     #TODO: write useful tests for refactored effects system
     #src/test/effectchainslottest.cpp
     src/test/enginebufferscalelineartest.cpp
@@ -2258,6 +2276,8 @@ if(BUILD_TESTING)
 
   target_precompile_headers(mixxx-test REUSE_FROM mixxx-lib)
   set_target_properties(mixxx-test PROPERTIES AUTOMOC ON)
+  # The preferences dialogs' generated ui_*.h headers (dlgprefwaveformtest.cpp).
+  target_include_directories(mixxx-test PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/mixxx-lib_autogen/include")
   target_link_libraries(mixxx-test PRIVATE mixxx-lib mixxx-gitinfostore GTest::gtest GTest::gmock)
 
   if(BUILD_BENCH)

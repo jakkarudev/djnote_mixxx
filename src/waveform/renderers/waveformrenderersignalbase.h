@@ -2,6 +2,7 @@
 
 #include "skin/legacy/skincontext.h"
 #include "util/span.h"
+#include "waveform/waveformgains.h"
 #include "waveformrendererabstract.h"
 
 class ControlProxy;
@@ -20,6 +21,8 @@ public:
 
   protected:
     void deleteControls();
+
+    mixxx::waveformgains::Inputs gainInputs(bool applyCompensation);
 
     void getGains(float* pAllGain,
             bool applyCompensation,

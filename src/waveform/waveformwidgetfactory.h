@@ -10,6 +10,7 @@
 #include "util/performancetimer.h"
 #include "util/singleton.h"
 #include "waveform/overviewsettings.h"
+#include "waveform/phosphor/phosphorsettings.h"
 #include "waveform/widgets/waveformwidgettype.h"
 
 class WVuMeterLegacy;
@@ -146,6 +147,23 @@ class WaveformWidgetFactory : public QObject, public Singleton<WaveformWidgetFac
     void setVisualGain(FilterIndex index, double gain);
     double getVisualGain(FilterIndex index) const;
 
+    // Whether the scrolling waveforms follow the deck's gain / EQ.
+    void setFollowsGain(bool follows);
+    bool followsGain() const {
+        return m_followsGain;
+    }
+    void setFollowsEq(bool follows);
+    bool followsEq() const {
+        return m_followsEq;
+    }
+    /// The Phosphor settings the renderers use now: loaded from the config at
+    /// start, replaced (and saved) by the preferences. Live values reach all
+    /// decks on their next frame.
+    const mixxx::phosphor::PhosphorSettings& phosphorSettings() const {
+        return m_phosphorSettings;
+    }
+    void setPhosphorSettings(const mixxx::phosphor::PhosphorSettings& settings);
+
     void setOverviewNormalized(bool normalize);
     int isOverviewNormalized() const { return m_overviewNormalized;}
 
@@ -244,6 +262,9 @@ class WaveformWidgetFactory : public QObject, public Singleton<WaveformWidgetFac
     double m_defaultZoom;
     bool m_zoomSync;
     double m_visualGain[FilterCount];
+    bool m_followsGain;
+    bool m_followsEq;
+    mixxx::phosphor::PhosphorSettings m_phosphorSettings;
     bool m_overviewNormalized;
     mixxx::overviewlayout::LineSettings m_overviewLineSettings;
     void saveOverviewLineSettings();
