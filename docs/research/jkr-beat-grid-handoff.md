@@ -1,21 +1,12 @@
-# Handoff: jkr beat detection (continue fixing grid placement)
+# Handoff: jkr beat detection
 
 You are continuing work on **jkr**, DJNote's beat detection, in this Mixxx fork (`D:\Coding Projects\DJNote_Mixxx`, Windows, PowerShell plus Git Bash). Read `CLAUDE.md`, `GLOSSARY.md` (terms: jkr, Beat grid, Downbeat, Bar) and `docs/adr/0004-beat-grid-refined-on-the-kick.md` first.
 
-## The user's report (start here)
+## The user's report (start here)## Status
 
-The user tried jkr in the app: "it mostly works pretty good, but the grid is kinda not exactly where it's supposed to be". It needs "a little fix". **Before changing code, ask the user for specifics:**
-- Is the grid early or late, and by roughly how much (a few ms, or a 16th or half a beat)?
-- Is it every track or some? Which tracks, and what genre or format (FLAC, WAV, MP3)?
-- Is it constant along the track, or does it drift toward the end (a BPM problem)?
-- Is it the beat lines, or the bar/phrase lines (a downbeat problem)?
-- Which view (scrolling waveform or overview, Phosphor or another waveform type)? What is it compared against: the visible kick transient, or Traktor?
+The user tested jkr in the app and first thought the grid was slightly off. They then checked the same tracks in Traktor, and Traktor places the grid the same way, so **this is not a bug**. It matches the benchmark: on lossless files jkr is within ±1 ms of Traktor. There is no known grid-placement problem to fix. Open items are only the known misses below, untested modes (fast analysis; fixed tempo off, which should equal Mixxx QM) and merging `feature/beat-accuracy` into `djnote`.
 
-Then reproduce it on those tracks with the benchmark below, and check whether it is analysis or display. The benchmark said jkr matches Traktor within ±1 ms on lossless files. A consistent visual offset could come from how the waveform or beat lines are drawn, not from the grid. It could also be the user's expectation differing from Traktor's convention, or the MP3/AAC decoder delay.
-
-## State of the code
-
-Branch `feature/beat-accuracy` (off `djnote`), **all uncommitted** (check `git status`):
+ture/beat-accuracy` (off `djnote`), **all uncommitted** (check `git status`):
 - `src/analyzer/beatgridrefiner.{h,cpp}`: `mixxx::BeatGridRefiner`, the jkr grid placement.
 - `src/analyzer/plugins/analyzerjkrbeats.h`: the jkr detector ids `jkr-qm-tempotracker` and `jkr-soundtouch`, plus `isJkr()` and `tempoPluginId()`.
 - `src/analyzer/analyzerbeats.{h,cpp}`: `availablePlugins()` lists jkr QM (the default), jkr SoundTouch, then Mixxx QM and SoundTouch (unchanged). `usesGridRefiner()` means a jkr detector, plus the fixed tempo assumption or jkr SoundTouch. The refiner is fed in `processSamples`. In `storeResults` the Mixxx grid's BPM (`getLastMarkerBpm`) goes to `refine()`, which builds `Beats::fromConstTempo(firstBeat.toNearestFrameBoundary(), bpm, subVersion)`. jkr sub-versions carry `grid_refiner=1`: **bump it whenever placement changes**, so "re-analyze when settings change" picks it up.
