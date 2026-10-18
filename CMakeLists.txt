@@ -1277,6 +1277,7 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/waveform/overviewlayout.cpp
   src/waveform/overviewlinelayout.cpp
   src/waveform/overviewsettings.cpp
+  src/waveform/phosphor/phosphorcolourtrack.cpp
   src/waveform/phosphor/phosphordata.cpp
   src/waveform/phosphor/phosphorlanecache.cpp
   src/waveform/phosphor/phosphorlanemodel.cpp

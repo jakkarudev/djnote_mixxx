@@ -42,6 +42,7 @@ bool AnalyzerPhosphor::initialize(const AnalyzerTrack& track,
     m_pTrack = track.getTrack();
     m_pData = std::make_shared<mixxx::phosphor::PhosphorData>(sampleRate.value(), frameLength);
     m_stored = false;
+    m_pColour = std::make_unique<mixxx::phosphor::ColourTrackBuilder>(sampleRate.value());
     // From now on other threads can touch it.
     m_pTrack->setPhosphorData(m_pData);
     return true;
@@ -55,12 +56,19 @@ bool AnalyzerPhosphor::processSamples(const CSAMPLE* pIn, SINT count) {
         m_mono[static_cast<size_t>(i)] = monoSample(pIn[2 * i], pIn[2 * i + 1]);
     }
     m_pData->append(m_mono.data(), frames);
+    // The colour track trails the samples (filter delay, look-ahead).
+    m_colourOut.clear();
+    m_pColour->append(m_mono.data(), frames, &m_colourOut);
+    m_pData->appendColour(m_colourOut.data(), static_cast<SINT>(m_colourOut.size() / 3));
     return true;
 }
 
 void AnalyzerPhosphor::storeResults(TrackPointer pTrack) {
     Q_UNUSED(pTrack);
     if (m_pData) {
+        m_colourOut.clear();
+        m_pColour->finish(&m_colourOut);
+        m_pData->appendColour(m_colourOut.data(), static_cast<SINT>(m_colourOut.size() / 3));
         m_pData->finish();
         m_stored = true;
     }
@@ -75,5 +83,7 @@ void AnalyzerPhosphor::cleanup() {
     m_pTrack.reset();
     m_pData.reset();
     m_mono.clear();
+    m_pColour.reset();
+    m_colourOut.clear();
     m_stored = false;
 }
