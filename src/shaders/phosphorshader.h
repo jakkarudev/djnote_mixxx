@@ -7,7 +7,7 @@ class PhosphorShader;
 }
 
 /// Draws the Phosphor lane from the ring texture of density columns (see
-/// phosphortexelcodec.h): flat colour x brightness x density, added to what
+/// phosphortexelcodec.h): band levels -> colour (saturation, brightness curve, channel gains) x density, added to what
 /// is behind; digital silence is a black row.
 class mixxx::PhosphorShader final : public mixxx::Shader {
   public:
@@ -32,9 +32,13 @@ class mixxx::PhosphorShader final : public mixxx::Shader {
     int ringOffsetLocation() const {
         return m_ringOffsetLocation;
     }
-    /// vec3: colour x brightness
-    int colorLocation() const {
-        return m_colorLocation;
+    /// sampler2D: the band levels of the column slots
+    int colourTextureLocation() const {
+        return m_colourTextureLocation;
+    }
+    /// vec3: the Low, Mid, High visual gains (applied to the band levels)
+    int visualGainsLocation() const {
+        return m_visualGainsLocation;
     }
 
   private:
@@ -43,7 +47,8 @@ class mixxx::PhosphorShader final : public mixxx::Shader {
     int m_textureLocation;
     int m_mapSizeLocation;
     int m_ringOffsetLocation;
-    int m_colorLocation;
+    int m_colourTextureLocation;
+    int m_visualGainsLocation;
 
     DISALLOW_COPY_AND_ASSIGN(PhosphorShader)
 };

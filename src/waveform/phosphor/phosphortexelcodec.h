@@ -41,6 +41,34 @@ inline void encodeColumn(const LaneColumn* pColumn, int height, uint8_t* pOut) {
     }
 }
 
+/// The band levels of the columns live in a second, small RGBA8 texture with
+/// one texel per column slot in two rows: row 0 holds the high bytes of the
+/// R, G, B levels (16-bit fixed point, 0..1), row 1 the low bytes (A = 255).
+/// An outside column is all zero.
+constexpr int kColourRows = 2;
+
+inline void encodeColumnLevels(const LaneColumn* pColumn, uint8_t* pHigh, uint8_t* pLow) {
+    for (int c = 0; c < 4; ++c) {
+        pHigh[c] = 0;
+        pLow[c] = 0;
+    }
+    if (!pColumn || pColumn->status == ColumnStatus::Outside) {
+        return;
+    }
+    for (int c = 0; c < 3; ++c) {
+        const unsigned v = static_cast<unsigned>(std::clamp(pColumn->levels[c], 0.0f, 1.0f) * 65535.0f + 0.5f);
+        pHigh[c] = static_cast<uint8_t>(v >> 8);
+        pLow[c] = static_cast<uint8_t>(v & 0xFF);
+    }
+    pHigh[3] = 255;
+    pLow[3] = 255;
+}
+
+/// The level a pair of bytes stands for.
+inline float decodeLevel(uint8_t high, uint8_t low) {
+    return (high * 256u + low) / 65535.0f;
+}
+
 /// The density a texel stands for (what the shader computes).
 inline float decodeDensity(const uint8_t* pTexel) {
     return ((pTexel[0] * 256u + pTexel[2]) / 65535.0f) * kTexelDensityMax;
