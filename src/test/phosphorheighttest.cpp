@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <numeric>
+#include <vector>
+
 #include "waveform/phosphor/phosphorheight.h"
 
 namespace {
@@ -85,24 +89,91 @@ TEST(PhosphorHeightTest, ColumnHeightFactorCombinesGainAndEq) {
     EXPECT_NEAR(1.44222f, columnHeightFactor(kLevels, g), 1e-4);
 }
 
-TEST(PhosphorHeightTest, StretchResamplesAtYOverGAboutTheCenter) {
-    // A lane of 100 rows, center at 50.0. Pixel row 70 (center 70.5) at g = 2
-    // reads the source at 50 + 20.5 / 2 = 60.25, i.e. row 60.
-    EXPECT_EQ(60, stretchSourceRow(70, 100, 2.0f));
-    EXPECT_EQ(70, stretchSourceRow(70, 100, 1.0f));
-    // g < 1 pulls from further out: 50 + 10.5 / 0.5 = 71.
-    EXPECT_EQ(71, stretchSourceRow(60, 100, 0.5f));
+namespace {
+
+std::vector<float> stretchColumn(const std::vector<float>& src, float g) {
+    const int h = static_cast<int>(src.size());
+    std::vector<float> out(h);
+    for (int y = 0; y < h; ++y) {
+        out[y] = stretchedRowDensity(src.data(), h, y, g);
+    }
+    return out;
+}
+
+float sum(const std::vector<float>& v) {
+    return std::accumulate(v.begin(), v.end(), 0.0f);
+}
+
+// A hollow box: bright 1-row edges at 40 and 59, a dim inside.
+std::vector<float> hollowBox() {
+    std::vector<float> src(100, 0.0f);
+    for (int y = 40; y <= 59; ++y) {
+        src[y] = 0.1f;
+    }
+    src[40] = 5.0f;
+    src[59] = 5.0f;
+    return src;
+}
+
+} // namespace
+
+TEST(PhosphorHeightTest, StretchByOneIsTheIdentity) {
+    const std::vector<float> src = hollowBox();
+    EXPECT_EQ(src, stretchColumn(src, 1.0f));
+}
+
+TEST(PhosphorHeightTest, StretchUpMatchesTheSourceAtYOverGDividedByG) {
+    // g = 2: pixel row 70 (center 70.5) covers the source [60, 60.5], inside
+    // row 60.
+    std::vector<float> src(100, 0.0f);
+    src[60] = 3.0f;
+    src[61] = 7.0f;
+    EXPECT_FLOAT_EQ(1.5f, stretchedRowDensity(src.data(), 100, 70, 2.0f));
+    EXPECT_FLOAT_EQ(1.5f, stretchedRowDensity(src.data(), 100, 71, 2.0f));
+    EXPECT_FLOAT_EQ(3.5f, stretchedRowDensity(src.data(), 100, 72, 2.0f));
+}
+
+TEST(PhosphorHeightTest, ShrinkKeepsAOneRowEdgeAndTheTotal) {
+    const std::vector<float> src = hollowBox();
+    const std::vector<float> out = stretchColumn(src, 0.4f);
+    EXPECT_NEAR(sum(src), sum(out), 1e-3);
+    // The edges survive as the brightest rows, and the inside stays dark.
+    const float edge = *std::max_element(out.begin(), out.end());
+    EXPECT_GT(edge, 1.5f);
+    const int top = static_cast<int>(std::max_element(out.begin(), out.begin() + 50) - out.begin());
+    EXPECT_GT(out[top], 1.5f);
+    EXPECT_NEAR(0.0f, out[50], 0.3f * edge);
+    EXPECT_LT(out[50], 0.25f * edge);
+    // The box shrank towards the center: 20 rows * 0.4 = 8 rows.
+    EXPECT_EQ(0.0f, out[30]);
+    EXPECT_EQ(0.0f, out[70]);
+}
+
+TEST(PhosphorHeightTest, TheTotalIsConservedForEveryGInsideTheLane) {
+    const std::vector<float> src = hollowBox();
+    for (float g : {0.07f, 0.1f, 0.25f, 0.4f, 0.5f, 0.77f, 0.99f, 1.0f, 1.3f, 2.0f}) {
+        EXPECT_NEAR(sum(src), sum(stretchColumn(src, g)), 1e-3) << "g = " << g;
+    }
 }
 
 TEST(PhosphorHeightTest, StretchClipsAtTheLaneEdge) {
-    // g = 0.5: pixel row 80 reads 50 + 30.5 / 0.5 = 111: outside the lane.
-    EXPECT_EQ(-1, stretchSourceRow(80, 100, 0.5f));
-    EXPECT_EQ(-1, stretchSourceRow(5, 100, 0.5f));
-    // No height at all draws nothing.
-    EXPECT_EQ(-1, stretchSourceRow(70, 100, 0.0f));
+    // Density in the outer rows of the lane is pushed out of it when g > 1.
+    std::vector<float> src(100, 0.0f);
+    src[0] = 4.0f;
+    src[99] = 4.0f;
+    src[50] = 1.0f;
+    const std::vector<float> out = stretchColumn(src, 2.0f);
+    EXPECT_FLOAT_EQ(0.0f, out[0]);
+    EXPECT_FLOAT_EQ(0.0f, out[99]);
+    EXPECT_NEAR(1.0f, sum(out), 1e-5);
+    // g < 1: pixel row 80 covers the source [110, 112]: outside the lane.
+    std::vector<float> full(100, 1.0f);
+    EXPECT_FLOAT_EQ(0.0f, stretchedRowDensity(full.data(), 100, 80, 0.5f));
+    EXPECT_FLOAT_EQ(0.0f, stretchedRowDensity(full.data(), 100, 5, 0.5f));
 }
 
-TEST(PhosphorHeightTest, StretchedDensityIsDividedByG) {
-    EXPECT_FLOAT_EQ(1.5f, stretchedDensity(3.0f, 2.0f));
-    EXPECT_FLOAT_EQ(0.0f, stretchedDensity(3.0f, 0.0f));
+TEST(PhosphorHeightTest, NoHeightAtAllDrawsNothing) {
+    const std::vector<float> src(100, 1.0f);
+    EXPECT_FLOAT_EQ(0.0f, stretchedRowDensity(src.data(), 100, 70, 0.0f));
+    EXPECT_FLOAT_EQ(0.0f, stretchedRowDensity(src.data(), 100, 70, kMinHeightFactor / 2));
 }
