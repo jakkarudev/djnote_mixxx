@@ -91,7 +91,7 @@ TEST_F(PhosphorSettingsTest, InvalidValuesFallBackToHigh) {
 namespace {
 const ConfigKey kSaturationKey(QStringLiteral("[Waveform]"), QStringLiteral("PhosphorSaturation"));
 const ConfigKey kBlendKey(QStringLiteral("[Waveform]"), QStringLiteral("PhosphorBlend"));
-const ConfigKey kGainBKey(QStringLiteral("[Waveform]"), QStringLiteral("PhosphorGainB"));
+const ConfigKey kGainBKey(QStringLiteral("[Waveform]"), QStringLiteral("PhosphorGainHigh"));
 const ConfigKey kReleaseHighKey(
         QStringLiteral("[Waveform]"), QStringLiteral("PhosphorReleaseHighMs"));
 } // namespace

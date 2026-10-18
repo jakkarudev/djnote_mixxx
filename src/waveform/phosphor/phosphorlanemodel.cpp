@@ -1,7 +1,6 @@
 #include "waveform/phosphor/phosphorlanemodel.h"
 
 #include <algorithm>
-#include <QtGlobal>
 #include <cmath>
 
 namespace mixxx::phosphor {
@@ -30,13 +29,15 @@ double windowSpan(const LaneParams& params) {
     return params.windowColumns * std::max(params.framesPerColumn, kMinFramesPerColumn) / 2;
 }
 
-// First index in [0, n) with pointTime(index) >= t (n if none).
-SINT lowerBound(const PhosphorData& data, SINT n, double t) {
+// First index in [0, n) with pointTime(index) >= t (n if none), or with
+// pointTime(index) > t if equalIsBefore (a point exactly at t counts as before).
+SINT firstPointFrom(const PhosphorData& data, SINT n, double t, bool equalIsBefore) {
     SINT lo = 0;
     SINT hi = n;
     while (lo < hi) {
         const SINT mid = lo + (hi - lo) / 2;
-        if (data.pointTime(mid) < t) {
+        const double time = data.pointTime(mid);
+        if (equalIsBefore ? time <= t : time < t) {
             lo = mid + 1;
         } else {
             hi = mid;
@@ -45,19 +46,12 @@ SINT lowerBound(const PhosphorData& data, SINT n, double t) {
     return lo;
 }
 
-// First index in [0, n) with pointTime(index) > t (n if none).
+SINT lowerBound(const PhosphorData& data, SINT n, double t) {
+    return firstPointFrom(data, n, t, false);
+}
+
 SINT upperBound(const PhosphorData& data, SINT n, double t) {
-    SINT lo = 0;
-    SINT hi = n;
-    while (lo < hi) {
-        const SINT mid = lo + (hi - lo) / 2;
-        if (data.pointTime(mid) <= t) {
-            lo = mid + 1;
-        } else {
-            hi = mid;
-        }
-    }
-    return lo;
+    return firstPointFrom(data, n, t, true);
 }
 
 // Points whose time lies in [c - span, c + span] (snapped, see above), widened to always include
@@ -95,7 +89,15 @@ double pxPerBarForZoom(double zoom) {
 
 double visualSamplePerPixelForZoom(double zoom, double bpm) {
     // framesPerColumn() in visual samples; the sample rate cancels out.
-    return framesPerColumn(441.0, pxPerBarForZoom(zoom), bpm);
+    return framesPerColumn(kVisualSamplesPerSecond, pxPerBarForZoom(zoom), bpm);
+}
+
+double zoomDownFrom(double zoom) {
+    return zoom - 1.0 >= 1.0 ? zoom - 1.0 : zoom / 2.0;
+}
+
+double zoomUpFrom(double zoom) {
+    return zoom < 1.0 ? std::min(zoom * 2.0, 1.0) : zoom + 1.0;
 }
 
 double framesPerColumn(double sampleRate, double pxPerBar, double bpm) {

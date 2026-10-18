@@ -23,7 +23,7 @@ struct LaneCase {
     double position = 0;
     double pxPerBar = 0;
     double bpm = 0;
-    double playheadX = 0;
+    double playMarkerX = 0;
     uint32_t width = 0;
     uint32_t height = 0;
     uint32_t windowMilliColumns = 2000;
@@ -137,7 +137,7 @@ inline Fixture load(const QString& path) {
             c.position = r.get<double>();
             c.pxPerBar = r.get<double>();
             c.bpm = r.get<double>();
-            c.playheadX = r.get<double>();
+            c.playMarkerX = r.get<double>();
             c.width = r.get<uint32_t>();
             c.height = r.get<uint32_t>();
             c.windowMilliColumns = r.get<uint32_t>();

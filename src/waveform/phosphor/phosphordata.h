@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "util/types.h"
+#include "waveform/phosphor/phosphorsettings.h"
 
 namespace mixxx::phosphor {
 
@@ -83,14 +84,18 @@ class PhosphorData {
         return m_color[static_cast<size_t>(block) * 3 + static_cast<size_t>(channel)];
     }
 
-    /// The exponent the levels were built with (level = peak^exponent); the
-    /// shader needs it to turn levels back into a brightness. Set before the
-    /// data is shared.
-    double colorMixExponent() const {
-        return m_colorMixExponent;
+    /// The settings the color track is built with. Set before the data is
+    /// shared. A track whose data was built with other settings is rebuilt.
+    const ColorTrackParams& colorParams() const {
+        return m_colorParams;
     }
-    void setColorMixExponent(double exponent) {
-        m_colorMixExponent = exponent;
+    void setColorParams(const ColorTrackParams& params) {
+        m_colorParams = params;
+    }
+    /// The exponent the levels were built with (level = peak^exponent); the
+    /// shader needs it to turn levels back into a brightness.
+    double colorMixExponent() const {
+        return m_colorParams.mixExponent;
     }
 
     /// Writer side. Appends blocks of (R, G, B) levels; extra blocks beyond
@@ -120,7 +125,7 @@ class PhosphorData {
     int m_blockMinAt;
     int m_blockMaxAt;
     std::atomic<SINT> m_completed;
-    double m_colorMixExponent = 0.35;
+    ColorTrackParams m_colorParams;
     const SINT m_colorBlockFrames;
     std::vector<uint16_t> m_color;
     SINT m_colorWritten; // writer thread only

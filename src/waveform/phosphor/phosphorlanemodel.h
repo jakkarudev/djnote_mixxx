@@ -24,6 +24,15 @@ constexpr double kPhosphorWheelStep = 1.15;
 
 double pxPerBarForZoom(double zoom);
 
+/// What the zoom out (up) and zoom in (down) buttons do: from 1 on they step
+/// by 1, below 1 they double (up, stopping at 1) and halve (down).
+double zoomDownFrom(double zoom);
+double zoomUpFrom(double zoom);
+
+/// Mixxx's visual sample rate: the deck's zoom is in visual samples (441 per
+/// second at any file rate) per logical pixel.
+constexpr double kVisualSamplesPerSecond = 441.0;
+
 /// The view scale as the shared overlays (beat grid, marks) read it: visual
 /// samples (441 per second) per logical pixel. It depends on the zoom and the
 /// track's BPM only, never on the rate ratio.

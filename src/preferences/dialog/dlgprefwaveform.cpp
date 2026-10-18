@@ -354,7 +354,7 @@ void DlgPrefWaveform::slotUpdate() {
     highVisualGain->setValue(factory->getVisualGain(WaveformWidgetFactory::High));
     followsGainCheckBox->setChecked(factory->followsGain());
     followsEqCheckBox->setChecked(factory->followsEq());
-    showPhosphorSettings(mixxx::phosphor::loadSettings(m_pConfig));
+    showPhosphorSettings(factory->phosphorSettings());
     normalizeOverviewCheckBox->setChecked(factory->isOverviewNormalized());
     overviewLinesComboBox->setCurrentIndex(overviewLinesComboBox->findData(
             static_cast<int>(factory->getOverviewLineSettings().mode)));
@@ -674,14 +674,14 @@ void DlgPrefWaveform::buildPhosphorAdvanced() {
             kMinBrightnessExponent, kMaxBrightnessExponent, 0.01, 2, QString()));
     addSetting(tr("Brightness curve"),
             {m_pPhosphorBrightnessExponent},
-            tr("How bright quiet sounds look next to loud ones. Lower values make quiet sounds "
-               "glow more; higher values keep only the loudest parts bright."));
+            tr("How bright quiet sounds look next to loud ones. Lower values make quiet "
+               "sounds look brighter; higher values keep only the loudest parts bright."));
 
     m_pPhosphorDensityBrightness = changed(makeSpinBox(
             kMinDensityBrightness, kMaxDensityBrightness, 0.05, 2, QString()));
     addSetting(tr("Overall brightness"),
             {m_pPhosphorDensityBrightness},
-            tr("How bright the whole waveform is. Raise it for a bolder, glowing waveform; "
+            tr("How bright the whole waveform is. Raise it for a bolder, brighter waveform; "
                "lower it for a subtler one."));
 
     m_pPhosphorBlend = new QComboBox();
@@ -693,7 +693,7 @@ void DlgPrefWaveform::buildPhosphorAdvanced() {
             &DlgPrefWaveform::slotPhosphorAdvancedChanged);
     addSetting(tr("Light blend"),
             {m_pPhosphorBlend},
-            tr("Add lets the waveform glow like light on top of what is behind it (beat grid, "
+            tr("Add puts the waveform on top of what is behind it as light (beat grid, "
                "background). Opaque paints the waveform over the background instead."));
 
     m_pPhosphorShapeWindow = changed(makeSpinBox(

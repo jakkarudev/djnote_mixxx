@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cmath>
 
+#include "waveform/phosphor/phosphorcolortrack.h"
+
 namespace mixxx::phosphor {
 
 PhosphorData::PhosphorData(int sampleRate, SINT frameCapacity, int blockSize)
@@ -18,7 +20,7 @@ PhosphorData::PhosphorData(int sampleRate, SINT frameCapacity, int blockSize)
           m_blockMinAt(0),
           m_blockMaxAt(0),
           m_completed(0),
-          m_colorBlockFrames(std::max(1, static_cast<int>(std::lround(sampleRate / 1000.0)))),
+          m_colorBlockFrames(phosphor::colorBlockFrames(sampleRate)),
           m_color(static_cast<size_t>(m_frameCapacity / m_colorBlockFrames) * 3, 0),
           m_colorWritten(0),
           m_colorCompleted(0),

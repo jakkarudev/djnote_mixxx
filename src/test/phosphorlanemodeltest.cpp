@@ -1,7 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <future>
 #include <memory>
+#include <thread>
 #include <vector>
 
 #include "test/mixxxtest.h"
@@ -77,7 +81,7 @@ TEST_F(PhosphorLaneModelTest, FullDetailColumnsMatchTheReferenceFixtures) {
             params.windowColumns = lane.windowMilliColumns / 1000.0;
             for (uint32_t x = 0; x < lane.width; ++x) {
                 const double center = lane.position +
-                        (x + 0.5 - lane.playheadX) * params.framesPerColumn;
+                        (x + 0.5 - lane.playMarkerX) * params.framesPerColumn;
                 const LaneColumn col = computeColumn(data, params, center);
                 const QString where = QStringLiteral("%1 / %2 / column %3")
                                               .arg(name, lane.name)
@@ -125,7 +129,7 @@ TEST_F(PhosphorLaneModelTest, DecimatedTierColumnsMatchTheReferenceFixtures) {
             params.windowColumns = lane.windowMilliColumns / 1000.0;
             for (uint32_t x = 0; x < lane.width; ++x) {
                 const double center = lane.position +
-                        (x + 0.5 - lane.playheadX) * params.framesPerColumn;
+                        (x + 0.5 - lane.playMarkerX) * params.framesPerColumn;
                 const LaneColumn col = computeColumn(*pData, params, center);
                 const QString where = QStringLiteral("%1 / %2 / column %3")
                                               .arg(name, lane.name)
@@ -222,6 +226,22 @@ TEST(PhosphorLaneModelPlainTest, ZoomedOutLimitIsTenAndDeepestIsAboutOneFramePer
     EXPECT_DOUBLE_EQ(1.15, kPhosphorWheelStep);
 }
 
+TEST(PhosphorLaneModelPlainTest, ZoomButtonsAreInverseBelowOne) {
+    // Below 1 the buttons halve and double (up stops at 1), from 1 on they
+    // step by 1.
+    EXPECT_DOUBLE_EQ(0.5, zoomDownFrom(1.0));
+    EXPECT_DOUBLE_EQ(0.125, zoomDownFrom(0.25));
+    EXPECT_DOUBLE_EQ(3.0, zoomDownFrom(4.0));
+    EXPECT_DOUBLE_EQ(0.5, zoomUpFrom(0.25));
+    EXPECT_DOUBLE_EQ(1.0, zoomUpFrom(0.5));
+    EXPECT_DOUBLE_EQ(1.0, zoomUpFrom(0.75));
+    EXPECT_DOUBLE_EQ(2.0, zoomUpFrom(1.0));
+    EXPECT_DOUBLE_EQ(5.0, zoomUpFrom(4.0));
+    for (const double z : {2.0, 1.0, 0.5, 0.25, 0.0625, 0.01}) {
+        EXPECT_DOUBLE_EQ(z, zoomUpFrom(zoomDownFrom(z))) << z;
+    }
+}
+
 TEST(PhosphorLaneModelPlainTest, ZoomDoesNotDependOnRateRatioAndMatchesBarsAtAnyBpm) {
     // The view scale in visual samples (441 per second) per logical pixel
     // takes no rate ratio: it is a function of zoom and BPM only.
@@ -293,7 +313,8 @@ TEST(PhosphorTexelCodecTest, DensityRoundTripsAndSilenceMarksTheCenterRow) {
     encodeColumn(&column, 5, texels.data());
     EXPECT_NEAR(0.25f, decodeDensity(&texels[1 * 4]), 1e-3);
     EXPECT_NEAR(3.9f, decodeDensity(&texels[3 * 4]), 1e-3);
-    EXPECT_NEAR(kTexelDensityMax, decodeDensity(&texels[4 * 4]), 1e-3); // clipped
+    // Not clipped before the final pixel: a density above 4 survives.
+    EXPECT_NEAR(7.0f, decodeDensity(&texels[4 * 4]), 1e-2);
     for (int row = 0; row < 5; ++row) {
         EXPECT_EQ(0, texels[row * 4 + 1]) << row;
     }
@@ -308,6 +329,27 @@ TEST(PhosphorTexelCodecTest, DensityRoundTripsAndSilenceMarksTheCenterRow) {
     encodeColumn(nullptr, 5, texels.data());
     for (const uint8_t b : texels) {
         EXPECT_EQ(0, b);
+    }
+}
+
+TEST(PhosphorTexelCodecTest, DensityErrorStaysUnderOneLevelOfTheFinalPixel) {
+    // The final pixel is clip(color * 0.7 * density) with color <= 1, so the
+    // worst case for a density d is the color that just does not clip.
+    constexpr int kRows = 2000;
+    LaneColumn column;
+    column.status = ColumnStatus::Signal;
+    column.density.resize(kRows);
+    for (int row = 0; row < kRows; ++row) {
+        // 0..10 in steps of 0.01, then 11..1010.
+        column.density[row] = row < 1000 ? row * 0.01f : 10.0f + (row - 1000);
+    }
+    std::vector<uint8_t> texels(static_cast<size_t>(kRows) * kBytesPerTexel);
+    encodeColumn(&column, kRows, texels.data());
+    for (int row = 0; row < kRows; ++row) {
+        const float d = column.density[row];
+        const float decoded = decodeDensity(&texels[static_cast<size_t>(row) * 4]);
+        const float color = std::min(1.0f, 1.0f / (0.7f * std::max(d, 1e-6f)));
+        EXPECT_LT(std::abs(0.7f * color * (decoded - d)), 1.0f / 255.0f) << "density " << d;
     }
 }
 
@@ -414,6 +456,40 @@ TEST(PhosphorLaneCachePlainTest, ColumnsComputedWhileDecodingEqualThoseOfTheFini
         ASSERT_NE(nullptr, cache.column(k));
         EXPECT_TRUE(sameColumn(*cache.column(k), *fresh.column(k))) << k;
     }
+}
+
+} // namespace
+
+namespace {
+
+TEST(PhosphorPendingCacheBuildTest, CancelDoesNotWaitForTheWorkerAndDropsItsResult) {
+    const auto data = noiseData();
+    std::promise<void> gate;
+    const std::shared_future<void> gateOpen = gate.get_future().share();
+    PendingCacheBuild pending;
+    EXPECT_FALSE(pending.isRunning());
+    pending.start([data, gateOpen]() {
+        gateOpen.wait(); // a long recompute
+        return std::make_unique<PhosphorLaneCache>(data, LaneParams());
+    });
+    EXPECT_TRUE(pending.isRunning());
+    EXPECT_EQ(nullptr, pending.takeIfReady());
+    // The worker is still blocked: cancelling must return at once.
+    pending.cancel();
+    EXPECT_FALSE(pending.isRunning());
+    gate.set_value();
+    // The stale result never shows up, and a new build is independent.
+    pending.start([data]() { return std::make_unique<PhosphorLaneCache>(data, LaneParams()); });
+    std::unique_ptr<PhosphorLaneCache> result;
+    for (int i = 0; i < 5000 && !result; ++i) {
+        result = pending.takeIfReady();
+        if (!result) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+    }
+    ASSERT_TRUE(result);
+    EXPECT_FALSE(pending.isRunning());
+    EXPECT_EQ(nullptr, pending.takeIfReady());
 }
 
 } // namespace

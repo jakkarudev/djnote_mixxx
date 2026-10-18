@@ -30,8 +30,9 @@ std::array<std::vector<double>, 3> designColorFilters(
 /// backward follower. These numbers are the defaults of ColorTrackParams.
 ///
 /// Output is three uint16 per block (level * 65535). A block is emitted once
-/// the filters' delay and the backward follower's memory (about 1.2 s) are
-/// behind it, so the color track trails the samples by about 2 s.
+/// the filters' delay and the backward follower's memory (10 look-ahead time
+/// constants, 1.2 s by default) are behind it, so the color track trails the
+/// samples by about 2 s at the defaults.
 /// One writer thread; not thread-safe.
 class ColorTrackBuilder {
   public:

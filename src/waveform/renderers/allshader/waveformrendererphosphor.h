@@ -1,6 +1,5 @@
 #pragma once
 
-#include <future>
 #include <memory>
 #include <vector>
 
@@ -42,7 +41,11 @@ class allshader::WaveformRendererPhosphor final : public allshader::WaveformRend
             int64_t firstColumn,
             int64_t lastColumn);
     void ensureTexture(int slotCount, int rows);
-    void deleteTextureObject(GLuint* pTexture);
+    // The ring slot of a column.
+    int slotOf(int64_t column) const;
+    // A GL texture with nearest filtering and clamped edges, bound, with
+    // zeroed texels of the given size.
+    GLuint createTexture(int width, int height, std::vector<uint8_t>* pTexels);
     void uploadColumns(int64_t firstColumn, int64_t lastColumn);
     void deleteTexture();
     void forgetUploadedColumns();
@@ -54,7 +57,7 @@ class allshader::WaveformRendererPhosphor final : public allshader::WaveformRend
     // The cache that is drawn, and the one a worker thread is building after
     // a zoom or size change.
     std::unique_ptr<Cache> m_pCache;
-    std::future<std::unique_ptr<Cache>> m_pending;
+    mixxx::phosphor::PendingCacheBuild m_pending;
 
     // Ring texture: one texel per lane row along x, one slot per column along
     // y, so that a run of columns is a contiguous block of the CPU copy.

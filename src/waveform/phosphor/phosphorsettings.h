@@ -72,6 +72,8 @@ struct ColorTrackParams {
     double releaseMs[3] = {350.0, 180.0, 40.0};
     /// How early red (bass) starts to rise before a hit.
     double lookAheadMs = 120.0;
+
+    bool operator==(const ColorTrackParams&) const = default;
 };
 
 /// Ranges of the advanced settings (also the clamping limits).

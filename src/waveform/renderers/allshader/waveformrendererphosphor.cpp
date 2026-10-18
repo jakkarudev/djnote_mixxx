@@ -4,7 +4,6 @@
 #include <QVector2D>
 #include <QVector3D>
 #include <algorithm>
-#include <chrono>
 #include <cmath>
 
 #include "track/track.h"
@@ -23,9 +22,6 @@ namespace {
 // filled in over the next frames (a zoom or size change is done on a worker).
 constexpr int kMaxColumnsPerFrame = 64;
 constexpr int64_t kNoColumn = INT64_MIN;
-// Ticket #12: Mixxx's existing zoom mapping. The deck's zoom is in visual
-// samples (441 per second at the file's rate) per logical pixel.
-constexpr double kVisualSamplesPerSecond = 441.0;
 } // namespace
 
 WaveformRendererPhosphor::WaveformRendererPhosphor(WaveformWidgetRenderer* waveformWidget,
@@ -40,9 +36,6 @@ WaveformRendererPhosphor::WaveformRendererPhosphor(WaveformWidgetRenderer* wavef
 
 WaveformRendererPhosphor::~WaveformRendererPhosphor() {
     // The widget makes the GL context current before deleting its renderers.
-    if (m_pending.valid()) {
-        m_pending.wait();
-    }
     deleteTexture();
 }
 
@@ -59,10 +52,8 @@ void WaveformRendererPhosphor::forgetUploadedColumns() {
 }
 
 void WaveformRendererPhosphor::resetCache() {
-    if (m_pending.valid()) {
-        m_pending.wait();
-        m_pending = {};
-    }
+    // Does not wait for a running build: its result is dropped.
+    m_pending.cancel();
     m_pCache.reset();
     forgetUploadedColumns();
 }
@@ -112,20 +103,18 @@ void WaveformRendererPhosphor::updateCache(const PhosphorDataPointer& pData,
     }
 
     // Collect a finished recompute.
-    if (m_pending.valid() &&
-            m_pending.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-        m_pCache = m_pending.get();
-        m_pending = {};
+    if (auto pReady = m_pending.takeIfReady()) {
+        m_pCache = std::move(pReady);
         forgetUploadedColumns();
     }
 
-    if (m_pCache->params() == desired || m_pending.valid()) {
+    if (m_pCache->params() == desired || m_pending.isRunning()) {
         // Up to date, or a recompute is running; the next frame asks again.
         return;
     }
     // Zoom or size changed: recompute the visible lane on a worker thread and
     // keep drawing the previous one meanwhile.
-    m_pending = std::async(std::launch::async, [pData, desired, firstColumn, lastColumn]() {
+    m_pending.start([pData, desired, firstColumn, lastColumn]() {
         auto pCache = std::make_unique<Cache>(pData, desired);
         for (int64_t k = firstColumn; k <= lastColumn; ++k) {
             pCache->column(k);
@@ -134,46 +123,43 @@ void WaveformRendererPhosphor::updateCache(const PhosphorDataPointer& pData,
     });
 }
 
+int WaveformRendererPhosphor::slotOf(int64_t column) const {
+    return static_cast<int>(((column % m_textureSlotCount) + m_textureSlotCount) %
+            m_textureSlotCount);
+}
+
+GLuint WaveformRendererPhosphor::createTexture(
+        int width, int height, std::vector<uint8_t>* pTexels) {
+    GLuint texture = 0;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    pTexels->assign(static_cast<size_t>(width) * height * kBytesPerTexel, 0);
+    glTexImage2D(GL_TEXTURE_2D,
+            0,
+            GL_RGBA,
+            width,
+            height,
+            0,
+            GL_RGBA,
+            GL_UNSIGNED_BYTE,
+            pTexels->data());
+    return texture;
+}
+
 void WaveformRendererPhosphor::ensureTexture(int slotCount, int rows) {
     if (m_texture != 0 && m_textureSlotCount == slotCount && m_textureRows == rows) {
         return;
     }
     deleteTexture();
-    glGenTextures(1, &m_texture);
-    glBindTexture(GL_TEXTURE_2D, m_texture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     m_textureSlotCount = slotCount;
     m_textureRows = rows;
-    m_texels.assign(static_cast<size_t>(slotCount) * rows * kBytesPerTexel, 0);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-    glTexImage2D(GL_TEXTURE_2D,
-            0,
-            GL_RGBA,
-            rows,
-            slotCount,
-            0,
-            GL_RGBA,
-            GL_UNSIGNED_BYTE,
-            m_texels.data());
-    glGenTextures(1, &m_colorTexture);
-    glBindTexture(GL_TEXTURE_2D, m_colorTexture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    m_colorTexels.assign(static_cast<size_t>(slotCount) * kColorRows * kBytesPerTexel, 0);
-    glTexImage2D(GL_TEXTURE_2D,
-            0,
-            GL_RGBA,
-            slotCount,
-            kColorRows,
-            0,
-            GL_RGBA,
-            GL_UNSIGNED_BYTE,
-            m_colorTexels.data());
+    m_texture = createTexture(rows, slotCount, &m_texels);
+    m_colorTexture = createTexture(slotCount, kColorRows, &m_colorTexels);
     glBindTexture(GL_TEXTURE_2D, m_texture);
     m_slotColumn.assign(static_cast<size_t>(slotCount), kNoColumn);
     m_slotDirty.assign(static_cast<size_t>(slotCount), 0);
@@ -184,7 +170,7 @@ void WaveformRendererPhosphor::uploadColumns(int64_t firstColumn, int64_t lastCo
     const int rows = m_textureRows;
     int computed = 0;
     for (int64_t k = firstColumn; k <= lastColumn; ++k) {
-        const int slot = static_cast<int>(((k % slotCount) + slotCount) % slotCount);
+        const int slot = slotOf(k);
         if (m_slotColumn[static_cast<size_t>(slot)] == k) {
             continue;
         }
@@ -313,8 +299,7 @@ void WaveformRendererPhosphor::paintGL() {
     m_vertices.addRectangle(0.f, 0.f, static_cast<float>(length), breadth);
 
     const QMatrix4x4 matrix = matrixForWidgetGeometry(m_waveformRenderer, true);
-    const int ringOffset = static_cast<int>(
-            ((firstColumn % m_textureSlotCount) + m_textureSlotCount) % m_textureSlotCount);
+    const int ringOffset = slotOf(firstColumn);
 
     // The advanced settings: live, from the next frame on every deck.
     const PhosphorSettings& settings = WaveformWidgetFactory::instance()->phosphorSettings();

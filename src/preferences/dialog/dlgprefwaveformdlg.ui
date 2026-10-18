@@ -667,7 +667,7 @@ Select from different types of displays for the waveform, which differ primarily
         <item row="0" column="1">
          <widget class="QComboBox" name="phosphorDetailComboBox">
           <property name="toolTip">
-           <string>Lower detail uses less memory and only affects the texture inside the shape, never its outline. A very long or high sample rate file is drawn at a lower detail automatically. A change applies from the next track load.</string>
+           <string>Lower detail uses less memory and only affects the density inside the shape, never its outline. A very long or high sample rate file is drawn at a lower detail automatically. A change applies from the next track load.</string>
           </property>
          </widget>
         </item>

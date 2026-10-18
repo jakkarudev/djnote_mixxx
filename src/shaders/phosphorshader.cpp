@@ -60,12 +60,19 @@ void main()
     highp float sourceY = halfLane + (vLanePixel.y - halfLane) / max(g, 1e-6);
     if (g <= 1e-6 || sourceY < 0.0 || sourceY >= mapSize.x) {
         // Clipped at the lane edge, or no height at all.
-        gl_FragColor = vec4(0.0, 0.0, 0.0, lightOpaque);
+        gl_FragColor = vec4(0.0);
         return;
     }
     texel = texture2D(densityMap,
             vec2((floor(sourceY) + 0.5) / mapSize.x, (slot + 0.5) / mapSize.y));
-    highp float density = (texel.r * 256.0 + texel.b) * (255.0 / 65535.0) * DENSITY_MAX / g;
+    highp float root = (texel.r * 256.0 + texel.b) * (255.0 / 65535.0);
+    if (root <= 0.0) {
+        // Not covered by the signal: nothing is drawn, whatever the blend, so
+        // what is behind (background, marks) stays visible.
+        gl_FragColor = vec4(0.0);
+        return;
+    }
+    highp float density = root * root * DENSITY_MAX / g;
     highp vec3 levels = rawLevels * visualGains;
     highp float norm = length(levels);
     highp vec3 color = vec3(0.0);

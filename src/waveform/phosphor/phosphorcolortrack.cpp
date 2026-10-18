@@ -18,9 +18,9 @@ constexpr double kTableRgb[3][kTableSize] = {
     {.07, .09, .16, .23, .34, .53, .71, .84, .91, .94},
 };
 
-// Blocks the backward follower looks ahead before a block is final: 10 time
-// constants of the look-ahead, so the cut-off error is below 5e-5.
-constexpr size_t kBackwardMemoryBlocks = 1200;
+// The backward follower looks ahead this many time constants before a block
+// is final, so the cut-off error is below 5e-5.
+constexpr double kBackwardMemoryTimeConstants = 10.0;
 // FFT size; the chunk is the size minus the filter length plus one.
 constexpr int kFftSize = 32768;
 
@@ -129,6 +129,9 @@ struct ColorTrackBuilder::Impl {
         const double dt = static_cast<double>(blockFrames) / sampleRate;
         attackCoefficient = followerCoefficient(dt, colorParams.attackMs / 1000.0);
         lookAheadCoefficient = followerCoefficient(dt, colorParams.lookAheadMs / 1000.0);
+        backwardMemoryBlocks = std::max<size_t>(1,
+                static_cast<size_t>(std::ceil(kBackwardMemoryTimeConstants *
+                        colorParams.lookAheadMs / 1000.0 / dt)));
         for (int c = 0; c < 3; ++c) {
             releaseCoefficient[c] = followerCoefficient(dt, colorParams.releaseMs[c] / 1000.0);
         }
@@ -234,7 +237,8 @@ struct ColorTrackBuilder::Impl {
     // which depends on later blocks.
     void commit(bool last, std::vector<uint16_t>* pOut) {
         const size_t total = raw.size() / 3;
-        const size_t end = last ? total : (total > kBackwardMemoryBlocks ? total - kBackwardMemoryBlocks : 0);
+        const size_t end = last ? total
+                                : (total > backwardMemoryBlocks ? total - backwardMemoryBlocks : 0);
         if (end == 0) {
             return;
         }
@@ -262,6 +266,7 @@ struct ColorTrackBuilder::Impl {
     FFT fft;
     double attackCoefficient;
     double lookAheadCoefficient;
+    size_t backwardMemoryBlocks = 1;
     double releaseCoefficient[3] = {0, 0, 0};
 
     Spectrum spectrumRG; // tap spectra: R + iG, B

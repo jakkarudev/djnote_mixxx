@@ -5,6 +5,7 @@
 
 #include "analyzer/constants.h"
 #include "track/track.h"
+#include "waveform/phosphor/phosphordata.h"
 #include "util/logger.h"
 #include "waveform/phosphor/phosphorsettings.h"
 
@@ -36,30 +37,46 @@ bool AnalyzerPhosphor::initialize(const AnalyzerTrack& track,
         kLogger.warning() << "Cannot build Phosphor data: invalid signal info";
         return false;
     }
-    // Already built, or being built for another deck: share it.
-    if (track.getTrack()->getPhosphorData()) {
-        return false;
-    }
-    m_pTrack = track.getTrack();
     // The tier is read per track, so a change applies from the next load. It
     // is a floor: a long input drops to a lower tier to stay under the cap.
     const auto settings = mixxx::phosphor::loadSettings(m_pConfig);
     const auto detail = mixxx::phosphor::effectiveDetail(settings.detail, frameLength);
-    m_pData = std::make_shared<mixxx::phosphor::PhosphorData>(
-            sampleRate.value(), frameLength, mixxx::phosphor::blockSizeOf(detail));
+    const int blockSize = mixxx::phosphor::blockSizeOf(detail);
+    const TrackPointer pTrack = track.getTrack();
+    std::shared_ptr<mixxx::phosphor::PhosphorData> pData;
+    for (;;) {
+        // Already built, or being built for another deck, with the settings
+        // that apply now: share it. Otherwise replace it, unless another
+        // thread replaced it first (then look again).
+        const auto pExisting = pTrack->getPhosphorData();
+        if (pExisting && pExisting->blockSize() == blockSize &&
+                pExisting->sampleRate() == sampleRate.value() &&
+                pExisting->colorParams() == settings.color) {
+            return false;
+        }
+        if (!pData) {
+            pData = std::make_shared<mixxx::phosphor::PhosphorData>(
+                    sampleRate.value(), frameLength, blockSize);
+            // The color settings are read per track too: they apply from the
+            // next load.
+            pData->setColorParams(settings.color);
+        }
+        if (pTrack->replacePhosphorData(pExisting, pData)) {
+            break;
+        }
+    }
+    // From now on other threads can touch it.
+    m_pTrack = pTrack;
+    m_pData = std::move(pData);
     m_stored = false;
-    // The color settings are read per track too: they apply from the next load.
-    m_pData->setColorMixExponent(settings.color.mixExponent);
     m_pColor = std::make_unique<mixxx::phosphor::ColorTrackBuilder>(
             sampleRate.value(), settings.color);
-    // From now on other threads can touch it.
-    m_pTrack->setPhosphorData(m_pData);
     return true;
 }
 
 bool AnalyzerPhosphor::processSamples(const CSAMPLE* pIn, SINT count) {
     DEBUG_ASSERT(m_pData);
-    const SINT frames = count / 2;
+    const SINT frames = count / mixxx::kAnalysisChannels;
     m_mono.resize(static_cast<size_t>(frames));
     for (SINT i = 0; i < frames; ++i) {
         m_mono[static_cast<size_t>(i)] = monoSample(pIn[2 * i], pIn[2 * i + 1]);
@@ -87,7 +104,8 @@ void AnalyzerPhosphor::cleanup() {
     if (m_pTrack && m_pData && !m_stored) {
         // Aborted: do not leave half-filled data on the track, so that the
         // next load builds it again.
-        m_pTrack->setPhosphorData(nullptr);
+        // (Unless a newer build already replaced it.)
+        m_pTrack->replacePhosphorData(m_pData, nullptr);
     }
     m_pTrack.reset();
     m_pData.reset();

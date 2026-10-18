@@ -1,7 +1,6 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
-#include <chrono>
 #include <cmath>
 #include <iostream>
 #include <utility>
@@ -167,6 +166,65 @@ TEST_F(AnalyzerPhosphorTest, SecondLoadOfSameTrackSharesTheBuffer) {
             mixxx::audio::SampleRate(44100),
             44100));
     EXPECT_EQ(pData, pTrack->getPhosphorData());
+}
+
+TEST_F(AnalyzerPhosphorTest, ReloadWithAnotherDetailTierRebuilds) {
+    using mixxx::phosphor::WaveformDetail;
+    TrackPointer pTrack = Track::newTemporary();
+    AnalyzerPhosphor first(config());
+    ASSERT_TRUE(first.initialize(AnalyzerTrack(pTrack, deckOptions()),
+            mixxx::audio::SampleRate(44100),
+            44100));
+    first.storeResults(pTrack);
+    first.cleanup();
+    const auto pFull = pTrack->getPhosphorData();
+    ASSERT_EQ(1, pFull->blockSize());
+
+    setDetail(WaveformDetail::High);
+    AnalyzerPhosphor second(config());
+    EXPECT_TRUE(second.initialize(AnalyzerTrack(pTrack, deckOptions()),
+            mixxx::audio::SampleRate(44100),
+            44100));
+    ASSERT_TRUE(pTrack->getPhosphorData());
+    EXPECT_NE(pFull, pTrack->getPhosphorData());
+    EXPECT_EQ(4, pTrack->getPhosphorData()->blockSize());
+}
+
+TEST_F(AnalyzerPhosphorTest, ReloadWithOtherColorTrackSettingsRebuilds) {
+    TrackPointer pTrack = Track::newTemporary();
+    AnalyzerPhosphor first(config());
+    ASSERT_TRUE(first.initialize(AnalyzerTrack(pTrack, deckOptions()),
+            mixxx::audio::SampleRate(44100),
+            44100));
+    first.storeResults(pTrack);
+    first.cleanup();
+    const auto pOld = pTrack->getPhosphorData();
+
+    mixxx::phosphor::PhosphorSettings settings = mixxx::phosphor::loadSettings(config());
+    settings.color.attackMs = 20.0;
+    mixxx::phosphor::saveSettings(config(), settings);
+    AnalyzerPhosphor second(config());
+    EXPECT_TRUE(second.initialize(AnalyzerTrack(pTrack, deckOptions()),
+            mixxx::audio::SampleRate(44100),
+            44100));
+    EXPECT_NE(pOld, pTrack->getPhosphorData());
+    EXPECT_DOUBLE_EQ(20.0, pTrack->getPhosphorData()->colorParams().attackMs);
+}
+
+TEST_F(AnalyzerPhosphorTest, AbortOfASupersededBuildKeepsTheNewerData) {
+    TrackPointer pTrack = Track::newTemporary();
+    AnalyzerPhosphor first(config());
+    ASSERT_TRUE(first.initialize(AnalyzerTrack(pTrack, deckOptions()),
+            mixxx::audio::SampleRate(44100),
+            44100));
+    setDetail(mixxx::phosphor::WaveformDetail::High);
+    AnalyzerPhosphor second(config());
+    ASSERT_TRUE(second.initialize(AnalyzerTrack(pTrack, deckOptions()),
+            mixxx::audio::SampleRate(44100),
+            44100));
+    const auto pNewer = pTrack->getPhosphorData();
+    first.cleanup(); // aborted, but no longer the data of the track
+    EXPECT_EQ(pNewer, pTrack->getPhosphorData());
 }
 
 TEST_F(AnalyzerPhosphorTest, AbortedAnalysisDropsPartialDataSoTheNextLoadRetries) {
@@ -370,29 +428,40 @@ TEST_F(AnalyzerPhosphorTest, ColorTrackMatchesReferenceFixtures) {
               << std::endl;
 }
 
-TEST_F(AnalyzerPhosphorTest, AnalyzerCostPerMinuteOfAudio) {
+TEST_F(AnalyzerPhosphorTest, LongLookAheadDoesNotDependOnTheChunking) {
+    // The backward follower must remember 10 time constants of the look-ahead
+    // setting: feeding in chunks gives the same color track as feeding all at once.
+    mixxx::phosphor::PhosphorSettings settings = mixxx::phosphor::loadSettings(config());
+    settings.color.lookAheadMs = 500.0;
+    mixxx::phosphor::saveSettings(config(), settings);
+
     const int rate = 44100;
-    const SINT frames = 60 * rate;
-    TrackPointer pTrack = Track::newTemporary();
-    AnalyzerPhosphor analyzer(config());
-    ASSERT_TRUE(analyzer.initialize(AnalyzerTrack(pTrack, deckOptions()),
-            mixxx::audio::SampleRate(rate),
-            frames));
-    std::vector<CSAMPLE> stereo(2 * frames);
-    uint32_t state = 12345;
-    for (auto& v : stereo) {
-        state = state * 1664525u + 1013904223u;
-        v = (static_cast<int>(state >> 16) - 32768) / 65536.0f;
+    const SINT frames = 9 * rate;
+    std::vector<CSAMPLE> stereo(2 * frames, 0.0f);
+    // A 100 Hz burst at 7 s: the red level rises about 1.5 s before it.
+    for (SINT i = 7 * rate; i < 7 * rate + 4410; ++i) {
+        stereo[2 * i] = stereo[2 * i + 1] =
+                0.5f * static_cast<float>(std::sin(2 * M_PI * 100 * i / rate));
     }
-    const auto start = std::chrono::steady_clock::now();
-    ASSERT_TRUE(feed(&analyzer, stereo, 2 * 4096));
-    analyzer.storeResults(pTrack);
-    const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now() - start)
-                            .count();
-    analyzer.cleanup();
-    std::cout << "Phosphor analyzer: " << ms << " ms per minute of audio" << std::endl;
-    EXPECT_EQ(frames / 44, pTrack->getPhosphorData()->colorBlocksCompleted());
+    auto build = [&](SINT samplesPerChunk) {
+        TrackPointer pTrack = Track::newTemporary();
+        AnalyzerPhosphor analyzer(config());
+        EXPECT_TRUE(analyzer.initialize(AnalyzerTrack(pTrack, deckOptions()),
+                mixxx::audio::SampleRate(rate),
+                frames));
+        EXPECT_TRUE(feed(&analyzer, stereo, samplesPerChunk));
+        analyzer.storeResults(pTrack);
+        analyzer.cleanup();
+        return pTrack->getPhosphorData();
+    };
+    const auto pChunked = build(2 * 4096);
+    const auto pAtOnce = build(2 * frames);
+    ASSERT_EQ(pAtOnce->colorBlocksCompleted(), pChunked->colorBlocksCompleted());
+    for (SINT b = 4800; b < 5400; b += 10) {
+        EXPECT_NEAR(pAtOnce->colorLevel(b, 0), pChunked->colorLevel(b, 0), 65535.0 / 255) << b;
+    }
+    // The follower really has risen there (2 s before the burst).
+    EXPECT_GT(pAtOnce->colorLevel(5000, 0), 100);
 }
 
 TEST_F(AnalyzerPhosphorTest, ColorTrackFillsProgressively) {
