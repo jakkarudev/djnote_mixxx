@@ -50,7 +50,33 @@ class mixxx::PhosphorShader final : public mixxx::Shader {
         return m_heightGainLocation;
     }
 
+    /// float: how vivid the colours are
+    int saturationLocation() const {
+        return m_saturationLocation;
+    }
+    /// float: brightness exponent / colour mix exponent - 1
+    int brightnessExponentLocation() const {
+        return m_brightnessExponentLocation;
+    }
+    /// vec3: Low, Mid, High channel gains
+    int channelGainsLocation() const {
+        return m_channelGainsLocation;
+    }
+    /// float: the brightness of the density
+    int densityBrightnessLocation() const {
+        return m_densityBrightnessLocation;
+    }
+    /// float: 0 adds the light, 1 replaces what is behind
+    int opaqueLocation() const {
+        return m_opaqueLocation;
+    }
+
   private:
+    int m_saturationLocation;
+    int m_brightnessExponentLocation;
+    int m_channelGainsLocation;
+    int m_densityBrightnessLocation;
+    int m_opaqueLocation;
     int m_eqGainsLocation;
     int m_heightGainLocation;
     int m_matrixLocation;
