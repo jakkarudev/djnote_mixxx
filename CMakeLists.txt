@@ -2179,7 +2179,8 @@ if(BUILD_TESTING)
     src/test/durationutiltest.cpp
     src/test/overviewlayouttest.cpp
     src/test/overviewlinelayouttest.cpp
-    src/test/overviewsettingstest.cpp
+    src/test/dlgprefwaveformtest.cpp
+  src/test/overviewsettingstest.cpp
     src/test/phosphorheighttest.cpp
     src/test/phosphorlanemodeltest.cpp
     src/test/phosphorsettingstest.cpp
@@ -2275,6 +2276,8 @@ if(BUILD_TESTING)
 
   target_precompile_headers(mixxx-test REUSE_FROM mixxx-lib)
   set_target_properties(mixxx-test PROPERTIES AUTOMOC ON)
+  # The preferences dialogs' generated ui_*.h headers (dlgprefwaveformtest.cpp).
+  target_include_directories(mixxx-test PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/mixxx-lib_autogen/include")
   target_link_libraries(mixxx-test PRIVATE mixxx-lib mixxx-gitinfostore GTest::gtest GTest::gmock)
 
   if(BUILD_BENCH)

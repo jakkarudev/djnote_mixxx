@@ -134,6 +134,17 @@ DlgPrefWaveform::DlgPrefWaveform(
                 QVariant(static_cast<int>(HoverOverCue::MoveHoverReadout)));
     }
 
+    // slotUpdate() shows the Phosphor settings, so its controls must exist.
+    phosphorDetailComboBox->addItem(
+            tr("Full"), static_cast<int>(mixxx::phosphor::WaveformDetail::Full));
+    phosphorDetailComboBox->addItem(
+            tr("High"), static_cast<int>(mixxx::phosphor::WaveformDetail::High));
+    phosphorDetailComboBox->addItem(
+            tr("Medium"), static_cast<int>(mixxx::phosphor::WaveformDetail::Medium));
+    phosphorDetailComboBox->addItem(
+            tr("Low"), static_cast<int>(mixxx::phosphor::WaveformDetail::Low));
+    buildPhosphorAdvanced();
+
     // The GUI is not fully setup so connecting signals before calling
     // slotUpdate can generate rebootMixxxView calls.
     // TODO(XXX): Improve this awkwardness.
@@ -212,20 +223,12 @@ DlgPrefWaveform::DlgPrefWaveform(
             &QCheckBox::toggled,
             this,
             &DlgPrefWaveform::slotSetFollowsEq);
-    // Phosphor: the detail applies from the next track load.
-    phosphorDetailComboBox->addItem(
-            tr("Full"), static_cast<int>(mixxx::phosphor::WaveformDetail::Full));
-    phosphorDetailComboBox->addItem(
-            tr("High"), static_cast<int>(mixxx::phosphor::WaveformDetail::High));
-    phosphorDetailComboBox->addItem(
-            tr("Medium"), static_cast<int>(mixxx::phosphor::WaveformDetail::Medium));
-    phosphorDetailComboBox->addItem(
-            tr("Low"), static_cast<int>(mixxx::phosphor::WaveformDetail::Low));
+    // Phosphor: the detail applies from the next track load. (Its items and
+    // the advanced controls are created before slotUpdate().)
     connect(phosphorDetailComboBox,
             QOverload<int>::of(&QComboBox::currentIndexChanged),
             this,
             &DlgPrefWaveform::slotSetPhosphorDetail);
-    buildPhosphorAdvanced();
     connect(normalizeOverviewCheckBox,
             &QCheckBox::toggled,
             this,
@@ -879,6 +882,9 @@ void DlgPrefWaveform::slotSetUntilMarkTextHeightLimit(int index) {
 }
 
 void DlgPrefWaveform::calculateCachedWaveformDiskUsage() {
+    if (!m_pLibrary) {
+        return; // no database (dialog built without a library, in tests)
+    }
     AnalysisDao analysisDao(m_pConfig);
     QSqlDatabase dbConnection = mixxx::DbConnectionPooled(m_pLibrary->dbConnectionPool());
     size_t numBytes = analysisDao.getDiskUsageInBytes(dbConnection, AnalysisDao::TYPE_WAVEFORM) +
