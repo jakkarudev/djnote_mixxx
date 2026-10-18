@@ -36,12 +36,23 @@ class mixxx::PhosphorShader final : public mixxx::Shader {
     int colourTextureLocation() const {
         return m_colourTextureLocation;
     }
-    /// vec3: the Low, Mid, High visual gains (applied to the band levels)
+    /// vec3: the Low, Mid, High gains (EQ and visual) applied to the band levels
     int visualGainsLocation() const {
         return m_visualGainsLocation;
     }
 
+    /// vec3: the EQ knob gains with kills (1.0 when not followed), for the height
+    int eqGainsLocation() const {
+        return m_eqGainsLocation;
+    }
+    /// float: All visual gain x total gain (when followed)
+    int heightGainLocation() const {
+        return m_heightGainLocation;
+    }
+
   private:
+    int m_eqGainsLocation;
+    int m_heightGainLocation;
     int m_matrixLocation;
     int m_positionLocation;
     int m_textureLocation;

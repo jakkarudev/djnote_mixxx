@@ -170,11 +170,7 @@ void WaveformRendererSignalBase::setup(const QDomNode& node,
     onSetup(node);
 }
 
-void WaveformRendererSignalBase::getGains(float* pAllGain,
-        bool applyCompensation,
-        float* pLowGain,
-        float* pMidGain,
-        float* pHighGain) {
+mixxx::waveformgains::Inputs WaveformRendererSignalBase::gainInputs(bool applyCompensation) {
     WaveformWidgetFactory* factory = WaveformWidgetFactory::instance();
     mixxx::waveformgains::Inputs in;
     in.totalGain = static_cast<float>(m_waveformRenderer->getGain(false));
@@ -194,8 +190,16 @@ void WaveformRendererSignalBase::getGains(float* pAllGain,
     in.lowKill = m_pLowKillControlObject && m_pLowKillControlObject->get() > 0.0;
     in.midKill = m_pMidKillControlObject && m_pMidKillControlObject->get() > 0.0;
     in.highKill = m_pHighKillControlObject && m_pHighKillControlObject->get() > 0.0;
+    return in;
+}
 
-    const mixxx::waveformgains::Gains gains = mixxx::waveformgains::calculateGains(in);
+void WaveformRendererSignalBase::getGains(float* pAllGain,
+        bool applyCompensation,
+        float* pLowGain,
+        float* pMidGain,
+        float* pHighGain) {
+    const mixxx::waveformgains::Gains gains =
+            mixxx::waveformgains::calculateGains(gainInputs(applyCompensation));
     if (pAllGain) {
         *pAllGain = gains.all;
     }

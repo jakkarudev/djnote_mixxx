@@ -32,7 +32,9 @@ uniform sampler2D densityMap;
 uniform highp vec2 mapSize;
 uniform highp float ringOffset;
 uniform sampler2D colourMap; // see phosphortexelcodec.h
-uniform highp vec3 visualGains; // Low, Mid, High
+uniform highp vec3 visualGains; // Low, Mid, High: EQ x visual gains, for the colour
+uniform highp vec3 eqGains; // Low, Mid, High: knobs and kills only, for the height
+uniform highp float heightGain; // All visual gain x total gain
 varying highp vec2 vLanePixel;
 void main()
 {
@@ -45,11 +47,28 @@ void main()
         gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
         return;
     }
-    highp float density = (texel.r * 256.0 + texel.b) * (255.0 / 65535.0) * DENSITY_MAX;
     // Band levels of this column (R = Low, G = Mid, B = High).
     highp vec4 levelHigh = texture2D(colourMap, vec2((slot + 0.5) / mapSize.y, 0.25));
     highp vec4 levelLow = texture2D(colourMap, vec2((slot + 0.5) / mapSize.y, 0.75));
-    highp vec3 levels = (levelHigh.rgb * 256.0 + levelLow.rgb) * (255.0 / 65535.0) * visualGains;
+    highp vec3 rawLevels = (levelHigh.rgb * 256.0 + levelLow.rgb) * (255.0 / 65535.0);
+    // The column's height factor g: the gains stretch it about the lane centre
+    // (see phosphorheight.h, which tests the same maths).
+    highp float rawNorm = length(rawLevels);
+    highp float g = heightGain;
+    if (rawNorm > 1e-6) {
+        g *= length(rawLevels * eqGains) / rawNorm;
+    }
+    highp float halfLane = mapSize.x * 0.5;
+    highp float sourceY = halfLane + (vLanePixel.y - halfLane) / max(g, 1e-6);
+    if (g <= 1e-6 || sourceY < 0.0 || sourceY >= mapSize.x) {
+        // Clipped at the lane edge, or no height at all.
+        gl_FragColor = vec4(0.0);
+        return;
+    }
+    texel = texture2D(densityMap,
+            vec2((floor(sourceY) + 0.5) / mapSize.x, (slot + 0.5) / mapSize.y));
+    highp float density = (texel.r * 256.0 + texel.b) * (255.0 / 65535.0) * DENSITY_MAX / g;
+    highp vec3 levels = rawLevels * visualGains;
     highp float norm = length(levels);
     highp vec3 colour = vec3(0.0);
     if (norm > 1e-6) {
@@ -86,4 +105,6 @@ void main()
     m_ringOffsetLocation = uniformLocation("ringOffset");
     m_colourTextureLocation = uniformLocation("colourMap");
     m_visualGainsLocation = uniformLocation("visualGains");
+    m_eqGainsLocation = uniformLocation("eqGains");
+    m_heightGainLocation = uniformLocation("heightGain");
 }

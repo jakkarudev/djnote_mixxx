@@ -87,10 +87,10 @@ double framesPerColumn(double sampleRate, double pxPerBar, double bpm) {
     return sampleRate / (pxPerBar * usedBpm / 240.0);
 }
 
-int rowOfValue(double value, int height, double heightGain) {
+int rowOfValue(double value, int height) {
     const double centre = (height - 1) / 2.0;
     const double half = kFullScale * height / 2.0;
-    const double row = std::floor(centre + value * heightGain / 32768.0 * half + 0.5);
+    const double row = std::floor(centre + value / 32768.0 * half + 0.5);
     return static_cast<int>(std::clamp(row, 0.0, static_cast<double>(height - 1)));
 }
 
@@ -151,7 +151,7 @@ LaneColumn computeColumn(const PhosphorData& data,
     for (SINT i = w.lo; i <= w.hi; ++i) {
         const int value = data.pointValue(i);
         const double time = data.pointTime(i);
-        const int row = rowOfValue(value, height, params.heightGain);
+        const int row = rowOfValue(value, height);
         anySignal = anySignal || value != 0;
         rowMin = std::min(rowMin, row);
         rowMax = std::max(rowMax, row);
