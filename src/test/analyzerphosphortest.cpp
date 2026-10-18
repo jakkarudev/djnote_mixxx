@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cmath>
 #include <iostream>
+#include <utility>
 #include <vector>
 
 #include "analyzer/analyzerphosphor.h"
@@ -12,6 +13,7 @@
 #include "test/phosphorfixture.h"
 #include "track/track.h"
 #include "waveform/phosphor/phosphordata.h"
+#include "waveform/phosphor/phosphorsettings.h"
 
 namespace {
 
@@ -31,6 +33,17 @@ const char* const kFixtures[] = {
 
 class AnalyzerPhosphorTest : public MixxxTest {
   protected:
+    // The tests that do not ask for a tier look at the Full buffer.
+    void SetUp() override {
+        setDetail(mixxx::phosphor::WaveformDetail::Full);
+    }
+
+    void setDetail(mixxx::phosphor::WaveformDetail detail) {
+        mixxx::phosphor::PhosphorSettings settings;
+        settings.detail = detail;
+        mixxx::phosphor::saveSettings(config(), settings);
+    }
+
     static AnalyzerTrack::Options deckOptions() {
         AnalyzerTrack::Options options;
         options.buildPhosphor = true;
@@ -192,6 +205,122 @@ TEST_F(AnalyzerPhosphorTest, ShorterFileThanAnnouncedTrimsTheLength) {
     analyzer.cleanup();
     EXPECT_EQ(300, pTrack->getPhosphorData()->totalFrames());
     EXPECT_EQ(300, pTrack->getPhosphorData()->pointsCompleted());
+}
+
+TEST_F(AnalyzerPhosphorTest, TierBuffersMatchReferenceFixtures) {
+    using mixxx::phosphor::WaveformDetail;
+    const std::pair<WaveformDetail, uint32_t> tiers[] = {
+        {WaveformDetail::High, 4},
+        {WaveformDetail::Medium, 8},
+        {WaveformDetail::Low, 16},
+    };
+    for (const char* name : kFixtures) {
+        const auto f = phosphorfixture::load(
+                getTestDir().filePath(QStringLiteral("phosphor/%1.phfx").arg(name)));
+        ASSERT_TRUE(f.ok) << name;
+        for (const auto& [detail, n] : tiers) {
+            setDetail(detail);
+            TrackPointer pTrack = Track::newTemporary();
+            AnalyzerPhosphor analyzer(config());
+            ASSERT_TRUE(analyzer.initialize(AnalyzerTrack(pTrack, deckOptions()),
+                    mixxx::audio::SampleRate(f.rate),
+                    f.frames));
+            // Chunks that do not line up with the blocks.
+            ASSERT_TRUE(feed(&analyzer, toStereoFloats(f), 2 * 1001));
+            analyzer.storeResults(pTrack);
+            analyzer.cleanup();
+
+            const auto pData = pTrack->getPhosphorData();
+            ASSERT_TRUE(pData) << name;
+            ASSERT_EQ(static_cast<int>(n), pData->blockSize()) << name;
+            const phosphorfixture::Tier* pTier = nullptr;
+            for (const auto& t : f.tiers) {
+                if (t.n == n) {
+                    pTier = &t;
+                }
+            }
+            ASSERT_TRUE(pTier) << name << " N=" << n;
+            ASSERT_EQ(static_cast<SINT>(pTier->values.size()), pData->pointCount())
+                    << name << " N=" << n;
+            ASSERT_EQ(pData->pointCount(), pData->pointsCompleted()) << name << " N=" << n;
+            for (size_t i = 0; i < pTier->values.size(); ++i) {
+                ASSERT_EQ(pTier->values[i], pData->pointValue(static_cast<SINT>(i)))
+                        << name << " N=" << n << " point " << i;
+            }
+            // Point times: block k of length m has its points at k*N + m/4
+            // and k*N + 3m/4.
+            const SINT blocks = (static_cast<SINT>(f.frames) + n - 1) / n;
+            for (SINT k = 0; k < blocks; ++k) {
+                const double len = std::min<double>(n, f.frames - k * n);
+                ASSERT_DOUBLE_EQ(k * n + len * 0.25, pData->pointTime(2 * k)) << name;
+                ASSERT_DOUBLE_EQ(k * n + len * 0.75, pData->pointTime(2 * k + 1)) << name;
+            }
+        }
+    }
+}
+
+TEST_F(AnalyzerPhosphorTest, ThirtyTwoSampleBlocksMatchTheReferenceToo) {
+    // Not a preference tier, but the data module handles any block size.
+    const auto f = phosphorfixture::load(getTestDir().filePath("phosphor/q6_noise.phfx"));
+    ASSERT_TRUE(f.ok);
+    mixxx::phosphor::PhosphorData data(f.rate, f.frames, 32);
+    std::vector<int16_t> mono(f.frames);
+    for (uint32_t i = 0; i < f.frames; ++i) {
+        const int l = f.input[i * f.channels];
+        const int r = f.input[i * f.channels + (f.channels - 1)];
+        mono[i] = static_cast<int16_t>(std::floor((l + r) / 2.0 + 0.5));
+    }
+    data.append(mono.data(), mono.size());
+    data.finish();
+    for (const auto& t : f.tiers) {
+        if (t.n != 32) {
+            continue;
+        }
+        ASSERT_EQ(static_cast<SINT>(t.values.size()), data.pointCount());
+        for (size_t i = 0; i < t.values.size(); ++i) {
+            ASSERT_EQ(t.values[i], data.pointValue(static_cast<SINT>(i))) << i;
+        }
+    }
+}
+
+TEST_F(AnalyzerPhosphorTest, TierProgressCountsWholeBlocks) {
+    setDetail(mixxx::phosphor::WaveformDetail::High);
+    TrackPointer pTrack = Track::newTemporary();
+    AnalyzerPhosphor analyzer(config());
+    ASSERT_TRUE(analyzer.initialize(AnalyzerTrack(pTrack, deckOptions()),
+            mixxx::audio::SampleRate(44100),
+            1000));
+    const auto pData = pTrack->getPhosphorData();
+    const std::vector<CSAMPLE> stereo(2 * 10, 0.5f);
+    ASSERT_TRUE(analyzer.processSamples(stereo.data(), stereo.size()));
+    // 10 frames: two whole blocks of 4 (2 points each); the rest waits.
+    EXPECT_EQ(4, pData->pointsCompleted());
+    analyzer.storeResults(pTrack);
+    analyzer.cleanup();
+    EXPECT_EQ(10, pData->totalFrames());
+    EXPECT_EQ(6, pData->pointCount());
+    EXPECT_EQ(6, pData->pointsCompleted());
+}
+
+TEST_F(AnalyzerPhosphorTest, ChosenTierIsAFloorLongInputsDropToALowerOne) {
+    using mixxx::phosphor::WaveformDetail;
+    auto blockSizeFor = [&](WaveformDetail chosen, int rate, SINT frames) {
+        setDetail(chosen);
+        TrackPointer pTrack = Track::newTemporary();
+        AnalyzerPhosphor analyzer(config());
+        EXPECT_TRUE(analyzer.initialize(AnalyzerTrack(pTrack, deckOptions()),
+                mixxx::audio::SampleRate(rate),
+                frames));
+        const int n = pTrack->getPhosphorData()->blockSize();
+        analyzer.cleanup();
+        return n;
+    };
+    EXPECT_EQ(1, blockSizeFor(WaveformDetail::Full, 44100, 8 * 60 * 44100));
+    EXPECT_EQ(4, blockSizeFor(WaveformDetail::High, 44100, 8 * 60 * 44100));
+    // 8 minutes at 96 kHz: Full would be 92 MB.
+    EXPECT_EQ(4, blockSizeFor(WaveformDetail::Full, 96000, 8 * 60 * 96000));
+    // A 1 hour mix: High is 159 MB (Medium 79 MB).
+    EXPECT_EQ(8, blockSizeFor(WaveformDetail::High, 44100, 3600 * 44100));
 }
 
 // The colour track through the analyzer, against the reference script's

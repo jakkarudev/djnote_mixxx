@@ -10,6 +10,12 @@ namespace {
 
 constexpr double kMinFramesPerColumn = 1e-3;
 
+// A window of at least kSnapMinWindow frames snaps its edges outward to
+// multiples of kSnapBlock frames (the coarsest kept tier's block), so every
+// detail tier sees the same whole blocks and has the same outline.
+constexpr double kSnapBlock = 16;
+constexpr double kSnapMinWindow = 32;
+
 /// The inclusive index range of the points of a column's window. Empty
 /// (hi - lo < 1) when the column has no data.
 struct Window {
@@ -54,7 +60,7 @@ SINT upperBound(const PhosphorData& data, SINT n, double t) {
     return lo;
 }
 
-// Points whose time lies in [c - span, c + span], widened to always include
+// Points whose time lies in [c - span, c + span] (snapped, see above), widened to always include
 // the point at or before c and the next one, clipped to the track.
 Window windowOf(const PhosphorData& data, const LaneParams& params, double centre) {
     const SINT n = data.pointCount();
@@ -62,8 +68,19 @@ Window windowOf(const PhosphorData& data, const LaneParams& params, double centr
         return {0, -1};
     }
     const double span = windowSpan(params);
-    SINT lo = lowerBound(data, n, centre - span);
-    SINT hi = upperBound(data, n, centre + span) - 1;
+    SINT lo;
+    SINT hi;
+    if (2 * span >= kSnapMinWindow) {
+        // Snap the edges outward to whole blocks of kSnapBlock frames, in
+        // every tier, so that all tiers see the same whole blocks.
+        const double from = std::floor((centre - span) / kSnapBlock) * kSnapBlock;
+        const double to = std::ceil((centre + span) / kSnapBlock) * kSnapBlock;
+        lo = lowerBound(data, n, from);
+        hi = lowerBound(data, n, to) - 1;
+    } else {
+        lo = lowerBound(data, n, centre - span);
+        hi = upperBound(data, n, centre + span) - 1;
+    }
     const SINT i0 = upperBound(data, n, centre) - 1;
     lo = std::max(std::min(lo, i0), SINT{0});
     hi = std::min(std::max(hi, i0 + 1), n - 1);
