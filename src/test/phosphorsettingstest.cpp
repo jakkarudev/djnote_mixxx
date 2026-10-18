@@ -91,7 +91,7 @@ TEST_F(PhosphorSettingsTest, InvalidValuesFallBackToHigh) {
 namespace {
 const ConfigKey kSaturationKey(QStringLiteral("[Waveform]"), QStringLiteral("PhosphorSaturation"));
 const ConfigKey kBlendKey(QStringLiteral("[Waveform]"), QStringLiteral("PhosphorBlend"));
-const ConfigKey kGainBKey(QStringLiteral("[Waveform]"), QStringLiteral("PhosphorGainB"));
+const ConfigKey kGainBKey(QStringLiteral("[Waveform]"), QStringLiteral("PhosphorGainHigh"));
 const ConfigKey kReleaseHighKey(
         QStringLiteral("[Waveform]"), QStringLiteral("PhosphorReleaseHighMs"));
 } // namespace
@@ -106,12 +106,12 @@ TEST(PhosphorSettingsPlainTest, AdvancedDefaultsAreTheCalibratedValues) {
     EXPECT_EQ(0.7, s.densityBrightness);
     EXPECT_EQ(LightBlend::Add, s.blend);
     EXPECT_EQ(2.0, s.shapeWindow);
-    EXPECT_EQ(0.35, s.colour.mixExponent);
-    EXPECT_EQ(5.0, s.colour.attackMs);
-    EXPECT_EQ(350.0, s.colour.releaseMs[0]);
-    EXPECT_EQ(180.0, s.colour.releaseMs[1]);
-    EXPECT_EQ(40.0, s.colour.releaseMs[2]);
-    EXPECT_EQ(120.0, s.colour.lookAheadMs);
+    EXPECT_EQ(0.35, s.color.mixExponent);
+    EXPECT_EQ(5.0, s.color.attackMs);
+    EXPECT_EQ(350.0, s.color.releaseMs[0]);
+    EXPECT_EQ(180.0, s.color.releaseMs[1]);
+    EXPECT_EQ(40.0, s.color.releaseMs[2]);
+    EXPECT_EQ(120.0, s.color.lookAheadMs);
 }
 
 TEST(PhosphorSettingsPlainTest, BlendParsingFallsBackToAdd) {
@@ -129,11 +129,11 @@ TEST(PhosphorSettingsPlainTest, OutOfRangeValuesAreClamped) {
     s.brightnessExponent = 0;
     s.densityBrightness = 50;
     s.shapeWindow = 0.2;
-    s.colour.mixExponent = 9;
-    s.colour.attackMs = 500;
-    s.colour.releaseMs[0] = 9999;
-    s.colour.releaseMs[1] = -5;
-    s.colour.lookAheadMs = 5000;
+    s.color.mixExponent = 9;
+    s.color.attackMs = 500;
+    s.color.releaseMs[0] = 9999;
+    s.color.releaseMs[1] = -5;
+    s.color.lookAheadMs = 5000;
     const PhosphorSettings c = clampSettings(s);
     EXPECT_EQ(10.0, c.saturation);
     EXPECT_EQ(0.0, c.channelGains[0]);
@@ -141,11 +141,11 @@ TEST(PhosphorSettingsPlainTest, OutOfRangeValuesAreClamped) {
     EXPECT_EQ(0.1, c.brightnessExponent);
     EXPECT_EQ(3.0, c.densityBrightness);
     EXPECT_EQ(1.0, c.shapeWindow);
-    EXPECT_EQ(1.5, c.colour.mixExponent);
-    EXPECT_EQ(50.0, c.colour.attackMs);
-    EXPECT_EQ(2000.0, c.colour.releaseMs[0]);
-    EXPECT_EQ(0.0, c.colour.releaseMs[1]);
-    EXPECT_EQ(500.0, c.colour.lookAheadMs);
+    EXPECT_EQ(1.5, c.color.mixExponent);
+    EXPECT_EQ(50.0, c.color.attackMs);
+    EXPECT_EQ(2000.0, c.color.releaseMs[0]);
+    EXPECT_EQ(0.0, c.color.releaseMs[1]);
+    EXPECT_EQ(500.0, c.color.lookAheadMs);
     // In range values are untouched.
     EXPECT_EQ(0.85, clampSettings(PhosphorSettings()).channelGains[1]);
 }
@@ -157,8 +157,8 @@ TEST_F(PhosphorSettingsTest, AdvancedEmptyConfigGivesDefaults) {
     EXPECT_EQ(d.channelGains[2], s.channelGains[2]);
     EXPECT_EQ(d.blend, s.blend);
     EXPECT_EQ(d.shapeWindow, s.shapeWindow);
-    EXPECT_EQ(d.colour.releaseMs[2], s.colour.releaseMs[2]);
-    EXPECT_EQ(d.colour.lookAheadMs, s.colour.lookAheadMs);
+    EXPECT_EQ(d.color.releaseMs[2], s.color.releaseMs[2]);
+    EXPECT_EQ(d.color.lookAheadMs, s.color.lookAheadMs);
 }
 
 TEST_F(PhosphorSettingsTest, AdvancedRoundTrip) {
@@ -169,10 +169,10 @@ TEST_F(PhosphorSettingsTest, AdvancedRoundTrip) {
     s.densityBrightness = 2.25;
     s.blend = LightBlend::Opaque;
     s.shapeWindow = 4.5;
-    s.colour.mixExponent = 0.6;
-    s.colour.attackMs = 12;
-    s.colour.releaseMs[0] = 1000;
-    s.colour.lookAheadMs = 300;
+    s.color.mixExponent = 0.6;
+    s.color.attackMs = 12;
+    s.color.releaseMs[0] = 1000;
+    s.color.lookAheadMs = 300;
     saveSettings(config(), s);
     const PhosphorSettings l = loadSettings(config());
     EXPECT_EQ(7.5, l.saturation);
@@ -181,10 +181,10 @@ TEST_F(PhosphorSettingsTest, AdvancedRoundTrip) {
     EXPECT_EQ(2.25, l.densityBrightness);
     EXPECT_EQ(LightBlend::Opaque, l.blend);
     EXPECT_EQ(4.5, l.shapeWindow);
-    EXPECT_EQ(0.6, l.colour.mixExponent);
-    EXPECT_EQ(12.0, l.colour.attackMs);
-    EXPECT_EQ(1000.0, l.colour.releaseMs[0]);
-    EXPECT_EQ(300.0, l.colour.lookAheadMs);
+    EXPECT_EQ(0.6, l.color.mixExponent);
+    EXPECT_EQ(12.0, l.color.attackMs);
+    EXPECT_EQ(1000.0, l.color.releaseMs[0]);
+    EXPECT_EQ(300.0, l.color.lookAheadMs);
 }
 
 TEST_F(PhosphorSettingsTest, AdvancedInvalidConfigValuesAreClampedOrDefaulted) {
@@ -195,7 +195,7 @@ TEST_F(PhosphorSettingsTest, AdvancedInvalidConfigValuesAreClampedOrDefaulted) {
     const PhosphorSettings s = loadSettings(config());
     EXPECT_EQ(10.0, s.saturation);
     EXPECT_EQ(0.0, s.channelGains[2]);
-    EXPECT_EQ(2000.0, s.colour.releaseMs[2]);
+    EXPECT_EQ(2000.0, s.color.releaseMs[2]);
     EXPECT_EQ(LightBlend::Add, s.blend);
     config()->setValue(kSaturationKey, QStringLiteral("not a number"));
     EXPECT_EQ(5.0, loadSettings(config()).saturation);
@@ -207,7 +207,7 @@ TEST_F(PhosphorSettingsTest, ResetRestoresEveryAdvancedValue) {
     s.channelGains[0] = 3;
     s.blend = LightBlend::Opaque;
     s.shapeWindow = 5;
-    s.colour.releaseMs[1] = 10;
+    s.color.releaseMs[1] = 10;
     saveSettings(config(), s);
     // The reset saves a default-constructed PhosphorSettings.
     saveSettings(config(), PhosphorSettings());
@@ -217,5 +217,5 @@ TEST_F(PhosphorSettingsTest, ResetRestoresEveryAdvancedValue) {
     EXPECT_EQ(d.channelGains[0], l.channelGains[0]);
     EXPECT_EQ(d.blend, l.blend);
     EXPECT_EQ(d.shapeWindow, l.shapeWindow);
-    EXPECT_EQ(d.colour.releaseMs[1], l.colour.releaseMs[1]);
+    EXPECT_EQ(d.color.releaseMs[1], l.color.releaseMs[1]);
 }

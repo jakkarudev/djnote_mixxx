@@ -916,7 +916,7 @@ void BaseTrackPlayerImpl::slotWaveformZoomUp(double pressed) {
         return;
     }
 
-    m_pWaveformZoom->set(m_pWaveformZoom->get() + 1.0);
+    m_pWaveformZoom->set(mixxx::phosphor::zoomUpFrom(m_pWaveformZoom->get()));
 }
 
 void BaseTrackPlayerImpl::slotWaveformZoomDown(double pressed) {
@@ -924,11 +924,8 @@ void BaseTrackPlayerImpl::slotWaveformZoomDown(double pressed) {
         return;
     }
 
-    // Below 1 (only reachable in the Phosphor type) halve the zoom value.
-    const double zoom = m_pWaveformZoom->get();
-    m_pWaveformZoom->set(zoom - 1.0 >= WaveformWidgetRenderer::s_waveformMinZoom
-                    ? zoom - 1.0
-                    : zoom / 2.0);
+    // Below 1 (only reachable in the Phosphor type) the zoom value halves.
+    m_pWaveformZoom->set(mixxx::phosphor::zoomDownFrom(m_pWaveformZoom->get()));
 }
 
 void BaseTrackPlayerImpl::slotWaveformZoomSetDefault(double pressed) {

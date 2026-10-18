@@ -1,7 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <future>
 #include <memory>
+#include <thread>
 #include <vector>
 
 #include "test/mixxxtest.h"
@@ -44,8 +48,8 @@ std::unique_ptr<PhosphorData> dataFromFixture(const phosphorfixture::Fixture& f,
         mono[i] = static_cast<int16_t>(std::floor((l + r) / 2.0 + 0.5));
     }
     pData->append(mono.data(), static_cast<SINT>(mono.size()));
-    // The fixture's own colour track: the lane model is tested on its own.
-    pData->appendColour(f.colour.data(), static_cast<SINT>(f.colour.size() / 3));
+    // The fixture's own color track: the lane model is tested on its own.
+    pData->appendColor(f.color.data(), static_cast<SINT>(f.color.size() / 3));
     pData->finish();
     return pData;
 }
@@ -76,9 +80,9 @@ TEST_F(PhosphorLaneModelTest, FullDetailColumnsMatchTheReferenceFixtures) {
             params.height = static_cast<int>(lane.height);
             params.windowColumns = lane.windowMilliColumns / 1000.0;
             for (uint32_t x = 0; x < lane.width; ++x) {
-                const double centre = lane.position +
-                        (x + 0.5 - lane.playheadX) * params.framesPerColumn;
-                const LaneColumn col = computeColumn(data, params, centre);
+                const double center = lane.position +
+                        (x + 0.5 - lane.playMarkerX) * params.framesPerColumn;
+                const LaneColumn col = computeColumn(data, params, center);
                 const QString where = QStringLiteral("%1 / %2 / column %3")
                                               .arg(name, lane.name)
                                               .arg(x);
@@ -124,9 +128,9 @@ TEST_F(PhosphorLaneModelTest, DecimatedTierColumnsMatchTheReferenceFixtures) {
             params.height = static_cast<int>(lane.height);
             params.windowColumns = lane.windowMilliColumns / 1000.0;
             for (uint32_t x = 0; x < lane.width; ++x) {
-                const double centre = lane.position +
-                        (x + 0.5 - lane.playheadX) * params.framesPerColumn;
-                const LaneColumn col = computeColumn(*pData, params, centre);
+                const double center = lane.position +
+                        (x + 0.5 - lane.playMarkerX) * params.framesPerColumn;
+                const LaneColumn col = computeColumn(*pData, params, center);
                 const QString where = QStringLiteral("%1 / %2 / column %3")
                                               .arg(name, lane.name)
                                               .arg(x);
@@ -168,9 +172,9 @@ TEST_F(PhosphorLaneModelTest, OutlineRowsAreIdenticalAtEveryTierWhenTheWindowIs3
                     params.height = 41;
                     params.windowColumns = 2.0;
                     for (int x = 0; x < 40; ++x) {
-                        const double centre = position + (x - 20 + 0.5) * fpc;
-                        const LaneColumn full = computeColumn(*pFull, params, centre);
-                        const LaneColumn tier = computeColumn(*pTier, params, centre);
+                        const double center = position + (x - 20 + 0.5) * fpc;
+                        const LaneColumn full = computeColumn(*pFull, params, center);
+                        const LaneColumn tier = computeColumn(*pTier, params, center);
                         ASSERT_EQ(full.status, tier.status) << name << " N=" << n << " x=" << x;
                         if (full.status == ColumnStatus::Outside) {
                             continue;
@@ -222,6 +226,22 @@ TEST(PhosphorLaneModelPlainTest, ZoomedOutLimitIsTenAndDeepestIsAboutOneFramePer
     EXPECT_DOUBLE_EQ(1.15, kPhosphorWheelStep);
 }
 
+TEST(PhosphorLaneModelPlainTest, ZoomButtonsAreInverseBelowOne) {
+    // Below 1 the buttons halve and double (up stops at 1), from 1 on they
+    // step by 1.
+    EXPECT_DOUBLE_EQ(0.5, zoomDownFrom(1.0));
+    EXPECT_DOUBLE_EQ(0.125, zoomDownFrom(0.25));
+    EXPECT_DOUBLE_EQ(3.0, zoomDownFrom(4.0));
+    EXPECT_DOUBLE_EQ(0.5, zoomUpFrom(0.25));
+    EXPECT_DOUBLE_EQ(1.0, zoomUpFrom(0.5));
+    EXPECT_DOUBLE_EQ(1.0, zoomUpFrom(0.75));
+    EXPECT_DOUBLE_EQ(2.0, zoomUpFrom(1.0));
+    EXPECT_DOUBLE_EQ(5.0, zoomUpFrom(4.0));
+    for (const double z : {2.0, 1.0, 0.5, 0.25, 0.0625, 0.01}) {
+        EXPECT_DOUBLE_EQ(z, zoomUpFrom(zoomDownFrom(z))) << z;
+    }
+}
+
 TEST(PhosphorLaneModelPlainTest, ZoomDoesNotDependOnRateRatioAndMatchesBarsAtAnyBpm) {
     // The view scale in visual samples (441 per second) per logical pixel
     // takes no rate ratio: it is a function of zoom and BPM only.
@@ -268,8 +288,8 @@ TEST(PhosphorLaneModelPlainTest, ColumnsNeedDecodedData) {
     PhosphorData data(44100, 1000);
     const std::vector<int16_t> s(400, 1000);
     data.append(s.data(), 400);
-    const std::vector<uint16_t> colour(3 * 30, 0);
-    data.appendColour(colour.data(), 9); // the colour track follows the samples
+    const std::vector<uint16_t> color(3 * 30, 0);
+    data.appendColor(color.data(), 9); // the color track follows the samples
     LaneParams params;
     params.framesPerColumn = 10;
     params.height = 21;
@@ -278,14 +298,14 @@ TEST(PhosphorLaneModelPlainTest, ColumnsNeedDecodedData) {
     EXPECT_FALSE(isColumnReady(data, params, 700));
     data.append(s.data(), 400);
     data.append(s.data(), 200);
-    data.appendColour(colour.data(), 5); // 14 of the 22 blocks: still behind
-    // The colour track trails the samples: not ready until it caught up.
+    data.appendColor(color.data(), 5); // 14 of the 22 blocks: still behind
+    // The color track trails the samples: not ready until it caught up.
     EXPECT_FALSE(isColumnReady(data, params, 999));
     data.finish();
     EXPECT_TRUE(isColumnReady(data, params, 999));
 }
 
-TEST(PhosphorTexelCodecTest, DensityRoundTripsAndSilenceMarksTheCentreRow) {
+TEST(PhosphorTexelCodecTest, DensityRoundTripsAndSilenceMarksTheCenterRow) {
     LaneColumn column;
     column.status = ColumnStatus::Signal;
     column.density = {0.0f, 0.25f, 1.0f, 3.9f, 7.0f};
@@ -293,7 +313,8 @@ TEST(PhosphorTexelCodecTest, DensityRoundTripsAndSilenceMarksTheCentreRow) {
     encodeColumn(&column, 5, texels.data());
     EXPECT_NEAR(0.25f, decodeDensity(&texels[1 * 4]), 1e-3);
     EXPECT_NEAR(3.9f, decodeDensity(&texels[3 * 4]), 1e-3);
-    EXPECT_NEAR(kTexelDensityMax, decodeDensity(&texels[4 * 4]), 1e-3); // clipped
+    // Not clipped before the final pixel: a density above 4 survives.
+    EXPECT_NEAR(7.0f, decodeDensity(&texels[4 * 4]), 1e-2);
     for (int row = 0; row < 5; ++row) {
         EXPECT_EQ(0, texels[row * 4 + 1]) << row;
     }
@@ -308,6 +329,27 @@ TEST(PhosphorTexelCodecTest, DensityRoundTripsAndSilenceMarksTheCentreRow) {
     encodeColumn(nullptr, 5, texels.data());
     for (const uint8_t b : texels) {
         EXPECT_EQ(0, b);
+    }
+}
+
+TEST(PhosphorTexelCodecTest, DensityErrorStaysUnderOneLevelOfTheFinalPixel) {
+    // The final pixel is clip(color * 0.7 * density) with color <= 1, so the
+    // worst case for a density d is the color that just does not clip.
+    constexpr int kRows = 2000;
+    LaneColumn column;
+    column.status = ColumnStatus::Signal;
+    column.density.resize(kRows);
+    for (int row = 0; row < kRows; ++row) {
+        // 0..10 in steps of 0.01, then 11..1010.
+        column.density[row] = row < 1000 ? row * 0.01f : 10.0f + (row - 1000);
+    }
+    std::vector<uint8_t> texels(static_cast<size_t>(kRows) * kBytesPerTexel);
+    encodeColumn(&column, kRows, texels.data());
+    for (int row = 0; row < kRows; ++row) {
+        const float d = column.density[row];
+        const float decoded = decodeDensity(&texels[static_cast<size_t>(row) * 4]);
+        const float color = std::min(1.0f, 1.0f / (0.7f * std::max(d, 1e-6f)));
+        EXPECT_LT(std::abs(0.7f * color * (decoded - d)), 1.0f / 255.0f) << "density " << d;
     }
 }
 
@@ -401,19 +443,53 @@ TEST(PhosphorLaneCachePlainTest, ColumnsComputedWhileDecodingEqualThoseOfTheFini
     params.height = 41;
     PhosphorLaneCache cache(data, params);
     EXPECT_EQ(nullptr, cache.column(100)); // nothing decoded yet
-    const std::vector<uint16_t> colour(3 * 454, 1000);
+    const std::vector<uint16_t> color(3 * 454, 1000);
     data->append(s.data(), 5000);
-    data->appendColour(colour.data(), 113);
+    data->appendColor(color.data(), 113);
     ASSERT_NE(nullptr, cache.column(100));
     EXPECT_EQ(nullptr, cache.column(499)); // window reaches undecoded data
     data->append(s.data() + 5000, 15000);
-    data->appendColour(colour.data(), 454 - 113);
+    data->appendColor(color.data(), 454 - 113);
     data->finish();
     PhosphorLaneCache fresh(data, params);
     for (int64_t k : {100, 499, 1000, 1999}) {
         ASSERT_NE(nullptr, cache.column(k));
         EXPECT_TRUE(sameColumn(*cache.column(k), *fresh.column(k))) << k;
     }
+}
+
+} // namespace
+
+namespace {
+
+TEST(PhosphorPendingCacheBuildTest, CancelDoesNotWaitForTheWorkerAndDropsItsResult) {
+    const auto data = noiseData();
+    std::promise<void> gate;
+    const std::shared_future<void> gateOpen = gate.get_future().share();
+    PendingCacheBuild pending;
+    EXPECT_FALSE(pending.isRunning());
+    pending.start([data, gateOpen]() {
+        gateOpen.wait(); // a long recompute
+        return std::make_unique<PhosphorLaneCache>(data, LaneParams());
+    });
+    EXPECT_TRUE(pending.isRunning());
+    EXPECT_EQ(nullptr, pending.takeIfReady());
+    // The worker is still blocked: cancelling must return at once.
+    pending.cancel();
+    EXPECT_FALSE(pending.isRunning());
+    gate.set_value();
+    // The stale result never shows up, and a new build is independent.
+    pending.start([data]() { return std::make_unique<PhosphorLaneCache>(data, LaneParams()); });
+    std::unique_ptr<PhosphorLaneCache> result;
+    for (int i = 0; i < 5000 && !result; ++i) {
+        result = pending.takeIfReady();
+        if (!result) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+    }
+    ASSERT_TRUE(result);
+    EXPECT_FALSE(pending.isRunning());
+    EXPECT_EQ(nullptr, pending.takeIfReady());
 }
 
 } // namespace

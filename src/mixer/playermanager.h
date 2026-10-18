@@ -214,7 +214,6 @@ class PlayerManager : public PlayerManagerInterface {
     void slotAnalyzeTrack(TrackPointer track);
     // Deck loads additionally build the Phosphor waveform data.
     void slotAnalyzeDeckTrack(TrackPointer track);
-    void analyzeLoadedTrack(TrackPointer track, AnalyzerTrack::Options options);
 
     void onTrackAnalysisProgress(TrackId trackId, AnalyzerProgress analyzerProgress);
     void onTrackAnalysisFinished();
@@ -242,6 +241,8 @@ class PlayerManager : public PlayerManagerInterface {
     void trackAnalyzerIdle();
 
   private:
+    // Schedules the analysis of a track that was loaded into a player.
+    void analyzeLoadedTrack(TrackPointer track, AnalyzerTrack::Options options);
     TrackPointer lookupTrack(QString location);
     // Must hold m_mutex before calling this method. Internal method that
     // creates a new deck.

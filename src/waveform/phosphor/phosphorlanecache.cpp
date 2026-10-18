@@ -1,6 +1,7 @@
 #include "waveform/phosphor/phosphorlanecache.h"
 
 #include <cmath>
+#include <thread>
 
 namespace mixxx::phosphor {
 
@@ -28,7 +29,7 @@ int64_t PhosphorLaneCache::columnAtFrame(double frame) const {
     return static_cast<int64_t>(std::floor(frame / m_params.framesPerColumn));
 }
 
-double PhosphorLaneCache::centreOfColumn(int64_t k) const {
+double PhosphorLaneCache::centerOfColumn(int64_t k) const {
     return (static_cast<double>(k) + 0.5) * m_params.framesPerColumn;
 }
 
@@ -61,11 +62,29 @@ const LaneColumn* PhosphorLaneCache::column(int64_t k) {
     if (it != m_columns.end()) {
         return &it->second;
     }
-    const double centre = centreOfColumn(k);
-    if (!isColumnReady(*m_pData, m_params, centre)) {
+    const double center = centerOfColumn(k);
+    if (!isColumnReady(*m_pData, m_params, center)) {
         return nullptr;
     }
-    return &m_columns.emplace(k, computeColumn(*m_pData, m_params, centre)).first->second;
+    return &m_columns.emplace(k, computeColumn(*m_pData, m_params, center)).first->second;
+}
+
+void PendingCacheBuild::start(Job job) {
+    auto pState = std::make_shared<State>();
+    m_pState = pState;
+    std::thread([pState, job = std::move(job)]() {
+        pState->result = job();
+        pState->ready.store(true, std::memory_order_release);
+    }).detach();
+}
+
+std::unique_ptr<PhosphorLaneCache> PendingCacheBuild::takeIfReady() {
+    if (!m_pState || !m_pState->ready.load(std::memory_order_acquire)) {
+        return nullptr;
+    }
+    auto pResult = std::move(m_pState->result);
+    m_pState.reset();
+    return pResult;
 }
 
 } // namespace mixxx::phosphor

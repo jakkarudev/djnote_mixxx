@@ -152,6 +152,10 @@ class WaveformWidgetFactory : public QObject, public Singleton<WaveformWidgetFac
     bool followsGain() const {
         return m_followsGain;
     }
+    void setFollowsEq(bool follows);
+    bool followsEq() const {
+        return m_followsEq;
+    }
     /// The Phosphor settings the renderers use now: loaded from the config at
     /// start, replaced (and saved) by the preferences. Live values reach all
     /// decks on their next frame.
@@ -159,10 +163,6 @@ class WaveformWidgetFactory : public QObject, public Singleton<WaveformWidgetFac
         return m_phosphorSettings;
     }
     void setPhosphorSettings(const mixxx::phosphor::PhosphorSettings& settings);
-    void setFollowsEq(bool follows);
-    bool followsEq() const {
-        return m_followsEq;
-    }
 
     void setOverviewNormalized(bool normalize);
     int isOverviewNormalized() const { return m_overviewNormalized;}

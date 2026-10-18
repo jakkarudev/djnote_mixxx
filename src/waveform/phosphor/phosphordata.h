@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "util/types.h"
+#include "waveform/phosphor/phosphorsettings.h"
 
 namespace mixxx::phosphor {
 
@@ -69,33 +70,37 @@ class PhosphorData {
     /// are dropped.
     void append(const int16_t* pSamples, SINT count);
 
-    /// The colour track (ADR-0002): three uint16 smoothed band levels (R, G, B =
-    /// Low, Mid, High; level * 65535) per block of colourBlockFrames() frames,
+    /// The color track (ADR-0002): three uint16 smoothed band levels (R, G, B =
+    /// Low, Mid, High; level * 65535) per block of colorBlockFrames() frames,
     /// 1 ms. It fills in behind the sample buffer.
-    SINT colourBlockFrames() const {
-        return m_colourBlockFrames;
+    SINT colorBlockFrames() const {
+        return m_colorBlockFrames;
     }
     /// Blocks that were written so far (a prefix of the track).
-    SINT colourBlocksCompleted() const {
-        return m_colourCompleted.load(std::memory_order_acquire);
+    SINT colorBlocksCompleted() const {
+        return m_colorCompleted.load(std::memory_order_acquire);
     }
-    int colourLevel(SINT block, int channel) const {
-        return m_colour[static_cast<size_t>(block) * 3 + static_cast<size_t>(channel)];
+    int colorLevel(SINT block, int channel) const {
+        return m_color[static_cast<size_t>(block) * 3 + static_cast<size_t>(channel)];
     }
 
-    /// The exponent the levels were built with (level = peak^exponent); the
-    /// shader needs it to turn levels back into a brightness. Set before the
-    /// data is shared.
-    double colourMixExponent() const {
-        return m_colourMixExponent;
+    /// The settings the color track is built with. Set before the data is
+    /// shared. A track whose data was built with other settings is rebuilt.
+    const ColorTrackParams& colorParams() const {
+        return m_colorParams;
     }
-    void setColourMixExponent(double exponent) {
-        m_colourMixExponent = exponent;
+    void setColorParams(const ColorTrackParams& params) {
+        m_colorParams = params;
+    }
+    /// The exponent the levels were built with (level = peak^exponent); the
+    /// shader needs it to turn levels back into a brightness.
+    double colorMixExponent() const {
+        return m_colorParams.mixExponent;
     }
 
     /// Writer side. Appends blocks of (R, G, B) levels; extra blocks beyond
     /// the capacity are dropped.
-    void appendColour(const uint16_t* pLevels, SINT blockCount);
+    void appendColor(const uint16_t* pLevels, SINT blockCount);
 
     /// Writer side. Marks the data complete and trims the track length to
     /// the frames that were really decoded.
@@ -120,11 +125,11 @@ class PhosphorData {
     int m_blockMinAt;
     int m_blockMaxAt;
     std::atomic<SINT> m_completed;
-    double m_colourMixExponent = 0.35;
-    const SINT m_colourBlockFrames;
-    std::vector<uint16_t> m_colour;
-    SINT m_colourWritten; // writer thread only
-    std::atomic<SINT> m_colourCompleted;
+    ColorTrackParams m_colorParams;
+    const SINT m_colorBlockFrames;
+    std::vector<uint16_t> m_color;
+    SINT m_colorWritten; // writer thread only
+    std::atomic<SINT> m_colorCompleted;
     std::atomic<SINT> m_totalFrames;
     std::atomic<bool> m_finished;
 };

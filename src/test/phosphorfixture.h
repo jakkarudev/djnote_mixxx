@@ -23,7 +23,7 @@ struct LaneCase {
     double position = 0;
     double pxPerBar = 0;
     double bpm = 0;
-    double playheadX = 0;
+    double playMarkerX = 0;
     uint32_t width = 0;
     uint32_t height = 0;
     uint32_t windowMilliColumns = 2000;
@@ -41,8 +41,8 @@ struct Fixture {
     uint32_t frames = 0;
     std::vector<int16_t> input; // interleaved
     std::vector<Tier> tiers;
-    uint32_t colourBlockFrames = 0;
-    std::vector<uint16_t> colour; // [blocks][3]
+    uint32_t colorBlockFrames = 0;
+    std::vector<uint16_t> color; // [blocks][3]
     std::vector<LaneCase> lanes;
 };
 
@@ -127,9 +127,9 @@ inline Fixture load(const QString& path) {
             t.values = r.vec<int16_t>(r.get<uint32_t>());
             f.tiers.push_back(std::move(t));
         } else if (tag == QLatin1String("COLR")) {
-            f.colourBlockFrames = r.get<uint32_t>();
+            f.colorBlockFrames = r.get<uint32_t>();
             const uint32_t blocks = r.get<uint32_t>();
-            f.colour = r.vec<uint16_t>(static_cast<size_t>(blocks) * 3);
+            f.color = r.vec<uint16_t>(static_cast<size_t>(blocks) * 3);
         } else if (tag == QLatin1String("LANE")) {
             LaneCase c;
             c.name = r.str(r.get<uint16_t>());
@@ -137,7 +137,7 @@ inline Fixture load(const QString& path) {
             c.position = r.get<double>();
             c.pxPerBar = r.get<double>();
             c.bpm = r.get<double>();
-            c.playheadX = r.get<double>();
+            c.playMarkerX = r.get<double>();
             c.width = r.get<uint32_t>();
             c.height = r.get<uint32_t>();
             c.windowMilliColumns = r.get<uint32_t>();

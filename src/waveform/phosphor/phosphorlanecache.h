@@ -1,6 +1,9 @@
 #pragma once
 
+#include <atomic>
 #include <cstdint>
+#include <functional>
+#include <memory>
 #include <unordered_map>
 
 #include "waveform/phosphor/phosphordata.h"
@@ -10,7 +13,7 @@ namespace mixxx::phosphor {
 
 /// Columns of the lane model, cached by their position along the track.
 ///
-/// Column k is centred on frame (k + 0.5) * framesPerColumn, so a column
+/// Column k is centered on frame (k + 0.5) * framesPerColumn, so a column
 /// keeps its index while the view scrolls. Only columns that are asked for
 /// are computed. What a column looks like never depends on what was cached
 /// before: the cache is only a memo of computeColumn(), invalidated as a whole
@@ -32,7 +35,7 @@ class PhosphorLaneCache {
 
     /// The column index of the column that contains a frame.
     int64_t columnAtFrame(double frame) const;
-    double centreOfColumn(int64_t k) const;
+    double centerOfColumn(int64_t k) const;
 
     /// Drops the columns outside [first, last], with some margin kept for
     /// scrolling.
@@ -62,7 +65,38 @@ class PhosphorLaneCache {
     LaneParams m_params;
     SINT m_totalFramesStamp;
     std::unordered_map<int64_t, LaneColumn> m_columns;
-    LaneColumn m_scratch;
+};
+
+/// A lane cache being built on a worker thread, to be swapped in by the owner
+/// (the GUI thread) when ready. Never blocks the owner: cancel() just forgets
+/// the build, and its result is dropped when the worker finishes.
+class PendingCacheBuild {
+  public:
+    using Job = std::function<std::unique_ptr<PhosphorLaneCache>()>;
+
+    PendingCacheBuild() = default;
+    ~PendingCacheBuild() {
+        cancel();
+    }
+
+    /// Starts the job on a new thread; a build that was running is cancelled.
+    void start(Job job);
+    bool isRunning() const {
+        return m_pState != nullptr;
+    }
+    /// The finished cache (once), or null if still running or not started.
+    std::unique_ptr<PhosphorLaneCache> takeIfReady();
+    void cancel() {
+        m_pState.reset();
+    }
+
+  private:
+    struct State {
+        std::atomic<bool> ready{false};
+        std::unique_ptr<PhosphorLaneCache> result;
+    };
+    // Shared with the worker, which outlives a cancelled build.
+    std::shared_ptr<State> m_pState;
 };
 
 } // namespace mixxx::phosphor

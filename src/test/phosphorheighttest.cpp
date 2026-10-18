@@ -45,12 +45,12 @@ TEST(PhosphorHeightTest, GainsFollowBoth) {
     in.highKill = true;
     const ShaderGains g = shaderGains(in);
     EXPECT_FLOAT_EQ(3.0f, g.height);
-    // The EQ gains don't include the visual gains; the colour gains do.
+    // The EQ gains don't include the visual gains; the color gains do.
     EXPECT_FLOAT_EQ(0.5f, g.eq[0]);
     EXPECT_FLOAT_EQ(1.0f, g.eq[1]);
     EXPECT_FLOAT_EQ(0.0f, g.eq[2]);
-    EXPECT_FLOAT_EQ(1.0f, g.colour[0]);
-    EXPECT_FLOAT_EQ(0.0f, g.colour[2]);
+    EXPECT_FLOAT_EQ(1.0f, g.color[0]);
+    EXPECT_FLOAT_EQ(0.0f, g.color[2]);
 }
 
 TEST(PhosphorHeightTest, BothOffLeavesOnlyTheVisualGains) {
@@ -67,8 +67,8 @@ TEST(PhosphorHeightTest, BothOffLeavesOnlyTheVisualGains) {
     for (int i = 0; i < 3; ++i) {
         EXPECT_FLOAT_EQ(1.0f, g.eq[i]);
     }
-    EXPECT_FLOAT_EQ(1.0f, g.colour[0]);
-    EXPECT_FLOAT_EQ(0.7f, g.colour[1]);
+    EXPECT_FLOAT_EQ(1.0f, g.color[0]);
+    EXPECT_FLOAT_EQ(0.7f, g.color[1]);
 }
 
 TEST(PhosphorHeightTest, DisabledEqCountsAsNeutral) {
@@ -85,8 +85,8 @@ TEST(PhosphorHeightTest, ColumnHeightFactorCombinesGainAndEq) {
     EXPECT_NEAR(1.44222f, columnHeightFactor(kLevels, g), 1e-4);
 }
 
-TEST(PhosphorHeightTest, StretchResamplesAtYOverGAboutTheCentre) {
-    // A lane of 100 rows, centre at 50.0. Pixel row 70 (centre 70.5) at g = 2
+TEST(PhosphorHeightTest, StretchResamplesAtYOverGAboutTheCenter) {
+    // A lane of 100 rows, center at 50.0. Pixel row 70 (center 70.5) at g = 2
     // reads the source at 50 + 20.5 / 2 = 60.25, i.e. row 60.
     EXPECT_EQ(60, stretchSourceRow(70, 100, 2.0f));
     EXPECT_EQ(70, stretchSourceRow(70, 100, 1.0f));

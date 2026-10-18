@@ -51,7 +51,7 @@ TEST(PhosphorSlipOverlayTest, OverlayShapeIsTheFullSignedShapeAtHalfScale) {
         ASSERT_NE(nullptr, a);
         ASSERT_NE(nullptr, b);
         ASSERT_EQ(ColumnStatus::Signal, b->status);
-        // Same signed shape, half the rows: centre at 25 of 50, not 50 of 100.
+        // Same signed shape, half the rows: center at 25 of 50, not 50 of 100.
         EXPECT_NEAR(a->rowMin / 2.0, b->rowMin, 1.0) << k;
         EXPECT_NEAR(a->rowMax / 2.0, b->rowMax, 1.0) << k;
         EXPECT_EQ(50u, b->density.size());

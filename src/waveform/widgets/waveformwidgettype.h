@@ -30,8 +30,8 @@ class WaveformWidgetType {
         AllShaderTexturedFiltered,   // 22 Filtered (textured) (all-shaders)
         AllShaderTexturedRGB,        // 23 RGB (textured) (all-shaders)
         AllShaderTexturedStacked,    // 24 Stacked (textured) (all-shaders)
-        AllShaderRGBStackedWaveform, // 26 Stacked (all-shaders)
-        AllShaderPhosphor,           // 27 Phosphor (all-shaders)
+        AllShaderRGBStackedWaveform, // 25 Stacked (all-shaders)
+        AllShaderPhosphor,           // 26 Phosphor (all-shaders)
         Count_WaveformwidgetType     //    Also used as invalid value
     };
 };

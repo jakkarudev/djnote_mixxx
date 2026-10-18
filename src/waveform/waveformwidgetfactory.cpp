@@ -751,17 +751,17 @@ void WaveformWidgetFactory::setFollowsGain(bool follows) {
     }
 }
 
-void WaveformWidgetFactory::setPhosphorSettings(const mixxx::phosphor::PhosphorSettings& settings) {
-    m_phosphorSettings = mixxx::phosphor::clampSettings(settings);
-    if (m_config) {
-        mixxx::phosphor::saveSettings(m_config, m_phosphorSettings);
-    }
-}
-
 void WaveformWidgetFactory::setFollowsEq(bool follows) {
     m_followsEq = follows;
     if (m_config) {
         m_config->setValue(ConfigKey("[Waveform]", "FollowsEq"), follows);
+    }
+}
+
+void WaveformWidgetFactory::setPhosphorSettings(const mixxx::phosphor::PhosphorSettings& settings) {
+    m_phosphorSettings = mixxx::phosphor::clampSettings(settings);
+    if (m_config) {
+        mixxx::phosphor::saveSettings(m_config, m_phosphorSettings);
     }
 }
 

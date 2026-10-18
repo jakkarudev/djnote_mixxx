@@ -18,8 +18,12 @@
 #include "util/compatibility/qmutex.h"
 #include "util/fileaccess.h"
 #include "util/performancetimer.h"
-#include "waveform/phosphor/phosphordata.h"
 #include "waveform/waveform.h"
+
+namespace mixxx::phosphor {
+class PhosphorData;
+using PhosphorDataPointer = std::shared_ptr<const PhosphorData>;
+} // namespace mixxx::phosphor
 
 class Track : public QObject {
     Q_OBJECT
@@ -293,6 +297,10 @@ class Track : public QObject {
     /// analyzer started. Safe to call from any thread.
     mixxx::phosphor::PhosphorDataPointer getPhosphorData() const;
     void setPhosphorData(mixxx::phosphor::PhosphorDataPointer pData);
+    /// Sets the data only if the track still holds `expected` (null: none).
+    /// Returns false, and changes nothing, if another thread got there first.
+    bool replacePhosphorData(const mixxx::phosphor::PhosphorDataPointer& expected,
+            mixxx::phosphor::PhosphorDataPointer pData);
 
     /// Get the track's main cue point
     mixxx::audio::FramePos getMainCuePosition() const;
@@ -589,7 +597,7 @@ class Track : public QObject {
     ConstWaveformPointer m_waveform;
     ConstWaveformPointer m_waveformSummary;
 
-    mutable std::mutex m_phosphorMutex;
+    mutable QMutex m_phosphorMutex;
     mixxx::phosphor::PhosphorDataPointer m_pPhosphorData;
 
     mixxx::BeatsImporterPointer m_pBeatsImporterPending;

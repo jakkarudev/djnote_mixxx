@@ -4,7 +4,6 @@
 #include <QVector2D>
 #include <QVector3D>
 #include <algorithm>
-#include <chrono>
 #include <cmath>
 
 #include "track/track.h"
@@ -23,9 +22,6 @@ namespace {
 // filled in over the next frames (a zoom or size change is done on a worker).
 constexpr int kMaxColumnsPerFrame = 64;
 constexpr int64_t kNoColumn = INT64_MIN;
-// Ticket #12: Mixxx's existing zoom mapping. The deck's zoom is in visual
-// samples (441 per second at the file's rate) per logical pixel.
-constexpr double kVisualSamplesPerSecond = 441.0;
 } // namespace
 
 WaveformRendererPhosphor::WaveformRendererPhosphor(WaveformWidgetRenderer* waveformWidget,
@@ -33,16 +29,13 @@ WaveformRendererPhosphor::WaveformRendererPhosphor(WaveformWidgetRenderer* wavef
         : WaveformRendererSignalBase(waveformWidget),
           m_isSlipRenderer(type == ::WaveformRendererAbstract::Slip),
           m_texture(0),
-          m_colourTexture(0),
+          m_colorTexture(0),
           m_textureRows(0),
           m_textureSlotCount(0) {
 }
 
 WaveformRendererPhosphor::~WaveformRendererPhosphor() {
     // The widget makes the GL context current before deleting its renderers.
-    if (m_pending.valid()) {
-        m_pending.wait();
-    }
     deleteTexture();
 }
 
@@ -59,10 +52,8 @@ void WaveformRendererPhosphor::forgetUploadedColumns() {
 }
 
 void WaveformRendererPhosphor::resetCache() {
-    if (m_pending.valid()) {
-        m_pending.wait();
-        m_pending = {};
-    }
+    // Does not wait for a running build: its result is dropped.
+    m_pending.cancel();
     m_pCache.reset();
     forgetUploadedColumns();
 }
@@ -72,7 +63,7 @@ void WaveformRendererPhosphor::initializeGL() {
     m_shader.init();
     // A new context: the texture is gone, upload everything again.
     m_texture = 0;
-    m_colourTexture = 0;
+    m_colorTexture = 0;
     m_textureRows = 0;
     m_textureSlotCount = 0;
     m_slotColumn.clear();
@@ -83,10 +74,10 @@ void WaveformRendererPhosphor::deleteTexture() {
         glDeleteTextures(1, &m_texture);
     }
     m_texture = 0;
-    if (m_colourTexture != 0 && QOpenGLContext::currentContext()) {
-        glDeleteTextures(1, &m_colourTexture);
+    if (m_colorTexture != 0 && QOpenGLContext::currentContext()) {
+        glDeleteTextures(1, &m_colorTexture);
     }
-    m_colourTexture = 0;
+    m_colorTexture = 0;
 }
 
 LaneParams WaveformRendererPhosphor::desiredParams(const PhosphorData& data) const {
@@ -112,20 +103,18 @@ void WaveformRendererPhosphor::updateCache(const PhosphorDataPointer& pData,
     }
 
     // Collect a finished recompute.
-    if (m_pending.valid() &&
-            m_pending.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-        m_pCache = m_pending.get();
-        m_pending = {};
+    if (auto pReady = m_pending.takeIfReady()) {
+        m_pCache = std::move(pReady);
         forgetUploadedColumns();
     }
 
-    if (m_pCache->params() == desired || m_pending.valid()) {
+    if (m_pCache->params() == desired || m_pending.isRunning()) {
         // Up to date, or a recompute is running; the next frame asks again.
         return;
     }
     // Zoom or size changed: recompute the visible lane on a worker thread and
     // keep drawing the previous one meanwhile.
-    m_pending = std::async(std::launch::async, [pData, desired, firstColumn, lastColumn]() {
+    m_pending.start([pData, desired, firstColumn, lastColumn]() {
         auto pCache = std::make_unique<Cache>(pData, desired);
         for (int64_t k = firstColumn; k <= lastColumn; ++k) {
             pCache->column(k);
@@ -134,46 +123,43 @@ void WaveformRendererPhosphor::updateCache(const PhosphorDataPointer& pData,
     });
 }
 
+int WaveformRendererPhosphor::slotOf(int64_t column) const {
+    return static_cast<int>(((column % m_textureSlotCount) + m_textureSlotCount) %
+            m_textureSlotCount);
+}
+
+GLuint WaveformRendererPhosphor::createTexture(
+        int width, int height, std::vector<uint8_t>* pTexels) {
+    GLuint texture = 0;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    pTexels->assign(static_cast<size_t>(width) * height * kBytesPerTexel, 0);
+    glTexImage2D(GL_TEXTURE_2D,
+            0,
+            GL_RGBA,
+            width,
+            height,
+            0,
+            GL_RGBA,
+            GL_UNSIGNED_BYTE,
+            pTexels->data());
+    return texture;
+}
+
 void WaveformRendererPhosphor::ensureTexture(int slotCount, int rows) {
     if (m_texture != 0 && m_textureSlotCount == slotCount && m_textureRows == rows) {
         return;
     }
     deleteTexture();
-    glGenTextures(1, &m_texture);
-    glBindTexture(GL_TEXTURE_2D, m_texture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     m_textureSlotCount = slotCount;
     m_textureRows = rows;
-    m_texels.assign(static_cast<size_t>(slotCount) * rows * kBytesPerTexel, 0);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-    glTexImage2D(GL_TEXTURE_2D,
-            0,
-            GL_RGBA,
-            rows,
-            slotCount,
-            0,
-            GL_RGBA,
-            GL_UNSIGNED_BYTE,
-            m_texels.data());
-    glGenTextures(1, &m_colourTexture);
-    glBindTexture(GL_TEXTURE_2D, m_colourTexture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    m_colourTexels.assign(static_cast<size_t>(slotCount) * kColourRows * kBytesPerTexel, 0);
-    glTexImage2D(GL_TEXTURE_2D,
-            0,
-            GL_RGBA,
-            slotCount,
-            kColourRows,
-            0,
-            GL_RGBA,
-            GL_UNSIGNED_BYTE,
-            m_colourTexels.data());
+    m_texture = createTexture(rows, slotCount, &m_texels);
+    m_colorTexture = createTexture(slotCount, kColorRows, &m_colorTexels);
     glBindTexture(GL_TEXTURE_2D, m_texture);
     m_slotColumn.assign(static_cast<size_t>(slotCount), kNoColumn);
     m_slotDirty.assign(static_cast<size_t>(slotCount), 0);
@@ -184,7 +170,7 @@ void WaveformRendererPhosphor::uploadColumns(int64_t firstColumn, int64_t lastCo
     const int rows = m_textureRows;
     int computed = 0;
     for (int64_t k = firstColumn; k <= lastColumn; ++k) {
-        const int slot = static_cast<int>(((k % slotCount) + slotCount) % slotCount);
+        const int slot = slotOf(k);
         if (m_slotColumn[static_cast<size_t>(slot)] == k) {
             continue;
         }
@@ -201,10 +187,10 @@ void WaveformRendererPhosphor::uploadColumns(int64_t firstColumn, int64_t lastCo
         // A column that can't be computed yet (data still decoding) is blank
         // and asked for again.
         {
-            uint8_t* pColourTexels = m_colourTexels.data();
+            uint8_t* pColorTexels = m_colorTexels.data();
             encodeColumnLevels(pColumn,
-                    pColourTexels + static_cast<size_t>(slot) * kBytesPerTexel,
-                    pColourTexels +
+                    pColorTexels + static_cast<size_t>(slot) * kBytesPerTexel,
+                    pColorTexels +
                             (static_cast<size_t>(slotCount) + static_cast<size_t>(slot)) *
                                     kBytesPerTexel);
         }
@@ -233,18 +219,18 @@ void WaveformRendererPhosphor::uploadColumns(int64_t firstColumn, int64_t lastCo
                 GL_UNSIGNED_BYTE,
                 m_texels.data() + static_cast<size_t>(slot) * rows * kBytesPerTexel);
         // The levels of the same run, in the second texture.
-        glBindTexture(GL_TEXTURE_2D, m_colourTexture);
-        for (int colourRow = 0; colourRow < kColourRows; ++colourRow) {
+        glBindTexture(GL_TEXTURE_2D, m_colorTexture);
+        for (int colorRow = 0; colorRow < kColorRows; ++colorRow) {
             glTexSubImage2D(GL_TEXTURE_2D,
                     0,
                     slot,
-                    colourRow,
+                    colorRow,
                     end - slot,
                     1,
                     GL_RGBA,
                     GL_UNSIGNED_BYTE,
-                    m_colourTexels.data() +
-                            (static_cast<size_t>(colourRow) * slotCount + slot) *
+                    m_colorTexels.data() +
+                            (static_cast<size_t>(colorRow) * slotCount + slot) *
                                     kBytesPerTexel);
         }
         glBindTexture(GL_TEXTURE_2D, m_texture);
@@ -313,13 +299,12 @@ void WaveformRendererPhosphor::paintGL() {
     m_vertices.addRectangle(0.f, 0.f, static_cast<float>(length), breadth);
 
     const QMatrix4x4 matrix = matrixForWidgetGeometry(m_waveformRenderer, true);
-    const int ringOffset = static_cast<int>(
-            ((firstColumn % m_textureSlotCount) + m_textureSlotCount) % m_textureSlotCount);
+    const int ringOffset = slotOf(firstColumn);
 
     // The advanced settings: live, from the next frame on every deck.
     const PhosphorSettings& settings = WaveformWidgetFactory::instance()->phosphorSettings();
     glEnable(GL_BLEND);
-    // Premultiplied: the colour is added (alpha 0), silence replaces (alpha 1).
+    // Premultiplied: the color is added (alpha 0), silence replaces (alpha 1).
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
     m_shader.bind();
@@ -330,18 +315,18 @@ void WaveformRendererPhosphor::paintGL() {
             QVector2D(static_cast<float>(m_textureRows), static_cast<float>(m_textureSlotCount)));
     m_shader.setUniformValue(m_shader.ringOffsetLocation(), static_cast<float>(ringOffset));
     glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, m_colourTexture);
+    glBindTexture(GL_TEXTURE_2D, m_colorTexture);
     glActiveTexture(GL_TEXTURE0);
-    m_shader.setUniformValue(m_shader.colourTextureLocation(), 1);
+    m_shader.setUniformValue(m_shader.colorTextureLocation(), 1);
     m_shader.setUniformValue(m_shader.visualGainsLocation(),
-            QVector3D(gains.colour[0], gains.colour[1], gains.colour[2]));
+            QVector3D(gains.color[0], gains.color[1], gains.color[2]));
     m_shader.setUniformValue(m_shader.eqGainsLocation(),
             QVector3D(gains.eq[0], gains.eq[1], gains.eq[2]));
     m_shader.setUniformValue(m_shader.heightGainLocation(), gains.height);
     m_shader.setUniformValue(m_shader.saturationLocation(), static_cast<float>(settings.saturation));
     // Levels are peak^mix, the brightness follows peak^brightnessExponent.
     m_shader.setUniformValue(m_shader.brightnessExponentLocation(),
-            static_cast<float>(settings.brightnessExponent / pData->colourMixExponent() - 1.0));
+            static_cast<float>(settings.brightnessExponent / pData->colorMixExponent() - 1.0));
     m_shader.setUniformValue(m_shader.channelGainsLocation(),
             QVector3D(static_cast<float>(settings.channelGains[0]),
                     static_cast<float>(settings.channelGains[1]),

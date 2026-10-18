@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cmath>
 
+#include "waveform/phosphor/phosphorcolortrack.h"
+
 namespace mixxx::phosphor {
 
 PhosphorData::PhosphorData(int sampleRate, SINT frameCapacity, int blockSize)
@@ -18,10 +20,10 @@ PhosphorData::PhosphorData(int sampleRate, SINT frameCapacity, int blockSize)
           m_blockMinAt(0),
           m_blockMaxAt(0),
           m_completed(0),
-          m_colourBlockFrames(std::max(1, static_cast<int>(std::lround(sampleRate / 1000.0)))),
-          m_colour(static_cast<size_t>(m_frameCapacity / m_colourBlockFrames) * 3, 0),
-          m_colourWritten(0),
-          m_colourCompleted(0),
+          m_colorBlockFrames(phosphor::colorBlockFrames(sampleRate)),
+          m_color(static_cast<size_t>(m_frameCapacity / m_colorBlockFrames) * 3, 0),
+          m_colorWritten(0),
+          m_colorCompleted(0),
           m_totalFrames(m_frameCapacity),
           m_finished(false) {
 }
@@ -81,15 +83,15 @@ void PhosphorData::append(const int16_t* pSamples, SINT count) {
     m_completed.store(m_written, std::memory_order_release);
 }
 
-void PhosphorData::appendColour(const uint16_t* pLevels, SINT blockCount) {
-    const SINT room = static_cast<SINT>(m_colour.size() / 3) - m_colourWritten;
+void PhosphorData::appendColor(const uint16_t* pLevels, SINT blockCount) {
+    const SINT room = static_cast<SINT>(m_color.size() / 3) - m_colorWritten;
     const SINT n = std::min(blockCount, room);
     if (n <= 0) {
         return;
     }
-    std::copy(pLevels, pLevels + n * 3, m_colour.begin() + m_colourWritten * 3);
-    m_colourWritten += n;
-    m_colourCompleted.store(m_colourWritten, std::memory_order_release);
+    std::copy(pLevels, pLevels + n * 3, m_color.begin() + m_colorWritten * 3);
+    m_colorWritten += n;
+    m_colorCompleted.store(m_colorWritten, std::memory_order_release);
 }
 
 void PhosphorData::finish() {
@@ -97,9 +99,9 @@ void PhosphorData::finish() {
         flushBlock();
         m_completed.store(m_written, std::memory_order_release);
     }
-    // The colour track covers whole blocks only. Blocks that were not written
-    // (data built without a colour track) stay at level 0.
-    m_colourCompleted.store(m_framesWritten / m_colourBlockFrames, std::memory_order_release);
+    // The color track covers whole blocks only. Blocks that were not written
+    // (data built without a color track) stay at level 0.
+    m_colorCompleted.store(m_framesWritten / m_colorBlockFrames, std::memory_order_release);
     m_totalFrames.store(m_framesWritten, std::memory_order_release);
     m_finished.store(true, std::memory_order_release);
 }

@@ -6,7 +6,7 @@ namespace mixxx::phosphor {
 
 /// The gain side of the Phosphor lane, as plain functions. The density cache
 /// does not depend on any of this: the shader stretches each column about the
-/// lane centre, so a knob, a kill or a Follows toggle never recomputes the
+/// lane center, so a knob, a kill or a Follows toggle never recomputes the
 /// cache. The shader repeats the maths of stretchSourceRow() and
 /// stretchedDensity() and eqHeightFactor().
 
@@ -17,8 +17,8 @@ struct ShaderGains {
     /// EQ knob gains with kills (1.0 when Follows EQ is off or the deck's EQ
     /// is disabled), Low, Mid, High. Without the visual gains.
     float eq[3] = {1.0f, 1.0f, 1.0f};
-    /// What multiplies the band levels for the colour: EQ x visual gains.
-    float colour[3] = {1.0f, 1.0f, 1.0f};
+    /// What multiplies the band levels for the color: EQ x visual gains.
+    float color[3] = {1.0f, 1.0f, 1.0f};
 };
 
 ShaderGains shaderGains(const waveformgains::Inputs& in);
@@ -30,7 +30,7 @@ float eqHeightFactor(const float levels[3], const float eq[3]);
 float columnHeightFactor(const float levels[3], const ShaderGains& gains);
 
 /// The source row a lane pixel row reads when its column is stretched by g
-/// about the lane centre (sample at y / g), or -1 when that is outside the
+/// about the lane center (sample at y / g), or -1 when that is outside the
 /// lane (clipped, or g is 0).
 int stretchSourceRow(int pixelRow, int height, float g);
 

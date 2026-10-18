@@ -15,7 +15,8 @@ namespace allshader {
 PhosphorWaveformWidget::PhosphorWaveformWidget(const QString& group, QWidget* parent)
         : WaveformWidget(group, parent) {
     usePerBarZoom();
-    addRenderer<WaveformRenderBackground>();
+    // The light is added to RGB 24 whatever the skin's background is.
+    addRenderer<WaveformRenderBackground>(QColor(24, 24, 24));
     addRenderer<WaveformRendererEndOfTrack>();
     addRenderer<WaveformRendererPreroll>();
     addRenderer<WaveformRenderMarkRange>();

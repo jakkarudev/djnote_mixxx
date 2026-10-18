@@ -9,47 +9,65 @@ namespace mixxx::phosphor {
 
 namespace {
 
-const ConfigKey kDetailCfgKey(QStringLiteral("[Waveform]"), QStringLiteral("PhosphorDetail"));
+const QString kGroup = QStringLiteral("[Waveform]");
 
-const ConfigKey kSaturationCfgKey(QStringLiteral("[Waveform]"), QStringLiteral("PhosphorSaturation"));
-const ConfigKey kGainCfgKeys[3] = {
-    ConfigKey(QStringLiteral("[Waveform]"), QStringLiteral("PhosphorGainR")),
-    ConfigKey(QStringLiteral("[Waveform]"), QStringLiteral("PhosphorGainG")),
-    ConfigKey(QStringLiteral("[Waveform]"), QStringLiteral("PhosphorGainB")),
+const ConfigKey kDetailCfgKey(kGroup, QStringLiteral("PhosphorDetail"));
+const ConfigKey kBlendCfgKey(kGroup, QStringLiteral("PhosphorBlend"));
+
+/// One numeric setting: its config key, range (the clamping limits) and where
+/// it lives in PhosphorSettings. The default is the value of a default
+/// constructed PhosphorSettings. clampSettings(), loadSettings() and
+/// saveSettings() all go through this table.
+struct NumberField {
+    const char* key;
+    double min;
+    double max;
+    double& (*value)(PhosphorSettings&);
+    const double& (*constValue)(const PhosphorSettings&);
 };
-const ConfigKey kBrightnessExponentCfgKey(
-        QStringLiteral("[Waveform]"), QStringLiteral("PhosphorBrightnessExponent"));
-const ConfigKey kDensityBrightnessCfgKey(
-        QStringLiteral("[Waveform]"), QStringLiteral("PhosphorDensityBrightness"));
-const ConfigKey kBlendCfgKey(QStringLiteral("[Waveform]"), QStringLiteral("PhosphorBlend"));
-const ConfigKey kShapeWindowCfgKey(
-        QStringLiteral("[Waveform]"), QStringLiteral("PhosphorShapeWindow"));
-const ConfigKey kMixExponentCfgKey(
-        QStringLiteral("[Waveform]"), QStringLiteral("PhosphorMixExponent"));
-const ConfigKey kAttackCfgKey(QStringLiteral("[Waveform]"), QStringLiteral("PhosphorAttackMs"));
-const ConfigKey kReleaseCfgKeys[3] = {
-    ConfigKey(QStringLiteral("[Waveform]"), QStringLiteral("PhosphorReleaseLowMs")),
-    ConfigKey(QStringLiteral("[Waveform]"), QStringLiteral("PhosphorReleaseMidMs")),
-    ConfigKey(QStringLiteral("[Waveform]"), QStringLiteral("PhosphorReleaseHighMs")),
+
+#define PHOSPHOR_FIELD(key, min, max, member)                                   \
+    {                                                                           \
+        key, min, max,                                                          \
+                [](PhosphorSettings& s) -> double& { return s.member; },        \
+                [](const PhosphorSettings& s) -> const double& { return s.member; } \
+    }
+
+const NumberField kNumberFields[] = {
+    PHOSPHOR_FIELD("PhosphorSaturation", kMinSaturation, kMaxSaturation, saturation),
+    PHOSPHOR_FIELD("PhosphorGainLow", 0.0, kMaxChannelGain, channelGains[0]),
+    PHOSPHOR_FIELD("PhosphorGainMid", 0.0, kMaxChannelGain, channelGains[1]),
+    PHOSPHOR_FIELD("PhosphorGainHigh", 0.0, kMaxChannelGain, channelGains[2]),
+    PHOSPHOR_FIELD("PhosphorBrightnessExponent",
+            kMinBrightnessExponent,
+            kMaxBrightnessExponent,
+            brightnessExponent),
+    PHOSPHOR_FIELD("PhosphorDensityBrightness",
+            kMinDensityBrightness,
+            kMaxDensityBrightness,
+            densityBrightness),
+    PHOSPHOR_FIELD("PhosphorShapeWindow", kMinShapeWindow, kMaxShapeWindow, shapeWindow),
+    PHOSPHOR_FIELD("PhosphorMixExponent", kMinMixExponent, kMaxMixExponent, color.mixExponent),
+    PHOSPHOR_FIELD("PhosphorAttackMs", 0.0, kMaxAttackMs, color.attackMs),
+    PHOSPHOR_FIELD("PhosphorReleaseLowMs", 0.0, kMaxReleaseMs, color.releaseMs[0]),
+    PHOSPHOR_FIELD("PhosphorReleaseMidMs", 0.0, kMaxReleaseMs, color.releaseMs[1]),
+    PHOSPHOR_FIELD("PhosphorReleaseHighMs", 0.0, kMaxReleaseMs, color.releaseMs[2]),
+    PHOSPHOR_FIELD("PhosphorLookAheadMs", 0.0, kMaxLookAheadMs, color.lookAheadMs),
 };
-const ConfigKey kLookAheadCfgKey(
-        QStringLiteral("[Waveform]"), QStringLiteral("PhosphorLookAheadMs"));
+
+#undef PHOSPHOR_FIELD
 
 /// Out of range values are pulled into the range; unreadable ones (not a
 /// number) give the default.
-double clamped(double value, double min, double max, double fallback) {
+double clamped(double value, const NumberField& field, double fallback) {
     if (!std::isfinite(value)) {
         return fallback;
     }
-    return std::clamp(value, min, max);
+    return std::clamp(value, field.min, field.max);
 }
 
-double readClamped(const UserSettingsPointer& pConfig,
-        const ConfigKey& key,
-        double min,
-        double max,
-        double fallback) {
-    return clamped(pConfig->getValue(key, fallback), min, max, fallback);
+ConfigKey keyOf(const NumberField& field) {
+    return ConfigKey(kGroup, QString::fromLatin1(field.key));
 }
 
 } // namespace
@@ -58,40 +76,23 @@ LightBlend blendFromInt(int value) {
     return value == static_cast<int>(LightBlend::Opaque) ? LightBlend::Opaque : LightBlend::Add;
 }
 
-PhosphorSettings clampSettings(const PhosphorSettings& in) {
-    const PhosphorSettings d;
-    PhosphorSettings s = in;
-    s.detail = detailFromInt(static_cast<int>(in.detail));
-    s.blend = blendFromInt(static_cast<int>(in.blend));
-    s.saturation = clamped(in.saturation, kMinSaturation, kMaxSaturation, d.saturation);
-    for (int c = 0; c < 3; ++c) {
-        s.channelGains[c] = clamped(in.channelGains[c], 0.0, kMaxChannelGain, d.channelGains[c]);
-        s.colour.releaseMs[c] =
-                clamped(in.colour.releaseMs[c], 0.0, kMaxReleaseMs, d.colour.releaseMs[c]);
-    }
-    s.brightnessExponent = clamped(in.brightnessExponent,
-            kMinBrightnessExponent,
-            kMaxBrightnessExponent,
-            d.brightnessExponent);
-    s.densityBrightness = clamped(in.densityBrightness,
-            kMinDensityBrightness,
-            kMaxDensityBrightness,
-            d.densityBrightness);
-    s.shapeWindow = clamped(in.shapeWindow, kMinShapeWindow, kMaxShapeWindow, d.shapeWindow);
-    s.colour.mixExponent = clamped(
-            in.colour.mixExponent, kMinMixExponent, kMaxMixExponent, d.colour.mixExponent);
-    s.colour.attackMs = clamped(in.colour.attackMs, 0.0, kMaxAttackMs, d.colour.attackMs);
-    s.colour.lookAheadMs =
-            clamped(in.colour.lookAheadMs, 0.0, kMaxLookAheadMs, d.colour.lookAheadMs);
-    return s;
-}
-
 WaveformDetail detailFromInt(int value) {
     if (value < static_cast<int>(WaveformDetail::Full) ||
             value > static_cast<int>(kLowestDetail)) {
         return kDefaultDetail;
     }
     return static_cast<WaveformDetail>(value);
+}
+
+PhosphorSettings clampSettings(const PhosphorSettings& in) {
+    PhosphorSettings defaults;
+    PhosphorSettings s = in;
+    s.detail = detailFromInt(static_cast<int>(in.detail));
+    s.blend = blendFromInt(static_cast<int>(in.blend));
+    for (const NumberField& field : kNumberFields) {
+        field.value(s) = clamped(field.constValue(in), field, field.value(defaults));
+    }
+    return s;
 }
 
 SINT dataBytes(WaveformDetail detail, SINT frames) {
@@ -113,56 +114,24 @@ WaveformDetail effectiveDetail(WaveformDetail chosen, SINT frames) {
 }
 
 PhosphorSettings loadSettings(const UserSettingsPointer& pConfig) {
-    const PhosphorSettings d;
     PhosphorSettings s;
-    s.detail = detailFromInt(pConfig->getValue(kDetailCfgKey, static_cast<int>(d.detail)));
-    s.saturation = readClamped(
-            pConfig, kSaturationCfgKey, kMinSaturation, kMaxSaturation, d.saturation);
-    for (int c = 0; c < 3; ++c) {
-        s.channelGains[c] = readClamped(
-                pConfig, kGainCfgKeys[c], 0.0, kMaxChannelGain, d.channelGains[c]);
-        s.colour.releaseMs[c] = readClamped(
-                pConfig, kReleaseCfgKeys[c], 0.0, kMaxReleaseMs, d.colour.releaseMs[c]);
+    const PhosphorSettings defaults;
+    s.detail = detailFromInt(pConfig->getValue(kDetailCfgKey, static_cast<int>(defaults.detail)));
+    s.blend = blendFromInt(pConfig->getValue(kBlendCfgKey, static_cast<int>(defaults.blend)));
+    for (const NumberField& field : kNumberFields) {
+        const double fallback = field.constValue(defaults);
+        field.value(s) = clamped(pConfig->getValue(keyOf(field), fallback), field, fallback);
     }
-    s.brightnessExponent = readClamped(pConfig,
-            kBrightnessExponentCfgKey,
-            kMinBrightnessExponent,
-            kMaxBrightnessExponent,
-            d.brightnessExponent);
-    s.densityBrightness = readClamped(pConfig,
-            kDensityBrightnessCfgKey,
-            kMinDensityBrightness,
-            kMaxDensityBrightness,
-            d.densityBrightness);
-    s.blend = blendFromInt(pConfig->getValue(kBlendCfgKey, static_cast<int>(d.blend)));
-    s.shapeWindow = readClamped(
-            pConfig, kShapeWindowCfgKey, kMinShapeWindow, kMaxShapeWindow, d.shapeWindow);
-    s.colour.mixExponent = readClamped(pConfig,
-            kMixExponentCfgKey,
-            kMinMixExponent,
-            kMaxMixExponent,
-            d.colour.mixExponent);
-    s.colour.attackMs = readClamped(pConfig, kAttackCfgKey, 0.0, kMaxAttackMs, d.colour.attackMs);
-    s.colour.lookAheadMs = readClamped(
-            pConfig, kLookAheadCfgKey, 0.0, kMaxLookAheadMs, d.colour.lookAheadMs);
     return s;
 }
 
 void saveSettings(const UserSettingsPointer& pConfig, const PhosphorSettings& settings) {
     const PhosphorSettings s = clampSettings(settings);
     pConfig->setValue(kDetailCfgKey, static_cast<int>(s.detail));
-    pConfig->setValue(kSaturationCfgKey, s.saturation);
-    for (int c = 0; c < 3; ++c) {
-        pConfig->setValue(kGainCfgKeys[c], s.channelGains[c]);
-        pConfig->setValue(kReleaseCfgKeys[c], s.colour.releaseMs[c]);
-    }
-    pConfig->setValue(kBrightnessExponentCfgKey, s.brightnessExponent);
-    pConfig->setValue(kDensityBrightnessCfgKey, s.densityBrightness);
     pConfig->setValue(kBlendCfgKey, static_cast<int>(s.blend));
-    pConfig->setValue(kShapeWindowCfgKey, s.shapeWindow);
-    pConfig->setValue(kMixExponentCfgKey, s.colour.mixExponent);
-    pConfig->setValue(kAttackCfgKey, s.colour.attackMs);
-    pConfig->setValue(kLookAheadCfgKey, s.colour.lookAheadMs);
+    for (const NumberField& field : kNumberFields) {
+        pConfig->setValue(keyOf(field), field.constValue(s));
+    }
 }
 
 } // namespace mixxx::phosphor

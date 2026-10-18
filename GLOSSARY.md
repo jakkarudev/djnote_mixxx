@@ -49,7 +49,7 @@ The color of a track's audio over time, derived from its low, mid and high conte
 _Avoid_: color data, spectrum data
 
 **Waveform detail**:
-The preference, from Full down to Lowest, that sets how much of a loaded track's audio the Phosphor scrolling waveform keeps in memory. Lower detail uses less memory and mostly affects the density, never the outline.
+The preference, from Full down to Low, that sets how much of a loaded track's audio the Phosphor scrolling waveform keeps in memory. Lower detail uses less memory and mostly affects the density, never the outline.
 _Avoid_: waveform quality, resolution
 
 **Visual gain**:

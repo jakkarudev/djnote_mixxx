@@ -5,14 +5,16 @@
 namespace allshader {
 
 WaveformRenderBackground::WaveformRenderBackground(
-        WaveformWidgetRenderer* waveformWidgetRenderer)
+        WaveformWidgetRenderer* waveformWidgetRenderer, std::optional<QColor> fixedColor)
         : WaveformRenderer(waveformWidgetRenderer),
+          m_fixedColor(fixedColor),
           m_backgroundColor(0, 0, 0) {
 }
 
 void WaveformRenderBackground::setup(const QDomNode& node,
         const SkinContext& context) {
-    m_backgroundColor = m_waveformRenderer->getWaveformSignalColors()->getBgColor();
+    m_backgroundColor = m_fixedColor.value_or(
+            m_waveformRenderer->getWaveformSignalColors()->getBgColor());
 
     QString backgroundPixmapPath = context.selectString(node, "BgPixmap");
     if (!backgroundPixmapPath.isEmpty()) {
