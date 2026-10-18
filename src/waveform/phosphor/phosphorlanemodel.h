@@ -42,6 +42,9 @@ struct LaneParams {
     int height = 1;
     /// Shape window, in columns.
     double windowColumns = 2.0;
+    /// The All visual gain: scales the height of the outline (1.0 = the
+    /// calibrated height). Colour is not affected.
+    double heightGain = 1.0;
 
     bool operator==(const LaneParams& other) const = default;
 };
@@ -68,10 +71,14 @@ struct LaneColumn {
     /// Per row: hits / samples in the window * height / 2. Empty when the
     /// column is outside.
     std::vector<float> density;
+    /// The band levels (0..1) of the colour track at the column centre,
+    /// interpolated between blocks: R = Low, G = Mid, B = High. Zero when
+    /// the column is outside.
+    float levels[3] = {0.f, 0.f, 0.f};
 };
 
 /// The row of a value (int16 units). Positive values go down.
-int rowOfValue(double value, int height);
+int rowOfValue(double value, int height, double heightGain = 1.0);
 
 /// Whether the data decoded so far is enough to compute the column centred on
 /// the given frame. False for columns whose window reaches data that was not

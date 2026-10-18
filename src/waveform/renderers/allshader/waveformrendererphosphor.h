@@ -35,14 +35,15 @@ class allshader::WaveformRendererPhosphor final : public allshader::WaveformRend
     using Cache = mixxx::phosphor::PhosphorLaneCache;
 
     // The view the lane has to show now.
-    mixxx::phosphor::LaneParams desiredParams(
-            const mixxx::phosphor::PhosphorData& data) const;
+    mixxx::phosphor::LaneParams desiredParams(const mixxx::phosphor::PhosphorData& data,
+            float allGain) const;
     void resetCache();
     void updateCache(const mixxx::phosphor::PhosphorDataPointer& pData,
             const mixxx::phosphor::LaneParams& desired,
             int64_t firstColumn,
             int64_t lastColumn);
     void ensureTexture(int slotCount, int rows);
+    void deleteTextureObject(GLuint* pTexture);
     void uploadColumns(int64_t firstColumn, int64_t lastColumn);
     void deleteTexture();
     void forgetUploadedColumns();
@@ -59,6 +60,9 @@ class allshader::WaveformRendererPhosphor final : public allshader::WaveformRend
     // Ring texture: one texel per lane row along x, one slot per column along
     // y, so that a run of columns is a contiguous block of the CPU copy.
     GLuint m_texture;
+    // Band levels, one texel per column slot in two rows (phosphortexelcodec.h).
+    GLuint m_colourTexture;
+    std::vector<uint8_t> m_colourTexels;
     int m_textureRows;
     int m_textureSlotCount;
     std::vector<uint8_t> m_texels;

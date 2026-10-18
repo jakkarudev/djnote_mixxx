@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <iostream>
 #include <utility>
 #include <vector>
 
@@ -319,6 +321,110 @@ TEST_F(AnalyzerPhosphorTest, ChosenTierIsAFloorLongInputsDropToALowerOne) {
     EXPECT_EQ(4, blockSizeFor(WaveformDetail::Full, 96000, 8 * 60 * 96000));
     // A 1 hour mix: High is 159 MB (Medium 79 MB).
     EXPECT_EQ(8, blockSizeFor(WaveformDetail::High, 44100, 3600 * 44100));
+}
+
+// The colour track through the analyzer, against the reference script's
+// fixtures. Level = u16 / 65535; the error is absolute, relative to the
+// loudest level of that channel in the fixture.
+TEST_F(AnalyzerPhosphorTest, ColourTrackMatchesReferenceFixtures) {
+    const char* const names[] = {"q2a_630hz",
+            "q2b_sweep",
+            "q3a_100hz_step",
+            "q5_click",
+            "q5_kick",
+            "q9_mixture",
+            "q4_sine"};
+    double worst = 0;
+    for (const char* name : names) {
+        const auto f = phosphorfixture::load(
+                getTestDir().filePath(QStringLiteral("phosphor/%1.phfx").arg(name)));
+        ASSERT_TRUE(f.ok) << name;
+        TrackPointer pTrack = Track::newTemporary();
+        AnalyzerPhosphor analyzer(config());
+        ASSERT_TRUE(analyzer.initialize(AnalyzerTrack(pTrack, deckOptions()),
+                mixxx::audio::SampleRate(f.rate),
+                f.frames));
+        ASSERT_TRUE(feed(&analyzer, toStereoFloats(f), 2 * 1001)) << name;
+        analyzer.storeResults(pTrack);
+        analyzer.cleanup();
+        const auto pData = pTrack->getPhosphorData();
+        ASSERT_TRUE(pData);
+        ASSERT_EQ(static_cast<SINT>(f.colourBlockFrames), pData->colourBlockFrames()) << name;
+        const size_t blocks = f.colour.size() / 3;
+        ASSERT_EQ(static_cast<SINT>(blocks), pData->colourBlocksCompleted()) << name;
+        for (int c = 0; c < 3; ++c) {
+            double peak = 1e-9;
+            for (size_t b = 0; b < blocks; ++b) {
+                peak = std::max(peak, f.colour[b * 3 + c] / 65535.0);
+            }
+            for (size_t b = 0; b < blocks; ++b) {
+                const double expected = f.colour[b * 3 + c] / 65535.0;
+                const double actual = pData->colourLevel(static_cast<SINT>(b), c) / 65535.0;
+                const double err = std::abs(expected - actual) / peak;
+                worst = std::max(worst, err);
+                ASSERT_LE(err, 0.01) << name << " channel " << c << " block " << b;
+            }
+        }
+    }
+    std::cout << "colour track worst error vs fixtures (relative to channel peak): " << worst
+              << std::endl;
+}
+
+TEST_F(AnalyzerPhosphorTest, AnalyzerCostPerMinuteOfAudio) {
+    const int rate = 44100;
+    const SINT frames = 60 * rate;
+    TrackPointer pTrack = Track::newTemporary();
+    AnalyzerPhosphor analyzer(config());
+    ASSERT_TRUE(analyzer.initialize(AnalyzerTrack(pTrack, deckOptions()),
+            mixxx::audio::SampleRate(rate),
+            frames));
+    std::vector<CSAMPLE> stereo(2 * frames);
+    uint32_t state = 12345;
+    for (auto& v : stereo) {
+        state = state * 1664525u + 1013904223u;
+        v = (static_cast<int>(state >> 16) - 32768) / 65536.0f;
+    }
+    const auto start = std::chrono::steady_clock::now();
+    ASSERT_TRUE(feed(&analyzer, stereo, 2 * 4096));
+    analyzer.storeResults(pTrack);
+    const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - start)
+                            .count();
+    analyzer.cleanup();
+    std::cout << "Phosphor analyzer: " << ms << " ms per minute of audio" << std::endl;
+    EXPECT_EQ(frames / 44, pTrack->getPhosphorData()->colourBlocksCompleted());
+}
+
+TEST_F(AnalyzerPhosphorTest, ColourTrackFillsProgressively) {
+    const int rate = 44100;
+    const SINT frames = 3 * rate;
+    TrackPointer pTrack = Track::newTemporary();
+    AnalyzerPhosphor analyzer(config());
+    ASSERT_TRUE(analyzer.initialize(AnalyzerTrack(pTrack, deckOptions()),
+            mixxx::audio::SampleRate(rate),
+            frames));
+    const auto pData = pTrack->getPhosphorData();
+    std::vector<CSAMPLE> stereo(2 * frames);
+    for (SINT i = 0; i < frames; ++i) {
+        stereo[2 * i] = stereo[2 * i + 1] =
+                0.5f * static_cast<float>(std::sin(2 * M_PI * 100 * i / rate));
+    }
+    SINT midBlocks = 0;
+    for (SINT pos = 0; pos < 2 * frames; pos += 2 * 4096) {
+        ASSERT_TRUE(analyzer.processSamples(
+                stereo.data() + pos, std::min<SINT>(2 * 4096, 2 * frames - pos)));
+        if (pos == 2 * 4096 * 20) {
+            midBlocks = pData->colourBlocksCompleted();
+        }
+    }
+    // Blocks appear while decoding, behind the samples.
+    EXPECT_GT(midBlocks, 0);
+    EXPECT_LT(midBlocks, 20 * 4096 / 44);
+    analyzer.storeResults(pTrack);
+    analyzer.cleanup();
+    EXPECT_EQ(frames / 44, pData->colourBlocksCompleted());
+    // A 100 Hz tone is red, not blue.
+    EXPECT_GT(pData->colourLevel(1500, 0), 3 * pData->colourLevel(1500, 2));
 }
 
 } // namespace

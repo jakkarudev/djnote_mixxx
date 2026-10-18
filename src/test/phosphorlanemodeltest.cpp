@@ -44,6 +44,8 @@ std::unique_ptr<PhosphorData> dataFromFixture(const phosphorfixture::Fixture& f,
         mono[i] = static_cast<int16_t>(std::floor((l + r) / 2.0 + 0.5));
     }
     pData->append(mono.data(), static_cast<SINT>(mono.size()));
+    // The fixture's own colour track: the lane model is tested on its own.
+    pData->appendColour(f.colour.data(), static_cast<SINT>(f.colour.size() / 3));
     pData->finish();
     return pData;
 }
@@ -87,6 +89,10 @@ TEST_F(PhosphorLaneModelTest, FullDetailColumnsMatchTheReferenceFixtures) {
                 ASSERT_EQ(lane.rowMin[x], col.rowMin) << where.toStdString();
                 ASSERT_EQ(lane.rowMax[x], col.rowMax) << where.toStdString();
                 ASSERT_EQ(lane.height, col.density.size()) << where.toStdString();
+                for (int c = 0; c < 3; ++c) {
+                    ASSERT_NEAR(lane.levels[static_cast<size_t>(x) * 3 + c], col.levels[c], 0.01)
+                            << where.toStdString() << " / level " << c;
+                }
                 for (uint32_t row = 0; row < lane.height; ++row) {
                     ASSERT_NEAR(lane.density[static_cast<size_t>(x) * lane.height + row],
                             col.density[row],
@@ -261,6 +267,8 @@ TEST(PhosphorLaneModelPlainTest, ColumnsNeedDecodedData) {
     PhosphorData data(44100, 1000);
     const std::vector<int16_t> s(400, 1000);
     data.append(s.data(), 400);
+    const std::vector<uint16_t> colour(3 * 30, 0);
+    data.appendColour(colour.data(), 9); // the colour track follows the samples
     LaneParams params;
     params.framesPerColumn = 10;
     params.height = 21;
@@ -269,6 +277,10 @@ TEST(PhosphorLaneModelPlainTest, ColumnsNeedDecodedData) {
     EXPECT_FALSE(isColumnReady(data, params, 700));
     data.append(s.data(), 400);
     data.append(s.data(), 200);
+    data.appendColour(colour.data(), 5); // 14 of the 22 blocks: still behind
+    // The colour track trails the samples: not ready until it caught up.
+    EXPECT_FALSE(isColumnReady(data, params, 999));
+    data.finish();
     EXPECT_TRUE(isColumnReady(data, params, 999));
 }
 
@@ -295,6 +307,44 @@ TEST(PhosphorTexelCodecTest, DensityRoundTripsAndSilenceMarksTheCentreRow) {
     encodeColumn(nullptr, 5, texels.data());
     for (const uint8_t b : texels) {
         EXPECT_EQ(0, b);
+    }
+}
+
+TEST(PhosphorTexelCodecTest, LevelsRoundTripInTwoBytes) {
+    LaneColumn column;
+    column.status = ColumnStatus::Signal;
+    column.levels[0] = 0.5f;
+    column.levels[1] = 0.01234f;
+    column.levels[2] = 1.0f;
+    uint8_t high[4];
+    uint8_t low[4];
+    encodeColumnLevels(&column, high, low);
+    EXPECT_NEAR(0.5f, decodeLevel(high[0], low[0]), 1e-4);
+    EXPECT_NEAR(0.01234f, decodeLevel(high[1], low[1]), 1e-4);
+    EXPECT_NEAR(1.0f, decodeLevel(high[2], low[2]), 1e-4);
+    encodeColumnLevels(nullptr, high, low);
+    EXPECT_EQ(0, high[0] + low[0] + high[3] + low[3]);
+}
+
+TEST(PhosphorLaneModelPlainTest, HeightGainScalesTheOutlineButNotTheColour) {
+    PhosphorData data(44100, 44100);
+    const std::vector<int16_t> s(44100, 4000);
+    data.append(s.data(), 44100);
+    const std::vector<uint16_t> colour(3 * 1002, 40000);
+    data.appendColour(colour.data(), 1002);
+    data.finish();
+    LaneParams params;
+    params.framesPerColumn = 10;
+    params.height = 101;
+    const LaneColumn base = computeColumn(data, params, 20000);
+    params.heightGain = 2.0;
+    const LaneColumn doubled = computeColumn(data, params, 20000);
+    // 50 + 4000 / 32768 * 0.8 * 101 / 2 = 55 (rounded); twice the value: 60.
+    EXPECT_EQ(55, base.rowMin);
+    EXPECT_EQ(60, doubled.rowMin);
+    for (int c = 0; c < 3; ++c) {
+        EXPECT_FLOAT_EQ(base.levels[c], doubled.levels[c]);
+        EXPECT_NEAR(40000 / 65535.0, base.levels[c], 1e-6);
     }
 }
 
@@ -372,10 +422,13 @@ TEST(PhosphorLaneCachePlainTest, ColumnsComputedWhileDecodingEqualThoseOfTheFini
     params.height = 41;
     PhosphorLaneCache cache(data, params);
     EXPECT_EQ(nullptr, cache.column(100)); // nothing decoded yet
+    const std::vector<uint16_t> colour(3 * 454, 1000);
     data->append(s.data(), 5000);
+    data->appendColour(colour.data(), 113);
     ASSERT_NE(nullptr, cache.column(100));
     EXPECT_EQ(nullptr, cache.column(499)); // window reaches undecoded data
     data->append(s.data() + 5000, 15000);
+    data->appendColour(colour.data(), 454 - 113);
     data->finish();
     PhosphorLaneCache fresh(data, params);
     for (int64_t k : {100, 499, 1000, 1999}) {

@@ -1,6 +1,7 @@
 #include "waveform/phosphor/phosphorlanemodel.h"
 
 #include <algorithm>
+#include <QtGlobal>
 #include <cmath>
 
 namespace mixxx::phosphor {
@@ -86,16 +87,43 @@ double framesPerColumn(double sampleRate, double pxPerBar, double bpm) {
     return sampleRate / (pxPerBar * usedBpm / 240.0);
 }
 
-int rowOfValue(double value, int height) {
+int rowOfValue(double value, int height, double heightGain) {
     const double centre = (height - 1) / 2.0;
     const double half = kFullScale * height / 2.0;
-    const double row = std::floor(centre + value / 32768.0 * half + 0.5);
+    const double row = std::floor(centre + value * heightGain / 32768.0 * half + 0.5);
     return static_cast<int>(std::clamp(row, 0.0, static_cast<double>(height - 1)));
 }
 
+namespace {
+
+// The two colour blocks around a column centre and the weight of the second.
+struct ColourBlocks {
+    SINT lo;
+    SINT hi;
+    double t;
+};
+
+ColourBlocks colourBlocksAt(const PhosphorData& data, double centreFrame) {
+    const double u = centreFrame / data.colourBlockFrames() - 0.5;
+    const SINT last = std::max<SINT>(data.totalFrames() / data.colourBlockFrames() - 1, 0);
+    const double clamped = std::clamp(u, 0.0, static_cast<double>(last));
+    const SINT lo = static_cast<SINT>(std::floor(clamped));
+    return {lo, std::min(lo + 1, last), clamped - lo};
+}
+
+} // namespace
+
 bool isColumnReady(const PhosphorData& data, const LaneParams& params, double centreFrame) {
     const Window w = windowOf(data, params, centreFrame);
-    return w.isEmpty() || w.hi < data.pointsCompleted();
+    if (w.isEmpty()) {
+        return true;
+    }
+    if (w.hi >= data.pointsCompleted()) {
+        return false;
+    }
+    // The colour track trails the samples.
+    return data.isFinished() ||
+            colourBlocksAt(data, centreFrame).hi < data.colourBlocksCompleted();
 }
 
 LaneColumn computeColumn(const PhosphorData& data,
@@ -123,7 +151,7 @@ LaneColumn computeColumn(const PhosphorData& data,
     for (SINT i = w.lo; i <= w.hi; ++i) {
         const int value = data.pointValue(i);
         const double time = data.pointTime(i);
-        const int row = rowOfValue(value, height);
+        const int row = rowOfValue(value, height, params.heightGain);
         anySignal = anySignal || value != 0;
         rowMin = std::min(rowMin, row);
         rowMax = std::max(rowMax, row);
@@ -149,6 +177,14 @@ LaneColumn computeColumn(const PhosphorData& data,
     }
     column.rowMin = rowMin;
     column.rowMax = rowMax;
+    if (data.colourBlocksCompleted() > 0) {
+        const ColourBlocks blocks = colourBlocksAt(data, centreFrame);
+        for (int c = 0; c < 3; ++c) {
+            const double lo = data.colourLevel(blocks.lo, c);
+            const double hi = data.colourLevel(blocks.hi, c);
+            column.levels[c] = static_cast<float>((lo + (hi - lo) * blocks.t) / 65535.0);
+        }
+    }
     column.status = anySignal ? ColumnStatus::Signal : ColumnStatus::Silence;
     return column;
 }

@@ -11,6 +11,7 @@
 #include "waveform/phosphor/phosphortexelcodec.h"
 #include "waveform/renderers/allshader/matrixforwidgetgeometry.h"
 #include "waveform/renderers/waveformwidgetrenderer.h"
+#include "waveform/waveformwidgetfactory.h"
 
 namespace allshader {
 
@@ -25,8 +26,6 @@ constexpr int64_t kNoColumn = INT64_MIN;
 // samples (441 per second at the file's rate) per logical pixel.
 constexpr double kVisualSamplesPerSecond = 441.0;
 constexpr double kWindowColumns = 2.0;
-// The calibrated density brightness.
-constexpr float kBrightness = 0.7f;
 } // namespace
 
 WaveformRendererPhosphor::WaveformRendererPhosphor(WaveformWidgetRenderer* waveformWidget,
@@ -34,6 +33,7 @@ WaveformRendererPhosphor::WaveformRendererPhosphor(WaveformWidgetRenderer* wavef
         : WaveformRendererSignalBase(waveformWidget),
           m_isSlipRenderer(type == ::WaveformRendererAbstract::Slip),
           m_texture(0),
+          m_colourTexture(0),
           m_textureRows(0),
           m_textureSlotCount(0) {
 }
@@ -72,6 +72,7 @@ void WaveformRendererPhosphor::initializeGL() {
     m_shader.init();
     // A new context: the texture is gone, upload everything again.
     m_texture = 0;
+    m_colourTexture = 0;
     m_textureRows = 0;
     m_textureSlotCount = 0;
     m_slotColumn.clear();
@@ -82,9 +83,13 @@ void WaveformRendererPhosphor::deleteTexture() {
         glDeleteTextures(1, &m_texture);
     }
     m_texture = 0;
+    if (m_colourTexture != 0 && QOpenGLContext::currentContext()) {
+        glDeleteTextures(1, &m_colourTexture);
+    }
+    m_colourTexture = 0;
 }
 
-LaneParams WaveformRendererPhosphor::desiredParams(const PhosphorData& data) const {
+LaneParams WaveformRendererPhosphor::desiredParams(const PhosphorData& data, float allGain) const {
     const float dpr = m_waveformRenderer->getDevicePixelRatio();
     LaneParams params;
     const double framesPerLogicalPixel = m_waveformRenderer->getVisualSamplePerPixel() *
@@ -92,6 +97,8 @@ LaneParams WaveformRendererPhosphor::desiredParams(const PhosphorData& data) con
     params.framesPerColumn = std::max(framesPerLogicalPixel / dpr, 1e-3);
     params.height = std::max(static_cast<int>(m_waveformRenderer->getBreadth() * dpr), 1);
     params.windowColumns = kWindowColumns;
+    // The All visual gain scales the height; 1.0 is the calibrated height.
+    params.heightGain = allGain;
     // The slip overlay is the full shape at half scale in the top half.
     return m_isSlipRenderer ? slipOverlayParams(params) : params;
 }
@@ -153,6 +160,23 @@ void WaveformRendererPhosphor::ensureTexture(int slotCount, int rows) {
             GL_RGBA,
             GL_UNSIGNED_BYTE,
             m_texels.data());
+    glGenTextures(1, &m_colourTexture);
+    glBindTexture(GL_TEXTURE_2D, m_colourTexture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    m_colourTexels.assign(static_cast<size_t>(slotCount) * kColourRows * kBytesPerTexel, 0);
+    glTexImage2D(GL_TEXTURE_2D,
+            0,
+            GL_RGBA,
+            slotCount,
+            kColourRows,
+            0,
+            GL_RGBA,
+            GL_UNSIGNED_BYTE,
+            m_colourTexels.data());
+    glBindTexture(GL_TEXTURE_2D, m_texture);
     m_slotColumn.assign(static_cast<size_t>(slotCount), kNoColumn);
     m_slotDirty.assign(static_cast<size_t>(slotCount), 0);
 }
@@ -178,6 +202,14 @@ void WaveformRendererPhosphor::uploadColumns(int64_t firstColumn, int64_t lastCo
                 m_texels.data() + static_cast<size_t>(slot) * rows * kBytesPerTexel);
         // A column that can't be computed yet (data still decoding) is blank
         // and asked for again.
+        {
+            uint8_t* pColourTexels = m_colourTexels.data();
+            encodeColumnLevels(pColumn,
+                    pColourTexels + static_cast<size_t>(slot) * kBytesPerTexel,
+                    pColourTexels +
+                            (static_cast<size_t>(slotCount) + static_cast<size_t>(slot)) *
+                                    kBytesPerTexel);
+        }
         m_slotColumn[static_cast<size_t>(slot)] = pColumn ? k : kNoColumn;
         m_slotDirty[static_cast<size_t>(slot)] = 1;
     }
@@ -202,6 +234,22 @@ void WaveformRendererPhosphor::uploadColumns(int64_t firstColumn, int64_t lastCo
                 GL_RGBA,
                 GL_UNSIGNED_BYTE,
                 m_texels.data() + static_cast<size_t>(slot) * rows * kBytesPerTexel);
+        // The levels of the same run, in the second texture.
+        glBindTexture(GL_TEXTURE_2D, m_colourTexture);
+        for (int colourRow = 0; colourRow < kColourRows; ++colourRow) {
+            glTexSubImage2D(GL_TEXTURE_2D,
+                    0,
+                    slot,
+                    colourRow,
+                    end - slot,
+                    1,
+                    GL_RGBA,
+                    GL_UNSIGNED_BYTE,
+                    m_colourTexels.data() +
+                            (static_cast<size_t>(colourRow) * slotCount + slot) *
+                                    kBytesPerTexel);
+        }
+        glBindTexture(GL_TEXTURE_2D, m_texture);
         slot = end;
     }
 }
@@ -228,7 +276,15 @@ void WaveformRendererPhosphor::paintGL() {
         return;
     }
 
-    const LaneParams desired = desiredParams(*pData);
+    // The visual gains: All is the height, Low/Mid/High only colour. Gain and
+    // EQ following is a separate ticket.
+    const WaveformWidgetFactory* pFactory = WaveformWidgetFactory::instance();
+    const float allGain = static_cast<float>(pFactory->getVisualGain(WaveformWidgetFactory::All));
+    const float lowGain = static_cast<float>(pFactory->getVisualGain(WaveformWidgetFactory::Low));
+    const float midGain = static_cast<float>(pFactory->getVisualGain(WaveformWidgetFactory::Mid));
+    const float highGain = static_cast<float>(pFactory->getVisualGain(WaveformWidgetFactory::High));
+
+    const LaneParams desired = desiredParams(*pData, allGain);
     // The play position as a fraction of the track keeps working when the
     // file's rate differs from the engine's.
     const double positionFrame =
@@ -277,11 +333,11 @@ void WaveformRendererPhosphor::paintGL() {
     m_shader.setUniformValue(m_shader.mapSizeLocation(),
             QVector2D(static_cast<float>(m_textureRows), static_cast<float>(m_textureSlotCount)));
     m_shader.setUniformValue(m_shader.ringOffsetLocation(), static_cast<float>(ringOffset));
-    // Flat colour: the skin's signal colour.
-    m_shader.setUniformValue(m_shader.colorLocation(),
-            QVector3D(static_cast<float>(m_signalColor_r) * kBrightness,
-                    static_cast<float>(m_signalColor_g) * kBrightness,
-                    static_cast<float>(m_signalColor_b) * kBrightness));
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, m_colourTexture);
+    glActiveTexture(GL_TEXTURE0);
+    m_shader.setUniformValue(m_shader.colourTextureLocation(), 1);
+    m_shader.setUniformValue(m_shader.visualGainsLocation(), QVector3D(lowGain, midGain, highGain));
     m_shader.setAttributeArray(m_shader.positionLocation(), GL_FLOAT, m_vertices.constData(), 2);
 
     glDrawArrays(GL_TRIANGLES, 0, m_vertices.size());
@@ -289,6 +345,9 @@ void WaveformRendererPhosphor::paintGL() {
     m_shader.disableAttributeArray(m_shader.positionLocation());
     m_shader.release();
     glBindTexture(GL_TEXTURE_2D, 0);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glActiveTexture(GL_TEXTURE0);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 

@@ -69,6 +69,24 @@ class PhosphorData {
     /// are dropped.
     void append(const int16_t* pSamples, SINT count);
 
+    /// The colour track (ADR-0002): three uint16 smoothed band levels (R, G, B =
+    /// Low, Mid, High; level * 65535) per block of colourBlockFrames() frames,
+    /// 1 ms. It fills in behind the sample buffer.
+    SINT colourBlockFrames() const {
+        return m_colourBlockFrames;
+    }
+    /// Blocks that were written so far (a prefix of the track).
+    SINT colourBlocksCompleted() const {
+        return m_colourCompleted.load(std::memory_order_acquire);
+    }
+    int colourLevel(SINT block, int channel) const {
+        return m_colour[static_cast<size_t>(block) * 3 + static_cast<size_t>(channel)];
+    }
+
+    /// Writer side. Appends blocks of (R, G, B) levels; extra blocks beyond
+    /// the capacity are dropped.
+    void appendColour(const uint16_t* pLevels, SINT blockCount);
+
     /// Writer side. Marks the data complete and trims the track length to
     /// the frames that were really decoded.
     void finish();
@@ -92,6 +110,10 @@ class PhosphorData {
     int m_blockMinAt;
     int m_blockMaxAt;
     std::atomic<SINT> m_completed;
+    const SINT m_colourBlockFrames;
+    std::vector<uint16_t> m_colour;
+    SINT m_colourWritten; // writer thread only
+    std::atomic<SINT> m_colourCompleted;
     std::atomic<SINT> m_totalFrames;
     std::atomic<bool> m_finished;
 };
