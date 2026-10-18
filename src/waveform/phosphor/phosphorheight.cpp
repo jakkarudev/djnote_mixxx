@@ -1,5 +1,6 @@
 #include "waveform/phosphor/phosphorheight.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace mixxx::phosphor {
@@ -42,20 +43,22 @@ float columnHeightFactor(const float levels[3], const ShaderGains& gains) {
     return gains.height * eqHeightFactor(levels, gains.eq);
 }
 
-int stretchSourceRow(int pixelRow, int height, float g) {
-    if (g <= 1e-6f || height < 1) {
-        return -1;
+float stretchedRowDensity(const float* density, int height, int pixelRow, float g) {
+    if (g < kMinHeightFactor || height < 1) {
+        return 0.0f;
     }
     const double center = height / 2.0;
-    const double source = center + (pixelRow + 0.5 - center) / g;
-    if (source < 0.0 || source >= height) {
-        return -1;
+    const double low = std::max(0.0, center + (pixelRow - center) / g);
+    const double high = std::min<double>(height, center + (pixelRow + 1 - center) / g);
+    double total = 0.0;
+    const int first = static_cast<int>(std::floor(low));
+    for (int i = first; i < first + kMaxCoveredRows && i < height && i < high; ++i) {
+        const double overlap = std::min<double>(high, i + 1) - std::max<double>(low, i);
+        if (overlap > 0.0) {
+            total += overlap * density[i];
+        }
     }
-    return static_cast<int>(std::floor(source));
-}
-
-float stretchedDensity(float density, float g) {
-    return g <= 1e-6f ? 0.0f : density / g;
+    return static_cast<float>(total);
 }
 
 } // namespace mixxx::phosphor

@@ -1,5 +1,6 @@
 #include "shaders/phosphorshader.h"
 
+#include "waveform/phosphor/phosphorheight.h"
 #include "waveform/phosphor/phosphortexelcodec.h"
 
 using namespace mixxx;
@@ -56,23 +57,38 @@ void main()
     if (rawNorm > 1e-6) {
         g *= length(rawLevels * eqGains) / rawNorm;
     }
+    // Output row y gets the integral of the source density over the source
+    // interval [c + (y - c) / g, c + (y + 1 - c) / g] (stretchedRowDensity()
+    // in phosphorheight.cpp does the same maths on the CPU).
     highp float halfLane = mapSize.x * 0.5;
-    highp float sourceY = halfLane + (vLanePixel.y - halfLane) / max(g, 1e-6);
-    if (g <= 1e-6 || sourceY < 0.0 || sourceY >= mapSize.x) {
-        // Clipped at the lane edge, or no height at all.
+    if (g < MIN_HEIGHT_FACTOR) {
+        // Not drawn at all (no height, or less than 1/16 of the lane).
         gl_FragColor = vec4(0.0);
         return;
     }
-    texel = texture2D(densityMap,
-            vec2((floor(sourceY) + 0.5) / mapSize.x, (slot + 0.5) / mapSize.y));
-    highp float root = (texel.r * 256.0 + texel.b) * (255.0 / 65535.0);
-    if (root <= 0.0) {
+    highp float low = max(0.0, halfLane + (floor(vLanePixel.y) - halfLane) / g);
+    highp float high = min(mapSize.x, halfLane + (floor(vLanePixel.y) + 1.0 - halfLane) / g);
+    highp float firstRow = floor(low);
+    highp float density = 0.0;
+    for (int k = 0; k < MAX_COVERED_ROWS; ++k) {
+        highp float sourceRow = firstRow + float(k);
+        if (sourceRow >= high || sourceRow >= mapSize.x) {
+            break;
+        }
+        highp float overlap = min(high, sourceRow + 1.0) - max(low, sourceRow);
+        if (overlap > 0.0) {
+            texel = texture2D(densityMap,
+                    vec2((sourceRow + 0.5) / mapSize.x, (slot + 0.5) / mapSize.y));
+            highp float root = (texel.r * 256.0 + texel.b) * (255.0 / 65535.0);
+            density += overlap * root * root * DENSITY_MAX;
+        }
+    }
+    if (density <= 0.0) {
         // Not covered by the signal: nothing is drawn, whatever the blend, so
         // what is behind (background, marks) stays visible.
         gl_FragColor = vec4(0.0);
         return;
     }
-    highp float density = root * root * DENSITY_MAX / g;
     highp vec3 levels = rawLevels * visualGains;
     highp float norm = length(levels);
     highp vec3 color = vec3(0.0);
@@ -88,7 +104,11 @@ void main()
 }
 )--")
                                      .replace(QStringLiteral("DENSITY_MAX"),
-                                                     QString::number(phosphor::kTexelDensityMax, 'f', 3));
+                                                     QString::number(phosphor::kTexelDensityMax, 'f', 3))
+                                     .replace(QStringLiteral("MIN_HEIGHT_FACTOR"),
+                                                     QString::number(phosphor::kMinHeightFactor, 'f', 6))
+                                     .replace(QStringLiteral("MAX_COVERED_ROWS"),
+                                                     QString::number(phosphor::kMaxCoveredRows));
 
     load(vertexShaderCode, fragmentShaderCode);
 
