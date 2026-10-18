@@ -9,6 +9,7 @@
 #include "preferences/waveformsettings.h"
 #include "util/db/dbconnectionpooled.h"
 #include "waveform/overviewlinelayout.h"
+#include "waveform/phosphor/phosphorsettings.h"
 #include "waveform/renderers/waveformwidgetrenderer.h"
 #include "waveform/waveformwidgetfactory.h"
 #include "widget/woverview.h"
@@ -203,6 +204,19 @@ DlgPrefWaveform::DlgPrefWaveform(
             &QCheckBox::toggled,
             this,
             &DlgPrefWaveform::slotSetFollowsEq);
+    // Phosphor: the detail applies from the next track load.
+    phosphorDetailComboBox->addItem(
+            tr("Full"), static_cast<int>(mixxx::phosphor::WaveformDetail::Full));
+    phosphorDetailComboBox->addItem(
+            tr("High"), static_cast<int>(mixxx::phosphor::WaveformDetail::High));
+    phosphorDetailComboBox->addItem(
+            tr("Medium"), static_cast<int>(mixxx::phosphor::WaveformDetail::Medium));
+    phosphorDetailComboBox->addItem(
+            tr("Low"), static_cast<int>(mixxx::phosphor::WaveformDetail::Low));
+    connect(phosphorDetailComboBox,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            &DlgPrefWaveform::slotSetPhosphorDetail);
     connect(normalizeOverviewCheckBox,
             &QCheckBox::toggled,
             this,
@@ -331,6 +345,7 @@ void DlgPrefWaveform::slotUpdate() {
     highVisualGain->setValue(factory->getVisualGain(WaveformWidgetFactory::High));
     followsGainCheckBox->setChecked(factory->followsGain());
     followsEqCheckBox->setChecked(factory->followsEq());
+    showPhosphorSettings(mixxx::phosphor::loadSettings(m_pConfig));
     normalizeOverviewCheckBox->setChecked(factory->isOverviewNormalized());
     overviewLinesComboBox->setCurrentIndex(overviewLinesComboBox->findData(
             static_cast<int>(factory->getOverviewLineSettings().mode)));
@@ -407,6 +422,9 @@ void DlgPrefWaveform::slotResetToDefaults() {
     // Waveforms follow the deck's gain and EQ.
     followsGainCheckBox->setChecked(true);
     followsEqCheckBox->setChecked(true);
+
+    // Phosphor: the defaults of PhosphorSettings.
+    showPhosphorSettings(mixxx::phosphor::PhosphorSettings());
 
     // Don't normalize overview.
     normalizeOverviewCheckBox->setChecked(false);
@@ -543,6 +561,17 @@ void DlgPrefWaveform::slotSetFollowsGain(bool follows) {
 
 void DlgPrefWaveform::slotSetFollowsEq(bool follows) {
     WaveformWidgetFactory::instance()->setFollowsEq(follows);
+}
+
+void DlgPrefWaveform::showPhosphorSettings(const mixxx::phosphor::PhosphorSettings& settings) {
+    phosphorDetailComboBox->setCurrentIndex(
+            phosphorDetailComboBox->findData(static_cast<int>(settings.detail)));
+}
+
+void DlgPrefWaveform::slotSetPhosphorDetail(int index) {
+    mixxx::phosphor::PhosphorSettings settings = mixxx::phosphor::loadSettings(m_pConfig);
+    settings.detail = mixxx::phosphor::detailFromInt(phosphorDetailComboBox->itemData(index).toInt());
+    mixxx::phosphor::saveSettings(m_pConfig, settings);
 }
 
 void DlgPrefWaveform::slotSetNormalizeOverview(bool normalize) {

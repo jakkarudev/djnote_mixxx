@@ -17,13 +17,20 @@ namespace mixxx::phosphor {
 /// threads may use every point below pointsCompleted().
 ///
 /// Readers access the data through "points" (a value at a time in frames).
-/// Today every sample is a point (Full detail); detail tiers will keep
-/// min/max pairs per block behind the same point accessors.
+/// At block size 1 (Full detail) every sample is a point. At a block size N > 1
+/// (the detail tiers) each block of N samples gives two points: the block's
+/// minimum and maximum in the order they first occurred, at 1/4 and 3/4 of the
+/// block's length (a shorter last block uses its own length).
 class PhosphorData {
   public:
     /// frameCapacity is the expected length. It can be inaccurate, so writes
     /// are bounded by it.
-    PhosphorData(int sampleRate, SINT frameCapacity);
+    PhosphorData(int sampleRate, SINT frameCapacity, int blockSize = 1);
+
+    /// Samples per block: 1 keeps every sample.
+    int blockSize() const {
+        return m_blockSize;
+    }
 
     int sampleRate() const {
         return m_sampleRate;
@@ -42,13 +49,11 @@ class PhosphorData {
 
     /// The number of points of the whole track.
     SINT pointCount() const {
-        return totalFrames();
+        return pointsFor(totalFrames());
     }
 
     /// The time of a point in frames.
-    double pointTime(SINT index) const {
-        return static_cast<double>(index);
-    }
+    double pointTime(SINT index) const;
 
     /// The value of a point, in int16 units.
     int pointValue(SINT index) const {
@@ -69,9 +74,23 @@ class PhosphorData {
     void finish();
 
   private:
+    SINT pointsFor(SINT frames) const {
+        return m_blockSize == 1 ? frames : (frames + m_blockSize - 1) / m_blockSize * 2;
+    }
+    void flushBlock();
+
     const int m_sampleRate;
+    const int m_blockSize;
+    const SINT m_frameCapacity;
     std::vector<int16_t> m_samples;
-    SINT m_written; // writer thread only
+    // Writer thread only.
+    SINT m_written; // points written
+    SINT m_framesWritten;
+    int m_blockFill;
+    int m_blockMin;
+    int m_blockMax;
+    int m_blockMinAt;
+    int m_blockMaxAt;
     std::atomic<SINT> m_completed;
     std::atomic<SINT> m_totalFrames;
     std::atomic<bool> m_finished;

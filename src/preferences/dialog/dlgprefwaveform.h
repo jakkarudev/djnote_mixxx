@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "preferences/dialog/dlgpreferencepage.h"
+#include "waveform/phosphor/phosphorsettings.h"
 #include "preferences/dialog/ui_dlgprefwaveformdlg.h"
 #include "preferences/usersettings.h"
 
@@ -41,6 +42,7 @@ class DlgPrefWaveform : public DlgPreferencePage, public Ui::DlgPrefWaveformDlg 
     void slotSetFollowsGain(bool follows);
     void slotSetFollowsEq(bool follows);
     void slotSetNormalizeOverview(bool normalize);
+    void slotSetPhosphorDetail(int index);
     void slotSetOverviewLinesMode(int index);
     void slotSetOverviewPhraseBars(int index);
     void slotSetOverviewLineOpacity(int percent);
@@ -57,6 +59,7 @@ class DlgPrefWaveform : public DlgPreferencePage, public Ui::DlgPrefWaveformDlg 
 
   private:
     void initWaveformControl();
+    void showPhosphorSettings(const mixxx::phosphor::PhosphorSettings& settings);
     void showHoverReadoutControls(const mixxx::overviewlayout::HoverReadoutSettings& settings);
     void calculateCachedWaveformDiskUsage();
     void notifyRebootNecessary();
