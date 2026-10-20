@@ -648,6 +648,11 @@ ALPHA_PER_G = 2.0
 DENSITY_FULL = 0.8       # a share of 0.8 stores as 255
 DENSITY_STORE_POWER = 0.25
 OVERVIEW_OVERLAP = 0.5   # column window = 2 columns centred (ticket #58)
+# Colour tails (research section 9, ticket #57): after a click or kick Traktor
+# keeps the colour for several columns. The stored low and high band levels
+# release across columns with these time constants (seconds); mid has none (its
+# colour track release already matches). 0 = no hold.
+OVERVIEW_HOLD = (0.7, 0.0, 0.1)
 
 
 @dataclass
@@ -688,21 +693,36 @@ def _round_u8(x):
     return np.clip(np.floor(np.asarray(x, np.float64) + 0.5), 0, 255).astype(np.uint8)
 
 
-def overview_columns(mono, rate, args, columns=OVERVIEW_COLUMNS, levels=None, n=None):
+def hold_levels(levels, n, rate, hold=OVERVIEW_HOLD):
+    """Release the band levels across columns: column k keeps at least the
+    previous column's held level times exp(-column seconds / tau), per band.
+    `levels` is float (columns, 3) in 0..255, only the built columns. Causal,
+    so it can run while the columns are produced."""
+    out = np.array(levels, np.float64)
+    ratio = np.array([np.exp(-(n / rate) / t) if t > 0 else 0.0 for t in hold])
+    for k in range(1, len(out)):
+        out[k] = np.maximum(out[k], out[k - 1] * ratio)
+    return out
+
+
+def overview_columns(mono, rate, args, columns=OVERVIEW_COLUMNS, levels=None, n=None, hold=OVERVIEW_HOLD):
     """The stored overview data of a track. `mono` is float in [-1, 1] (the
     (L+R)/2 sum); `levels` the colour track (1 ms blocks, float (n, 3), see
     colour_track), computed from `mono` with `args` if not given. `n` is the
-    samples per column, ceil(len / columns) if not given (tests set it)."""
+    samples per column, ceil(len / columns) if not given (tests set it).
+    `hold` are the colour tail time constants (OVERVIEW_HOLD); () for none."""
     if levels is None:
         levels = colour_track(mono, rate, args)
     block = colour_block(rate)
     n = n or -(-len(mono) // columns)
     lv_out = np.zeros((columns, 3), np.uint8)
+    built = 0
     d_out = np.zeros((columns, OVERVIEW_ROWS), np.uint8)
     for k in range(columns):
         a, b = k * n, min((k + 1) * n, len(mono))
         if a >= len(mono):
             break
+        built = k + 1
         l0, l1 = a // block, max(a // block + 1, b // block)
         lv = levels[l0:l1]
         if len(lv):
@@ -719,6 +739,8 @@ def overview_columns(mono, rate, args, columns=OVERVIEW_COLUMNS, levels=None, n=
         else:
             share = np.bincount(idx[:w1 - w0], minlength=OVERVIEW_ROWS)[:OVERVIEW_ROWS] / (w1 - w0)
         d_out[k] = _round_u8(255 * (np.clip(share, 0, None) / DENSITY_FULL) ** DENSITY_STORE_POWER)
+    if hold:
+        lv_out[:built] = _round_u8(hold_levels(lv_out[:built], n, rate, hold))
     return OverviewColumns(n, lv_out, d_out)
 
 
@@ -779,6 +801,11 @@ def overview_image(levels, density, n, settings=None, height=OVERVIEW_ROWS, colu
     px = np.clip(px, 0, 255)
     px[inside & ~live[:, None]] = (0, 0, 0, 255)  # silence: an opaque black line
     px[~inside] = 0
+    # Traktor draws that line one row above the row map's centre (row 30, research 9),
+    # while the map itself stays: shift silent columns up by a row.
+    sil = has & ~live
+    px[sil, :-1] = px[sil, 1:].copy()
+    px[sil, -1] = 0
     out[:, :done] = px.transpose(1, 0, 2)
     if height != OVERVIEW_ROWS:
         out = np.einsum("yr,rcb->ycb", _height_weights(height), out)
