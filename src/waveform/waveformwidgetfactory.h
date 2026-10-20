@@ -218,6 +218,8 @@ class WaveformWidgetFactory : public QObject, public Singleton<WaveformWidgetFac
 
     void overviewNormalizeChanged();
     void phosphorOverviewSettingsChanged();
+    /// The overview type was changed in Preferences.
+    void overviewTypeChanged();
     void overviewLinesChanged();
     void overallVisualGainChanged();
 

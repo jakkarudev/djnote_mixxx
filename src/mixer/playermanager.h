@@ -210,6 +210,12 @@ class PlayerManager : public PlayerManagerInterface {
     FRIEND_TEST(PlayerManagerTest, UnEjectInvalidTrackIdTest);
     void slotSaveEjectedTrack(TrackPointer track);
 
+  public slots:
+    /// Queues the tracks loaded in decks for analysis again, without
+    /// reloading them (switching the overview type to Phosphor). Samplers and
+    /// preview decks pick the change up on their next load.
+    void slotAnalyzeLoadedDeckTracks();
+
   private slots:
     void slotAnalyzeTrack(TrackPointer track);
     // Deck loads additionally build the Phosphor waveform data.

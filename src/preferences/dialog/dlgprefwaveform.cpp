@@ -550,6 +550,8 @@ void DlgPrefWaveform::slotSetWaveformOverviewType() {
     auto type = comboboxData.value<WOverview::Type>();
     m_pConfig->setValue(kOverviewTypeCfgKey, type);
     m_pTypeControl->forceSet(static_cast<double>(type));
+    // Config is written first: the analyzers read it on their own thread.
+    emit WaveformWidgetFactory::instance()->overviewTypeChanged();
 }
 
 void DlgPrefWaveform::slotSetDefaultZoom(int index) {
