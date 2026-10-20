@@ -1279,6 +1279,8 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/waveform/overviewlayout.cpp
   src/waveform/overviewlinelayout.cpp
   src/waveform/overviewsettings.cpp
+  src/waveform/scrollinglinelayout.cpp
+  src/waveform/scrollinglinesettings.cpp
   src/waveform/phosphor/phosphorcolortrack.cpp
   src/waveform/phosphor/phosphordata.cpp
   src/waveform/phosphor/phosphorheight.cpp
@@ -2188,6 +2190,8 @@ if(BUILD_TESTING)
     src/test/overviewlayouttest.cpp
     src/test/overviewlinelayouttest.cpp
     src/test/knobreadouttexttest.cpp
+    src/test/scrollinglinelayouttest.cpp
+    src/test/scrollinglinesettingstest.cpp
     src/test/dlgprefwaveformtest.cpp
   src/test/overviewsettingstest.cpp
     src/test/phosphorheighttest.cpp

@@ -11,6 +11,7 @@
 #include "util/singleton.h"
 #include "waveform/overviewsettings.h"
 #include "waveform/phosphor/phosphorsettings.h"
+#include "waveform/scrollinglinesettings.h"
 #include "waveform/widgets/waveformwidgettype.h"
 #include "widget/woverview.h"
 
@@ -184,6 +185,12 @@ class WaveformWidgetFactory : public QObject, public Singleton<WaveformWidgetFac
     mixxx::overviewlayout::LineSettings getOverviewLineSettings() const {
         return m_overviewLineSettings;
     }
+    /// DJNote beat, bar and step lines on the scrolling waveforms. The
+    /// renderers read them every frame, so a change shows on the next frame.
+    const mixxx::scrollinglinelayout::LineSettings& getScrollingLineSettings() const {
+        return m_scrollingLineSettings;
+    }
+    void setScrollingLineSettings(const mixxx::scrollinglinelayout::LineSettings& settings);
 
     const QVector<WaveformWidgetAbstractHandle>& getAvailableTypes() const {
         return m_waveformWidgetHandles;
@@ -282,6 +289,7 @@ class WaveformWidgetFactory : public QObject, public Singleton<WaveformWidgetFac
     mixxx::phosphor::PhosphorOverviewSettings m_phosphorOverviewSettings;
     bool m_overviewNormalized;
     mixxx::overviewlayout::LineSettings m_overviewLineSettings;
+    mixxx::scrollinglinelayout::LineSettings m_scrollingLineSettings;
     void saveOverviewLineSettings();
 
     bool m_untilMarkShowBeats;
