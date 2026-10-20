@@ -13,8 +13,10 @@ class QLabel;
 //
 // Knob adjustment readout group: each setting is one control, shown by
 // showKnobReadoutSettings() and read back by knobReadoutSettingsFromControls().
-// To add a setting, add its control in createKnobReadoutGroup() and cover it
-// in those two functions; apply, cancel and reset then follow.
+// To add a setting, add its control in createKnobReadoutGroup(), connect its
+// change signal to slotKnobReadoutControlChanged() and cover it in those two
+// functions; reset then follows. Like the Waveforms page, every change is
+// stored (and so applied) at once, without waiting for Apply.
 class DlgPrefDJNote : public DlgPreferencePage {
     Q_OBJECT
   public:
@@ -25,8 +27,13 @@ class DlgPrefDJNote : public DlgPreferencePage {
     void slotApply() override;
     void slotResetToDefaults() override;
 
+  private slots:
+    void slotKnobReadoutControlChanged();
+
   private:
     void createKnobReadoutGroup();
+    // Greys out (or not) the rows that mean nothing while the readout is off.
+    void setKnobReadoutDetailsEnabled(bool enabled);
     void showKnobReadoutSettings(const mixxx::knobreadout::Settings& settings);
     mixxx::knobreadout::Settings knobReadoutSettingsFromControls() const;
 
@@ -34,5 +41,9 @@ class DlgPrefDJNote : public DlgPreferencePage {
     QCheckBox* m_pKnobReadoutEnabled;
     QLabel* m_pKnobReadoutModeLabel;
     QComboBox* m_pKnobReadoutMode;
+    QLabel* m_pKnobReadoutStyleLabel;
     QComboBox* m_pKnobReadoutStyle;
+    // Set while showKnobReadoutSettings() fills the controls, so that showing
+    // settings doesn't store them.
+    bool m_showingKnobReadoutSettings = false;
 };

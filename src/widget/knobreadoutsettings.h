@@ -8,9 +8,6 @@
 namespace mixxx {
 namespace knobreadout {
 
-// Add a field here, its key in knobreadoutsettings.cpp and its control on
-// DlgPrefDJNote; the overlay reads the whole struct on every readout, so a new
-// setting applies live without more plumbing.
 // Where the readout is drawn.
 enum class Style {
     // Just under the knob, in full form.
@@ -20,6 +17,9 @@ enum class Style {
     KnobFace,
 };
 
+// Add a field here, its key in knobreadoutsettings.cpp and its control on
+// DlgPrefDJNote; the overlay reads the whole struct on every readout, so a new
+// setting applies live without more plumbing.
 struct Settings {
     // Show knob adjustment readout.
     bool enabled = true;

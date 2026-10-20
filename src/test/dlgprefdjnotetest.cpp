@@ -66,12 +66,26 @@ TEST_F(DlgPrefDJNoteTest, ApplyStoresTheSetting) {
     EXPECT_TRUE(mixxx::knobreadout::loadSettings(config()).enabled);
 }
 
-TEST_F(DlgPrefDJNoteTest, CancelShowsTheStoredSettingAgain) {
+TEST_F(DlgPrefDJNoteTest, SwitchingTheReadoutAppliesLive) {
+    // Like the Waveforms page: no Apply needed.
+    auto pPage = openPage();
+    enabledCheckBox(pPage.get())->setChecked(false);
+    EXPECT_FALSE(mixxx::knobreadout::loadSettings(config()).enabled);
+    enabledCheckBox(pPage.get())->setChecked(true);
+    EXPECT_TRUE(mixxx::knobreadout::loadSettings(config()).enabled);
+}
+
+TEST_F(DlgPrefDJNoteTest, CancelKeepsTheLiveSetting) {
     auto pPage = openPage();
     enabledCheckBox(pPage.get())->setChecked(false);
     pPage->slotCancel();
-    EXPECT_TRUE(enabledCheckBox(pPage.get())->isChecked());
-    EXPECT_TRUE(mixxx::knobreadout::loadSettings(config()).enabled);
+    EXPECT_FALSE(enabledCheckBox(pPage.get())->isChecked());
+    EXPECT_FALSE(mixxx::knobreadout::loadSettings(config()).enabled);
+}
+
+TEST_F(DlgPrefDJNoteTest, OpeningThePageStoresNothing) {
+    auto pPage = openPage();
+    EXPECT_FALSE(config()->exists(ConfigKey("[DJNote]", "knobReadoutEnabled")));
 }
 
 TEST_F(DlgPrefDJNoteTest, ResetRestoresTheDefault) {
@@ -187,4 +201,45 @@ TEST_F(DlgPrefDJNoteTest, ModeIsGreyedOutWhileTheReadoutIsOff) {
     EXPECT_FALSE(modeComboBox(pPage.get())->isEnabled());
     enabledCheckBox(pPage.get())->setChecked(true);
     EXPECT_TRUE(modeComboBox(pPage.get())->isEnabled());
+}
+
+TEST_F(DlgPrefDJNoteTest, ModeAndStyleApplyLive) {
+    auto pPage = openPage();
+    auto* pMode = modeComboBox(pPage.get());
+    pMode->setCurrentIndex(pMode->findText(QStringLiteral("Precise")));
+    EXPECT_EQ(mixxx::knobreadout::Mode::Precise,
+            mixxx::knobreadout::loadSettings(config()).mode);
+    auto* pStyle = styleComboBox(pPage.get());
+    pStyle->setCurrentIndex(pStyle->findText(QStringLiteral("On the knob face")));
+    EXPECT_EQ(Style::KnobFace, mixxx::knobreadout::loadSettings(config()).style);
+}
+
+TEST_F(DlgPrefDJNoteTest, ResetAppliesTheDefaultsLive) {
+    Settings stored;
+    stored.enabled = false;
+    stored.mode = mixxx::knobreadout::Mode::Precise;
+    stored.style = Style::KnobFace;
+    mixxx::knobreadout::saveSettings(config(), stored);
+    auto pPage = openPage();
+    pPage->slotResetToDefaults();
+    const Settings settings = mixxx::knobreadout::loadSettings(config());
+    EXPECT_TRUE(settings.enabled);
+    EXPECT_EQ(mixxx::knobreadout::Mode::Simple, settings.mode);
+    EXPECT_EQ(Style::UnderKnob, settings.style);
+}
+
+TEST_F(DlgPrefDJNoteTest, StyleIsGreyedOutWhileTheReadoutIsOff) {
+    auto pPage = openPage();
+    EXPECT_TRUE(styleComboBox(pPage.get())->isEnabled());
+    enabledCheckBox(pPage.get())->setChecked(false);
+    EXPECT_FALSE(styleComboBox(pPage.get())->isEnabled());
+    enabledCheckBox(pPage.get())->setChecked(true);
+    EXPECT_TRUE(styleComboBox(pPage.get())->isEnabled());
+}
+
+TEST_F(DlgPrefDJNoteTest, StoredOffShowsModeAndStyleGreyedOut) {
+    storeEnabled(false);
+    auto pPage = openPage();
+    EXPECT_FALSE(modeComboBox(pPage.get())->isEnabled());
+    EXPECT_FALSE(styleComboBox(pPage.get())->isEnabled());
 }

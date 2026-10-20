@@ -12,6 +12,7 @@
 #include <QSpinBox>
 
 #include "moc_scrollinglinesprefsgroup.cpp"
+#include "util/assert.h"
 
 using mixxx::scrollinglinelayout::LineSettings;
 using mixxx::scrollinglinelayout::LineWidthPx;
@@ -95,6 +96,7 @@ ScrollingLinesPrefsGroup::ScrollingLinesPrefsGroup(
     pGrid->addWidget(m_pStepsEnabledCheckBox, row++, 0, 1, 3);
     addExplanation(pGrid, row, stepsExplanation);
 
+    const int firstStepRow = row;
     {
         const QString explanation =
                 tr("Step lines are drawn only when adjacent steps are at least "
@@ -129,6 +131,14 @@ ScrollingLinesPrefsGroup::ScrollingLinesPrefsGroup(
             tr("Colour of the step lines: the skin's beat colour, or a colour "
                "of your choice."),
             &LineSettings::stepColor);
+    for (int stepRow = firstStepRow; stepRow < row; ++stepRow) {
+        for (int column = 0; column < pGrid->columnCount(); ++column) {
+            QLayoutItem* pItem = pGrid->itemAtPosition(stepRow, column);
+            if (pItem && pItem->widget() && !m_stepRowWidgets.contains(pItem->widget())) {
+                m_stepRowWidgets.append(pItem->widget());
+            }
+        }
+    }
 
     showSettings(m_settings);
 
@@ -183,6 +193,7 @@ ScrollingLinesPrefsGroup::ColorControls ScrollingLinesPrefsGroup::addColorRow(
         const QString& explanation,
         ColorMember pColor) {
     ColorControls controls;
+    controls.member = pColor;
     controls.pColorButton = new QPushButton();
     controls.pColorButton->setObjectName(objectNamePrefix + QStringLiteral("ColorButton"));
     controls.pColorButton->setToolTip(explanation);
@@ -219,12 +230,12 @@ ScrollingLinesPrefsGroup::ColorControls ScrollingLinesPrefsGroup::addColorRow(
 
 ScrollingLinesPrefsGroup::ColorControls& ScrollingLinesPrefsGroup::colorControls(
         ColorMember pColor) {
-    if (pColor == &LineSettings::barColor) {
-        return m_barColor;
+    for (ColorControls* pControls : {&m_barColor, &m_beatColor, &m_stepColor}) {
+        if (pControls->member == pColor) {
+            return *pControls;
+        }
     }
-    if (pColor == &LineSettings::stepColor) {
-        return m_stepColor;
-    }
+    DEBUG_ASSERT(!"no colour controls for this setting");
     return m_beatColor;
 }
 
@@ -237,6 +248,7 @@ void ScrollingLinesPrefsGroup::openColorDialog(ColorMember pColor) {
 void ScrollingLinesPrefsGroup::setColor(ColorMember pColor, const std::optional<QColor>& color) {
     m_settings.*pColor = color;
     showColor(colorControls(pColor), color);
+    updateEnabledControls();
     emit settingsChanged(m_settings);
 }
 
@@ -251,7 +263,6 @@ void ScrollingLinesPrefsGroup::showColor(
         controls.pColorButton->setIcon(QIcon());
         controls.pColorButton->setText(tr("Skin colour"));
     }
-    controls.pSkinColorButton->setEnabled(color.has_value());
 }
 
 ScrollingLinesPrefsGroup::OpacityControls ScrollingLinesPrefsGroup::addOpacityRow(
@@ -318,7 +329,7 @@ void ScrollingLinesPrefsGroup::showSettings(const LineSettings& settings) {
     showColor(m_barColor, settings.barColor);
     showColor(m_beatColor, settings.beatColor);
     showColor(m_stepColor, settings.stepColor);
-    updateUpstreamControls();
+    updateEnabledControls();
 }
 
 void ScrollingLinesPrefsGroup::slotControlChanged() {
@@ -331,12 +342,21 @@ void ScrollingLinesPrefsGroup::slotControlChanged() {
     m_settings.stepMinSpacing = StepSpacingPx(m_pStepMinSpacingSpinBox->value());
     m_settings.stepOpacity = OpacityPercent(m_stepOpacity.pSpinBox->value());
     m_settings.stepWidth = LineWidthPx(m_pStepWidthSpinBox->value());
-    updateUpstreamControls();
+    updateEnabledControls();
     emit settingsChanged(m_settings);
 }
 
-void ScrollingLinesPrefsGroup::updateUpstreamControls() {
+void ScrollingLinesPrefsGroup::updateEnabledControls() {
     for (QWidget* pControl : std::as_const(m_upstreamBeatGridControls)) {
         pControl->setEnabled(!m_settings.enabled);
+    }
+    for (QWidget* pWidget : std::as_const(m_stepRowWidgets)) {
+        pWidget->setEnabled(m_settings.stepsEnabled);
+    }
+    // "Skin colour" only undoes a custom colour (on an enabled row).
+    for (const ColorControls* pControls : {&m_barColor, &m_beatColor, &m_stepColor}) {
+        pControls->pSkinColorButton->setEnabled(
+                pControls->pColorButton->isEnabledTo(this) &&
+                (m_settings.*(pControls->member)).has_value());
     }
 }

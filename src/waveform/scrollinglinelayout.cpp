@@ -1,15 +1,14 @@
 #include "waveform/scrollinglinelayout.h"
 
 #include <cmath>
+#include <utility>
+
+#include "util/assert.h"
 
 namespace mixxx {
 namespace scrollinglinelayout {
 
 namespace {
-
-int positiveMod(int a, int n) {
-    return ((a % n) + n) % n;
-}
 
 constexpr int kStepsPerBeat = 4;
 
@@ -58,7 +57,6 @@ std::vector<Line> layoutLines(const Beats* pBeats,
     }
 
     const int upstreamPercent = OpacityPercent(upstreamOpacity).percent();
-    const auto first = pBeats->cfirstmarker();
     const bool showSteps = settings.enabled && settings.stepsEnabled &&
             settings.stepOpacity.percent() > 0;
     auto it = pBeats->iteratorFrom(start);
@@ -75,7 +73,7 @@ std::vector<Line> layoutLines(const Beats* pBeats,
             line.kind = LineKind::Beat;
             line.opacityPercent = upstreamPercent;
             line.color = skinColor;
-        } else if (positiveMod(it - first, kBeatsPerBar) == 0) {
+        } else if (overviewlayout::beatIndexInCycle(*pBeats, it, kBeatsPerBar) == 0) {
             line.kind = LineKind::Bar;
             line.opacityPercent = settings.barOpacity.percent();
             line.widthPx = settings.barWidth.px();
@@ -98,6 +96,36 @@ std::vector<Line> layoutLines(const Beats* pBeats,
         }
     }
     return lines;
+}
+
+std::vector<LineBatch> lineBatches(const std::vector<Line>& lines) {
+    std::vector<LineBatch> batches;
+    for (const LineKind kind : {LineKind::Step, LineKind::Bar, LineKind::Beat}) {
+        LineBatch batch;
+        batch.kind = kind;
+        const Line* pFirst = nullptr;
+        for (const Line& line : lines) {
+            if (line.kind != kind) {
+                continue;
+            }
+            if (!pFirst) {
+                pFirst = &line;
+                batch.color = line.color;
+                batch.color.setAlphaF(line.opacityPercent / 100.0f);
+            }
+            // One batch, one look: see the header.
+            DEBUG_ASSERT(line.color == pFirst->color &&
+                    line.widthPx == pFirst->widthPx &&
+                    line.opacityPercent == pFirst->opacityPercent);
+            const double centre = line.x + 0.5;
+            const double halfWidth = line.widthPx / 2.0;
+            batch.spans.push_back(LineSpan{centre - halfWidth, centre + halfWidth});
+        }
+        if (!batch.spans.empty()) {
+            batches.push_back(std::move(batch));
+        }
+    }
+    return batches;
 }
 
 } // namespace scrollinglinelayout

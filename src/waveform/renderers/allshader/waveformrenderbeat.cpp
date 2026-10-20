@@ -5,9 +5,8 @@
 #include "skin/legacy/skincontext.h"
 #include "track/track.h"
 #include "waveform/renderers/allshader/matrixforwidgetgeometry.h"
+#include "waveform/renderers/allshader/scrollinglinespainter.h"
 #include "waveform/renderers/waveformwidgetrenderer.h"
-#include "waveform/scrollinglinelayout.h"
-#include "waveform/waveformwidgetfactory.h"
 #include "widget/wskincolor.h"
 
 namespace allshader {
@@ -43,7 +42,29 @@ void WaveformRenderBeat::paintGL() {
         return;
     }
 
+    // DJNote: beat, bar and step lines. Upstream's drawing below runs only
+    // while DJNote's lines are switched off.
+    if (paintScrollingLines(*this,
+                m_waveformRenderer,
+                m_isSlipRenderer,
+                *trackBeats,
+                m_shader,
+                m_vertices,
+                m_color)) {
+        return;
+    }
+
+    int alpha = m_waveformRenderer->getBeatGridAlpha();
+    if (alpha == 0) {
+        return;
+    }
+
     const float devicePixelRatio = m_waveformRenderer->getDevicePixelRatio();
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    m_color.setAlphaF(alpha / 100.0f);
 
     const double trackSamples = m_waveformRenderer->getTrackSamples();
     if (trackSamples <= 0) {
@@ -65,27 +86,44 @@ void WaveformRenderBeat::paintGL() {
     }
 
     const float rendererBreadth = m_waveformRenderer->getBreadth();
-    const float lineBreadth = m_isSlipRenderer ? rendererBreadth / 2 : rendererBreadth;
 
-    // DJNote: the scrolling line layout decides which beat, bar and step lines to
-    // draw and how. With its master switch off it returns upstream's lines.
-    const auto lines = mixxx::scrollinglinelayout::layoutLines(trackBeats.get(),
-            startPosition,
-            endPosition,
-            [&](mixxx::audio::FramePos position) {
-                const double x = m_waveformRenderer->transformSamplePositionInRendererWorld(
-                        position.toEngineSamplePos(), positionType);
-                return qRound(x * devicePixelRatio) / static_cast<double>(devicePixelRatio);
-            },
-            WaveformWidgetFactory::instance()->getScrollingLineSettings(),
-            m_waveformRenderer->getBeatGridAlpha(),
-            m_color);
-    if (lines.empty()) {
-        return;
+    const int numVerticesPerLine = 6; // 2 triangles
+
+    // Count the number of beats in the range to reserve space in the m_vertices vector.
+    // Note that we could also use
+    //   int numBearsInRange = trackBeats->numBeatsInRange(startPosition, endPosition);
+    // for this, but there have been reports of that method failing with a DEBUG_ASSERT.
+    int numBeatsInRange = 0;
+    for (auto it = trackBeats->iteratorFrom(startPosition);
+            it != trackBeats->cend() && *it <= endPosition;
+            ++it) {
+        numBeatsInRange++;
     }
 
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    const int reserved = numBeatsInRange * numVerticesPerLine;
+    m_vertices.clear();
+    m_vertices.reserve(reserved);
+
+    for (auto it = trackBeats->iteratorFrom(startPosition);
+            it != trackBeats->cend() && *it <= endPosition;
+            ++it) {
+        double beatPosition = it->toEngineSamplePos();
+        double xBeatPoint =
+                m_waveformRenderer->transformSamplePositionInRendererWorld(
+                        beatPosition, positionType);
+
+        xBeatPoint = qRound(xBeatPoint * devicePixelRatio) / devicePixelRatio;
+
+        const float x1 = static_cast<float>(xBeatPoint);
+        const float x2 = x1 + 1.f;
+
+        m_vertices.addRectangle(x1,
+                0.f,
+                x2,
+                m_isSlipRenderer ? rendererBreadth / 2 : rendererBreadth);
+    }
+
+    DEBUG_ASSERT(reserved == m_vertices.size());
 
     const int positionLocation = m_shader.positionLocation();
     const int matrixLocation = m_shader.matrixLocation();
@@ -95,32 +133,14 @@ void WaveformRenderBeat::paintGL() {
     m_shader.enableAttributeArray(positionLocation);
 
     const QMatrix4x4 matrix = matrixForWidgetGeometry(m_waveformRenderer, false);
-    m_shader.setUniformValue(matrixLocation, matrix);
 
-    // One batch per line kind: all lines of a kind look the same (opacity,
-    // width and colour). Wider lines grow both ways from the beat. Step lines
-    // go first, under the beat and bar lines.
-    for (const auto kind : {mixxx::scrollinglinelayout::LineKind::Step,
-                 mixxx::scrollinglinelayout::LineKind::Bar,
-                 mixxx::scrollinglinelayout::LineKind::Beat}) {
-        m_vertices.clear();
-        QColor color;
-        for (const auto& line : lines) {
-            if (line.kind == kind) {
-                color = line.color;
-                color.setAlphaF(line.opacityPercent / 100.0f);
-                const float x1 = static_cast<float>(line.x) - (line.widthPx - 1) / 2;
-                m_vertices.addRectangle(x1, 0.f, x1 + line.widthPx, lineBreadth);
-            }
-        }
-        if (m_vertices.size() == 0) {
-            continue;
-        }
-        m_shader.setAttributeArray(
-                positionLocation, GL_FLOAT, m_vertices.constData(), 2);
-        m_shader.setUniformValue(colorLocation, color);
-        glDrawArrays(GL_TRIANGLES, 0, m_vertices.size());
-    }
+    m_shader.setAttributeArray(
+            positionLocation, GL_FLOAT, m_vertices.constData(), 2);
+
+    m_shader.setUniformValue(matrixLocation, matrix);
+    m_shader.setUniformValue(colorLocation, m_color);
+
+    glDrawArrays(GL_TRIANGLES, 0, m_vertices.size());
 
     m_shader.disableAttributeArray(positionLocation);
     m_shader.release();

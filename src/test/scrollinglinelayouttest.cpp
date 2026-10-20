@@ -422,3 +422,72 @@ TEST(ScrollingLineLayoutTest, StepLineOpacityWidthAndColour) {
     EXPECT_EQ(2, result[0].widthPx);
     EXPECT_EQ(kSkinColor, result[4].color);
 }
+
+// Batches for the renderer: one per line kind, lines centred on the beat.
+namespace {
+
+Line line(double x, LineKind kind, int widthPx, int opacityPercent = 100, QColor color = kSkinColor) {
+    Line result;
+    result.x = x;
+    result.kind = kind;
+    result.widthPx = widthPx;
+    result.opacityPercent = opacityPercent;
+    result.color = color;
+    return result;
+}
+
+} // namespace
+
+TEST(ScrollingLineBatchesTest, OnePixelLineCoversUpstreamsPixel) {
+    // Upstream draws a beat at x as the pixel column x .. x + 1.
+    const auto batches = lineBatches({line(10.0, LineKind::Beat, 1)});
+    ASSERT_EQ(1u, batches.size());
+    ASSERT_EQ(1u, batches[0].spans.size());
+    EXPECT_DOUBLE_EQ(10.0, batches[0].spans[0].left);
+    EXPECT_DOUBLE_EQ(11.0, batches[0].spans[0].right);
+}
+
+TEST(ScrollingLineBatchesTest, WiderLinesGrowEquallyBothWays) {
+    // Centred on the middle of upstream's pixel, 10.5, for even widths too.
+    const auto batches = lineBatches({line(10.0, LineKind::Bar, 2),
+            line(20.0, LineKind::Bar, 2)});
+    ASSERT_EQ(1u, batches.size());
+    ASSERT_EQ(2u, batches[0].spans.size());
+    EXPECT_DOUBLE_EQ(9.5, batches[0].spans[0].left);
+    EXPECT_DOUBLE_EQ(11.5, batches[0].spans[0].right);
+
+    const auto wide = lineBatches({line(10.0, LineKind::Beat, 3)});
+    EXPECT_DOUBLE_EQ(9.0, wide[0].spans[0].left);
+    EXPECT_DOUBLE_EQ(12.0, wide[0].spans[0].right);
+    const auto widest = lineBatches({line(10.0, LineKind::Beat, 4)});
+    EXPECT_DOUBLE_EQ(8.5, widest[0].spans[0].left);
+    EXPECT_DOUBLE_EQ(12.5, widest[0].spans[0].right);
+}
+
+TEST(ScrollingLineBatchesTest, StepsFirstThenBarsThenBeats) {
+    const auto batches = lineBatches({line(0.0, LineKind::Bar, 2),
+            line(5.0, LineKind::Step, 1),
+            line(10.0, LineKind::Beat, 1),
+            line(15.0, LineKind::Step, 1)});
+    ASSERT_EQ(3u, batches.size());
+    EXPECT_EQ(LineKind::Step, batches[0].kind);
+    EXPECT_EQ(2u, batches[0].spans.size());
+    EXPECT_EQ(LineKind::Bar, batches[1].kind);
+    EXPECT_EQ(LineKind::Beat, batches[2].kind);
+}
+
+TEST(ScrollingLineBatchesTest, KindsWithoutLinesHaveNoBatch) {
+    EXPECT_TRUE(lineBatches({}).empty());
+    const auto batches = lineBatches({line(0.0, LineKind::Beat, 1)});
+    ASSERT_EQ(1u, batches.size());
+    EXPECT_EQ(LineKind::Beat, batches[0].kind);
+}
+
+TEST(ScrollingLineBatchesTest, BatchColourCarriesTheOpacity) {
+    const auto batches = lineBatches({line(0.0, LineKind::Bar, 2, 40, QColor(200, 100, 50))});
+    ASSERT_EQ(1u, batches.size());
+    EXPECT_EQ(200, batches[0].color.red());
+    EXPECT_EQ(100, batches[0].color.green());
+    EXPECT_EQ(50, batches[0].color.blue());
+    EXPECT_NEAR(0.4, batches[0].color.alphaF(), 0.01);
+}
