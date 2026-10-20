@@ -1,8 +1,12 @@
 #include "preferences/dialog/scrollinglinesprefsgroup.h"
 
 #include <QCheckBox>
+#include <QColorDialog>
 #include <QGridLayout>
+#include <QIcon>
 #include <QLabel>
+#include <QPixmap>
+#include <QPushButton>
 #include <QSignalBlocker>
 #include <QSlider>
 #include <QSpinBox>
@@ -10,6 +14,7 @@
 #include "moc_scrollinglinesprefsgroup.cpp"
 
 using mixxx::scrollinglinelayout::LineSettings;
+using mixxx::scrollinglinelayout::LineWidthPx;
 using mixxx::scrollinglinelayout::OpacityPercent;
 
 namespace {
@@ -50,11 +55,35 @@ ScrollingLinesPrefsGroup::ScrollingLinesPrefsGroup(
             tr("Bar line opacity"),
             QStringLiteral("scrollingBarLineOpacity"),
             tr("Opacity of the line on each bar's first beat (downbeat)."));
+    m_pBarWidthSpinBox = addWidthRow(pGrid,
+            row,
+            tr("Bar line width"),
+            QStringLiteral("scrollingBarLineWidth"),
+            tr("Width of the bar lines, in pixels."));
+    m_barColor = addColorRow(pGrid,
+            row,
+            tr("Bar line colour"),
+            QStringLiteral("scrollingBarLine"),
+            tr("Colour of the bar lines: the skin's beat colour, or a colour "
+               "of your choice."),
+            &LineSettings::barColor);
     m_beatOpacity = addOpacityRow(pGrid,
             row,
             tr("Beat line opacity"),
             QStringLiteral("scrollingBeatLineOpacity"),
             tr("Opacity of the lines on the other beats."));
+    m_pBeatWidthSpinBox = addWidthRow(pGrid,
+            row,
+            tr("Beat line width"),
+            QStringLiteral("scrollingBeatLineWidth"),
+            tr("Width of the beat lines, in pixels."));
+    m_beatColor = addColorRow(pGrid,
+            row,
+            tr("Beat line colour"),
+            QStringLiteral("scrollingBeatLine"),
+            tr("Colour of the beat lines: the skin's beat colour, or a colour "
+               "of your choice."),
+            &LineSettings::beatColor);
 
     showSettings(m_settings);
 
@@ -68,6 +97,105 @@ ScrollingLinesPrefsGroup::ScrollingLinesPrefsGroup(
                 this,
                 &ScrollingLinesPrefsGroup::slotControlChanged);
     }
+    for (QSpinBox* pSpinBox : {m_pBarWidthSpinBox, m_pBeatWidthSpinBox}) {
+        connect(pSpinBox,
+                QOverload<int>::of(&QSpinBox::valueChanged),
+                this,
+                &ScrollingLinesPrefsGroup::slotControlChanged);
+    }
+}
+
+QSpinBox* ScrollingLinesPrefsGroup::addWidthRow(QGridLayout* pGrid,
+        int& row,
+        const QString& name,
+        const QString& objectNamePrefix,
+        const QString& explanation) {
+    auto* pSpinBox = new QSpinBox();
+    pSpinBox->setObjectName(objectNamePrefix + QStringLiteral("SpinBox"));
+    pSpinBox->setRange(LineWidthPx::kMin, LineWidthPx::kMax);
+    pSpinBox->setSuffix(tr(" px"));
+    pSpinBox->setToolTip(explanation);
+    auto* pLabel = new QLabel(name);
+    pLabel->setBuddy(pSpinBox);
+    pLabel->setToolTip(explanation);
+    pGrid->addWidget(pLabel, row, 0);
+    pGrid->addWidget(pSpinBox, row, 1, Qt::AlignLeft);
+    ++row;
+    return pSpinBox;
+}
+
+// objectNamePrefix + "ColorButton" / "SkinColorButton" / "ColorDialog".
+ScrollingLinesPrefsGroup::ColorControls ScrollingLinesPrefsGroup::addColorRow(
+        QGridLayout* pGrid,
+        int& row,
+        const QString& name,
+        const QString& objectNamePrefix,
+        const QString& explanation,
+        ColorMember pColor) {
+    ColorControls controls;
+    controls.pColorButton = new QPushButton();
+    controls.pColorButton->setObjectName(objectNamePrefix + QStringLiteral("ColorButton"));
+    controls.pColorButton->setToolTip(explanation);
+    controls.pSkinColorButton = new QPushButton(tr("Skin colour"));
+    controls.pSkinColorButton->setObjectName(
+            objectNamePrefix + QStringLiteral("SkinColorButton"));
+    controls.pSkinColorButton->setToolTip(tr("Go back to the skin's beat colour."));
+    controls.pDialog = new QColorDialog(this);
+    controls.pDialog->setObjectName(objectNamePrefix + QStringLiteral("ColorDialog"));
+    auto* pLabel = new QLabel(name);
+    pLabel->setBuddy(controls.pColorButton);
+    pLabel->setToolTip(explanation);
+    pGrid->addWidget(pLabel, row, 0);
+    pGrid->addWidget(controls.pColorButton, row, 1, Qt::AlignLeft);
+    pGrid->addWidget(controls.pSkinColorButton, row, 2);
+    ++row;
+
+    connect(controls.pColorButton, &QPushButton::clicked, this, [this, pColor]() {
+        openColorDialog(pColor);
+    });
+    connect(controls.pSkinColorButton, &QPushButton::clicked, this, [this, pColor]() {
+        setColor(pColor, std::nullopt);
+    });
+    connect(controls.pDialog,
+            &QColorDialog::colorSelected,
+            this,
+            [this, pColor](const QColor& color) {
+                if (color.isValid()) {
+                    setColor(pColor, color.toRgb());
+                }
+            });
+    return controls;
+}
+
+ScrollingLinesPrefsGroup::ColorControls& ScrollingLinesPrefsGroup::colorControls(
+        ColorMember pColor) {
+    return pColor == &LineSettings::barColor ? m_barColor : m_beatColor;
+}
+
+void ScrollingLinesPrefsGroup::openColorDialog(ColorMember pColor) {
+    QColorDialog* pDialog = colorControls(pColor).pDialog;
+    pDialog->setCurrentColor((m_settings.*pColor).value_or(QColor(Qt::white)));
+    pDialog->open();
+}
+
+void ScrollingLinesPrefsGroup::setColor(ColorMember pColor, const std::optional<QColor>& color) {
+    m_settings.*pColor = color;
+    showColor(colorControls(pColor), color);
+    emit settingsChanged(m_settings);
+}
+
+void ScrollingLinesPrefsGroup::showColor(
+        const ColorControls& controls, const std::optional<QColor>& color) {
+    if (color) {
+        QPixmap swatch(16, 16);
+        swatch.fill(*color);
+        controls.pColorButton->setIcon(QIcon(swatch));
+        controls.pColorButton->setText(color->name(QColor::HexRgb));
+    } else {
+        controls.pColorButton->setIcon(QIcon());
+        controls.pColorButton->setText(tr("Skin colour"));
+    }
+    controls.pSkinColorButton->setEnabled(color.has_value());
 }
 
 ScrollingLinesPrefsGroup::OpacityControls ScrollingLinesPrefsGroup::addOpacityRow(
@@ -119,6 +247,13 @@ void ScrollingLinesPrefsGroup::showSettings(const LineSettings& settings) {
     };
     show(m_barOpacity, settings.barOpacity);
     show(m_beatOpacity, settings.beatOpacity);
+    for (const auto& [pSpinBox, width] : {std::pair{m_pBarWidthSpinBox, settings.barWidth},
+                 std::pair{m_pBeatWidthSpinBox, settings.beatWidth}}) {
+        const QSignalBlocker blockSpinBox(pSpinBox);
+        pSpinBox->setValue(width.px());
+    }
+    showColor(m_barColor, settings.barColor);
+    showColor(m_beatColor, settings.beatColor);
     updateUpstreamControls();
 }
 
@@ -126,6 +261,8 @@ void ScrollingLinesPrefsGroup::slotControlChanged() {
     m_settings.enabled = m_pEnabledCheckBox->isChecked();
     m_settings.barOpacity = OpacityPercent(m_barOpacity.pSpinBox->value());
     m_settings.beatOpacity = OpacityPercent(m_beatOpacity.pSpinBox->value());
+    m_settings.barWidth = LineWidthPx(m_pBarWidthSpinBox->value());
+    m_settings.beatWidth = LineWidthPx(m_pBeatWidthSpinBox->value());
     updateUpstreamControls();
     emit settingsChanged(m_settings);
 }
