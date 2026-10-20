@@ -378,8 +378,9 @@ class OverviewImage(unittest.TestCase):
         c = pw.overview_columns(np.zeros(1920 * 2), 44100, pw.default_args(),
                                 levels=np.zeros((100, 3)))
         img = self.image(c)
-        self.assertEqual(self.rows(img, 0).tolist(), [31])
-        self.assertEqual(img[31, 0].tolist(), [0, 0, 0, 255])
+        # Traktor draws the silence line at row 30, one above the stored row 31.
+        self.assertEqual(self.rows(img, 0).tolist(), [30])
+        self.assertEqual(img[30, 0].tolist(), [0, 0, 0, 255])
 
     def test_brightness_scales_the_colour_and_clips(self):
         c = self.cols(self.square(0.5))

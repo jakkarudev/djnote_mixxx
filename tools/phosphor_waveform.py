@@ -757,6 +757,11 @@ def overview_image(levels, density, n, settings=None, height=OVERVIEW_ROWS, colu
     px = np.clip(px, 0, 255)
     px[inside & ~live[:, None]] = (0, 0, 0, 255)  # silence: an opaque black line
     px[~inside] = 0
+    # Traktor draws that line one row above the row map's centre (row 30, research 9),
+    # while the map itself stays: shift silent columns up by a row.
+    sil = has & ~live
+    px[sil, :-1] = px[sil, 1:].copy()
+    px[sil, -1] = 0
     out[:, :done] = px.transpose(1, 0, 2)
     if height != OVERVIEW_ROWS:
         out = np.einsum("yr,rcb->ycb", _height_weights(height), out)
