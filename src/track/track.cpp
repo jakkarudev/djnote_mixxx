@@ -11,6 +11,7 @@
 #include "util/logger.h"
 #include "util/time.h"
 #include "waveform/phosphor/phosphordata.h"
+#include "waveform/phosphor/phosphoroverview.h"
 
 namespace {
 
@@ -960,6 +961,32 @@ bool Track::replacePhosphorData(const mixxx::phosphor::PhosphorDataPointer& expe
         m_pPhosphorData = std::move(pData);
     }
     emit phosphorDataUpdated();
+    return true;
+}
+
+mixxx::phosphor::PhosphorOverviewPointer Track::getPhosphorOverview() const {
+    const auto locked = lockMutex(&m_phosphorOverviewMutex);
+    return m_pPhosphorOverview;
+}
+
+void Track::setPhosphorOverview(mixxx::phosphor::PhosphorOverviewPointer pOverview) {
+    {
+        const auto locked = lockMutex(&m_phosphorOverviewMutex);
+        m_pPhosphorOverview = std::move(pOverview);
+    }
+    emit phosphorOverviewUpdated();
+}
+
+bool Track::replacePhosphorOverview(const mixxx::phosphor::PhosphorOverviewPointer& expected,
+        mixxx::phosphor::PhosphorOverviewPointer pOverview) {
+    {
+        const auto locked = lockMutex(&m_phosphorOverviewMutex);
+        if (m_pPhosphorOverview != expected) {
+            return false;
+        }
+        m_pPhosphorOverview = std::move(pOverview);
+    }
+    emit phosphorOverviewUpdated();
     return true;
 }
 

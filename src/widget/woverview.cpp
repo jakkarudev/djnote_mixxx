@@ -320,7 +320,33 @@ void WOverview::onConnectedControlChanged(double dParameter, double dValue) {
     }
 }
 
+void WOverview::slotPhosphorOverviewUpdated() {
+    const TrackPointer pTrack(m_pCurrentTrack);
+    if (!pTrack || m_type != Type::Phosphor) {
+        return;
+    }
+    const auto pOverview = pTrack->getPhosphorOverview();
+    if (pOverview != m_pPhosphorOverview) {
+        // Replaced (rebuilt) or cleared: start over with what is there.
+        m_pPhosphorOverview = pOverview;
+        m_waveformSourceImage = QImage();
+        m_waveformImageScaled = QImage();
+        m_actualCompletion = 0;
+        m_waveformPeak = -1.0;
+        m_pixmapDone = false;
+        m_analyzerProgress = kAnalyzerProgressUnknown;
+    }
+    if (m_pPhosphorOverview) {
+        drawNextPixmapPart();
+    }
+    update();
+}
+
 void WOverview::slotWaveformSummaryUpdated() {
+    if (m_type == Type::Phosphor) {
+        slotPhosphorOverviewUpdated();
+        return;
+    }
     //qDebug() << "WOverview::slotWaveformSummaryUpdated()";
 
     TrackPointer pTrack(m_pCurrentTrack);
@@ -381,6 +407,10 @@ void WOverview::slotLoadingTrack(TrackPointer pNewTrack, TrackPointer pOldTrack)
                 this,
                 &WOverview::slotWaveformSummaryUpdated);
         disconnect(m_pCurrentTrack.get(),
+                &Track::phosphorOverviewUpdated,
+                this,
+                &WOverview::slotPhosphorOverviewUpdated);
+        disconnect(m_pCurrentTrack.get(),
                 &Track::cuesUpdated,
                 this,
                 &WOverview::receiveCuesUpdated);
@@ -391,6 +421,7 @@ void WOverview::slotLoadingTrack(TrackPointer pNewTrack, TrackPointer pOldTrack)
     }
 
     m_waveformSourceImage = QImage();
+    m_pPhosphorOverview.reset();
     m_analyzerProgress = kAnalyzerProgressUnknown;
     m_actualCompletion = 0;
     m_waveformPeak = -1.0;
@@ -409,6 +440,10 @@ void WOverview::slotLoadingTrack(TrackPointer pNewTrack, TrackPointer pOldTrack)
                 &Track::waveformSummaryUpdated,
                 this,
                 &WOverview::slotWaveformSummaryUpdated);
+        connect(pNewTrack.get(),
+                &Track::phosphorOverviewUpdated,
+                this,
+                &WOverview::slotPhosphorOverviewUpdated);
         slotWaveformSummaryUpdated();
         connect(pNewTrack.get(), &Track::cuesUpdated, this, &WOverview::receiveCuesUpdated);
         connect(pNewTrack.get(),
@@ -474,7 +509,12 @@ void WOverview::slotTypeControlChanged(double v) {
 
     m_type = type;
     m_pWaveform.clear();
+    m_pPhosphorOverview.reset();
     m_waveformSourceImage = QImage();
+    m_waveformImageScaled = QImage();
+    m_actualCompletion = 0;
+    m_waveformPeak = -1.0;
+    m_pixmapDone = false;
     slotWaveformSummaryUpdated();
 }
 
@@ -1520,7 +1560,42 @@ void WOverview::drawPassthroughOverlay(QPainter* pPainter) {
     }
 }
 
+mixxx::phosphor::OverviewDrawSettings WOverview::phosphorDrawSettings() const {
+    return mixxx::phosphor::OverviewDrawSettings();
+}
+
+bool WOverview::drawNextPhosphorPart() {
+    if (!m_pPhosphorOverview) {
+        return false;
+    }
+    const auto view = m_pPhosphorOverview->view();
+    const int completion = view.columnsDone;
+    const bool done = completion >= mixxx::phosphor::kOverviewColumns;
+    const int increment = completion - m_actualCompletion;
+    // Draw when at least one visible pixel is new, and when finished.
+    if (increment <= 0 ||
+            (!done && increment * length() / mixxx::phosphor::kOverviewColumns == 0)) {
+        return false;
+    }
+    // The source image has the height the other types use (2 * 255), so the
+    // crop of Normalize and visual gain is the same code for every type.
+    m_waveformSourceImage = mixxx::phosphor::overviewImage(
+            view, phosphorDrawSettings(), 2 * 255)
+                                    .convertToFormat(QImage::Format_ARGB32_Premultiplied);
+    // Peak in the 0..255 units of the other types.
+    m_waveformPeak = static_cast<float>(
+            mixxx::phosphor::overviewExtentRows(view) * 255.0 / (mixxx::phosphor::kOverviewRows / 2));
+    m_actualCompletion = completion;
+    m_pixmapDone = done;
+    m_waveformImageScaled = QImage();
+    m_diffGain = 0;
+    return true;
+}
+
 bool WOverview::drawNextPixmapPart() {
+    if (m_type == Type::Phosphor) {
+        return drawNextPhosphorPart();
+    }
     ConstWaveformPointer pWaveform = getWaveform();
     if (!pWaveform) {
         return false;

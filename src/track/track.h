@@ -23,6 +23,8 @@
 namespace mixxx::phosphor {
 class PhosphorData;
 using PhosphorDataPointer = std::shared_ptr<const PhosphorData>;
+class PhosphorOverviewData;
+using PhosphorOverviewPointer = std::shared_ptr<const PhosphorOverviewData>;
 } // namespace mixxx::phosphor
 
 class Track : public QObject {
@@ -302,6 +304,15 @@ class Track : public QObject {
     bool replacePhosphorData(const mixxx::phosphor::PhosphorDataPointer& expected,
             mixxx::phosphor::PhosphorDataPointer pData);
 
+    /// The Phosphor overview columns (ADR-0005), shared by every player that
+    /// shows the track. Null until the overview analyzer started. Safe to call
+    /// from any thread.
+    mixxx::phosphor::PhosphorOverviewPointer getPhosphorOverview() const;
+    void setPhosphorOverview(mixxx::phosphor::PhosphorOverviewPointer pOverview);
+    /// Sets the overview only if the track still holds `expected` (null: none).
+    bool replacePhosphorOverview(const mixxx::phosphor::PhosphorOverviewPointer& expected,
+            mixxx::phosphor::PhosphorOverviewPointer pOverview);
+
     /// Get the track's main cue point
     mixxx::audio::FramePos getMainCuePosition() const;
     // Set the track's main cue point
@@ -459,6 +470,8 @@ class Track : public QObject {
     /// The Phosphor data object was set or replaced (progress while it is
     /// filled is published through the data object itself).
     void phosphorDataUpdated();
+    /// The Phosphor overview object was set or replaced.
+    void phosphorOverviewUpdated();
     void waveformSummaryUpdated();
     void coverArtUpdated();
     void beatsUpdated();
@@ -599,6 +612,8 @@ class Track : public QObject {
 
     mutable QMutex m_phosphorMutex;
     mixxx::phosphor::PhosphorDataPointer m_pPhosphorData;
+    mutable QMutex m_phosphorOverviewMutex;
+    mixxx::phosphor::PhosphorOverviewPointer m_pPhosphorOverview;
 
     mixxx::BeatsImporterPointer m_pBeatsImporterPending;
     std::unique_ptr<mixxx::CueInfoImporter> m_pCueInfoImporterPending;

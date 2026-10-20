@@ -8,6 +8,7 @@
 #include "track/track_decl.h"
 #include "track/trackid.h"
 #include "util/parented_ptr.h"
+#include "waveform/phosphor/phosphoroverview.h"
 #include "waveform/renderers/waveformmarkrange.h"
 #include "waveform/renderers/waveformmarkset.h"
 #include "waveform/renderers/waveformsignalcolors.h"
@@ -47,6 +48,7 @@ class WOverview : public WWidget, public TrackDropTarget {
         Filtered,
         HSV,
         RGB,
+        Phosphor,
     };
     Q_ENUM(Type);
 
@@ -82,6 +84,7 @@ class WOverview : public WWidget, public TrackDropTarget {
     void receiveCuesUpdated();
 
     void slotWaveformSummaryUpdated();
+    void slotPhosphorOverviewUpdated();
     void slotCueMenuPopupAboutToHide();
 
     void slotTypeControlChanged(double v);
@@ -92,6 +95,12 @@ class WOverview : public WWidget, public TrackDropTarget {
     // Append the waveform overview pixmap according to available data
     // in waveform
     bool drawNextPixmapPart();
+    // The Phosphor type: renders the stored columns built so far into the
+    // source image through the pure image function.
+    bool drawNextPhosphorPart();
+    // How the Phosphor columns are drawn. The calibrated defaults; the settings
+    // group (#55) loads them from the config.
+    mixxx::phosphor::OverviewDrawSettings phosphorDrawSettings() const;
     void drawNextPixmapPartHSV(QPainter* pPainter,
             ConstWaveformPointer pWaveform,
             const int nextCompletion);
@@ -227,6 +236,7 @@ class WOverview : public WWidget, public TrackDropTarget {
     // Current active track
     TrackPointer m_pCurrentTrack;
     ConstWaveformPointer m_pWaveform;
+    mixxx::phosphor::PhosphorOverviewPointer m_pPhosphorOverview;
 
     QImage m_waveformSourceImage;
     QImage m_waveformImageScaled;

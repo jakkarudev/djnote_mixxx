@@ -733,6 +733,7 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/analyzer/analyzerthread.cpp
   src/analyzer/analyzertrack.cpp
   src/analyzer/analyzerphosphor.cpp
+  src/analyzer/analyzerphosphoroverview.cpp
   src/analyzer/analyzerwaveform.cpp
   src/analyzer/beatgridrefiner.cpp
   src/analyzer/plugins/analyzerqueenmarybeats.cpp
@@ -1283,6 +1284,7 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/waveform/phosphor/phosphorheight.cpp
   src/waveform/phosphor/phosphorlanecache.cpp
   src/waveform/phosphor/phosphorlanemodel.cpp
+  src/waveform/phosphor/phosphoroverview.cpp
   src/waveform/phosphor/phosphorsettings.cpp
   src/waveform/waveformgains.cpp
   src/waveform/waveformmarklabel.cpp
@@ -2140,6 +2142,7 @@ if(BUILD_TESTING)
   set(
     src-mixxx-test
     src/test/analyzerphosphortest.cpp
+    src/test/analyzerphosphoroverviewtest.cpp
     src/test/analyserwaveformtest.cpp
     src/test/analyzersilence_test.cpp
     src/test/audiotaperpot_test.cpp
@@ -2187,6 +2190,7 @@ if(BUILD_TESTING)
     src/test/phosphorheighttest.cpp
     src/test/phosphorlanemodeltest.cpp
     src/test/phosphoroverviewfixturetest.cpp
+    src/test/phosphoroverviewtest.cpp
     src/test/phosphorsettingstest.cpp
     src/test/phosphorslipoverlaytest.cpp
     src/test/waveformgainstest.cpp

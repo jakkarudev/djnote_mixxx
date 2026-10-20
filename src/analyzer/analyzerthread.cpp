@@ -4,6 +4,7 @@
 
 #include "analyzer/analyzerbeats.h"
 #include "analyzer/analyzerphosphor.h"
+#include "analyzer/analyzerphosphoroverview.h"
 #include "analyzer/analyzerebur128.h"
 #include "analyzer/analyzergain.h"
 #include "analyzer/analyzerkey.h"
@@ -119,6 +120,12 @@ void AnalyzerThread::doRun() {
     // Only builds data for tracks scheduled with AnalyzerTrack::Options::buildPhosphor
     // (deck loads), so it is inert for samplers, previews and batch analysis.
     m_analyzers.push_back(AnalyzerWithState(std::make_unique<AnalyzerPhosphor>(m_pConfig)));
+    // The Phosphor overview: runs wherever the waveform analyzer runs (deck,
+    // sampler and preview loads, library analysis), only while Phosphor is the
+    // selected overview type.
+    if (m_modeFlags & AnalyzerModeFlags::WithWaveform) {
+        m_analyzers.push_back(AnalyzerWithState(std::make_unique<AnalyzerPhosphorOverview>(m_pConfig)));
+    }
     DEBUG_ASSERT(!m_analyzers.empty());
     kLogger.debug() << "Activated" << m_analyzers.size() << "analyzers";
 
