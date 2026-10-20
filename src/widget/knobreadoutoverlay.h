@@ -3,6 +3,7 @@
 #include <QObject>
 #include <QPointer>
 #include <QTimer>
+#include <optional>
 
 #include "preferences/usersettings.h"
 #include "widget/knobreadoutsettings.h"
@@ -14,8 +15,8 @@ class ControlProxy;
 namespace mixxx {
 
 // The knob adjustment readout (see GLOSSARY.md): a small label shown just
-// under a knob while it is being turned, hidden about 1 s after the last
-// change.
+// under a knob (or centred on its face, see knobreadout::Style) while it is
+// being turned, hidden about 1 s after the last change.
 //
 // The overlay observes upstream knob widgets (WKnob, WKnobComposed and their
 // effect subclasses) without editing them: an event filter on each knob tells
@@ -49,7 +50,12 @@ class KnobReadoutOverlay : public QObject {
     // screen or on a controller.
     bool isOwnInput(QWidget* pKnob) const;
     void onKnobControlChanged(QWidget* pKnob, ControlProxy* pControl);
-    void showReadout(QWidget* pKnob, const QString& text);
+    // Shows text centred on the knob face at facePixelSize when given (the
+    // knob-face style), else just under the knob.
+    void showReadout(QWidget* pKnob,
+            const QString& text,
+            std::optional<int> facePixelSize = std::nullopt);
+    void setLabelStyleSheet(const QString& styleSheet);
 
     QWidget* const m_pMainWindow;
     const UserSettingsPointer m_pConfig;
