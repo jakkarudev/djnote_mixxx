@@ -421,7 +421,7 @@ Ticket #20. `tools/phosphor_waveform.py --fit-overview --signals-dir <waveform-t
 
 | Part | Rule | Evidence |
 |---|---|---|
-| Rows | A sample `v` (mono, -1..1) falls in row `floor(31 v + 31)`, clipped to 0..61, positive downward. The rows from the column's min to its max are present. | Top and bottom extents match the per-column min/max with r = 0.93-0.97 and a mean error of 0.7-0.9 row (Braindrain 2.2) on the four tracks. 0 dBFS gives 62 rows, -6 dB gives 32. |
+| Rows | A sample `v` (mono, -1..1) falls in row `floor(31 v + 31)`, clipped to 0..61, positive downward. The rows from the min to the max of the column's **window** are present: the column's N samples plus N/2 on each side (ticket #58, below). | Top and bottom extents match the per-column min/max with r = 0.93-0.97 and a mean error of 0.7-0.9 row (Braindrain 2.2) on the four tracks. 0 dBFS gives 62 rows, -6 dB gives 32. |
 | Colour | Unit colour of the column's band levels, taken as the **maximum over the column of the existing 1 ms colour track** (the same FIR filters, `table = stripe`, gamma 0.35 and smoothing as the scrolling waveform). Bytes are B, G, R: R = low band. | Mean distance between unit colours 0.053-0.081 on the tracks (cosine 0.995-0.997). Mean, middle or last block instead of the max is worse (0.10-0.14), so Traktor's column colour is a peak hold of the smoothed band levels. |
 | Magnitude | `norm(rgb) = (W . (r, g, b, b^4)) * norm(levels)^0.7 * d^0.25`, with (r, g, b) the unit colour, W = (83.5, 242.0, -37.4, 606.1) and `d` the row's density (next row). | Per-pixel median error 11 % on the tracks and 10 % on tones. The 0.7 matches amplitude^0.25 for a pure tone (0.35 x 0.7 = 0.245). The `b^4` term lifts bright blue (high-frequency) columns, as pure tones need (a 16 kHz tone is about 3.5 times as bright as a 40 Hz tone). |
 | **Profile** | `d` = the share of the column's samples that fall in the row (sample **density**), raised to 0.25. Rows inside the extent that no sample hit get half a sample. | Within a column, `log norm(rgb)` against `log d`: slope 0.26, R^2 = 0.91, residual 0.12 (67 000 pixels). This is the section 8.2 phosphor effect: Q7's sine is *brighter* at its edges (153 against 128), a square is a hollow box, and music columns are bright at the centre. The earlier "survival function" reading was close for unimodal columns but wrong for sines. |
@@ -460,10 +460,37 @@ Means over the four tracks: colour 0.068, profile 10.7, outline 0.954. The compa
 ### Remaining gaps
 
 1. **Colour tails.** After a click or kick Traktor's 1-pixel centre line keeps its colour for several columns (section 8.3). Our peak hold carries a shorter tail. This is most of the Q5 (0.181) and Q3c (0.143) colour error, and Q5's outline correlation is only 0.76. Silent columns in the model draw a 1-row line at row 31, Traktor's is at row 30 (a click of 0.9 reaches row 58 there). Moving the row map by half a row was tried and made the fit slightly worse, so it stays at 31.
-2. **Tone profile.** A 62-row tone has dim edges in Traktor (152 against 193) over about 5 rows; our density model gives a flat or edge-bright profile. Traktor probably draws the segments between samples and anti-aliases the edge (section 8.2). Profile errors on the test signals (14-80) are mostly this and the one-row offset. On music they are 6-9, except Braindrain (18, a heavily compressed master).
+2. **Tone profile** (investigated in #58, not fixed: see below). A 62-row tone has dim edges in Traktor (152 against 193) over about 5 rows; our density model gives a flat or edge-bright profile. Traktor probably draws the segments between samples and anti-aliases the edge (section 8.2). Profile errors on the test signals (14-80) are mostly this and the one-row offset. On music they are 6-9, except Braindrain (18, a heavily compressed master).
 3. **Brightness model.** 11 % median per pixel; the `b^4` term and the negative blue weight are a fit, not a mechanism.
 4. **Ren intro meaning** has no stripe, so the five-track set is four.
-5. **Edge extents** are 0.7-0.9 row wider than min..max on three tracks and 2 rows on Braindrain, perhaps from the line segments.
+5. ~~**Edge extents** are 0.7-0.9 row wider than min..max~~ Fixed in #58: Traktor's extent comes from a two-column window.
+
+### Ticket #58: line segments, anti-aliased edges and the extents (2026-10-20)
+
+Tested in the reference script (`--overview-overlap`, `--overview-segments`); the baseline is the table above re-run on the current signals.
+
+**Extents: the cause is a wider window, not anti-aliasing.** Traktor's top and bottom rows on music are 0.7 row (Gigando, Spiritual), 0.4 (Progress Paradox) and 2.1 rows (Braindrain) beyond the column's own min and max, on each side, by the same amount on both. Extending each column's window by a fraction of a column on each side and measuring the signed bias: 0.25 N leaves 0.3 (Braindrain 0.8); **0.5 N on each side (a window of two columns, the same two-column shape window as the scrolling waveform, section 8) leaves 0.00-0.05 on all four tracks**; 1.0 N overshoots by the same amount the other way. Tones have constant amplitude, so they show no bias. Anti-aliasing the edge row cannot explain it: it would also widen the tones. Adopted for the extent and the density: both come from the window (N + 2 x floor(N/2) samples, clipped to the track). A column whose own samples are all zero keeps its one-row line.
+
+**Tone edges: line segments reproduce the ramp, but not the brightness.** In Q3c (8 kHz, full scale; 62 rows) Traktor's alpha is flat (193) with a ramp over 5 rows at each edge (152, 168, 177, 185, 191, 194; as `d`, relative: 0.38 0.57 0.71 0.84 0.96). Counting a segment between consecutive samples **once in every row it crosses** (a drawn line; spreading a unit of weight over its rows gives a lumpy profile instead) gives 0.43 0.63 0.76 0.88 0.98 and a flat interior; at 16 rows the edge is 179 against 197 in Traktor and 0.71 against 0.91 in `d`. But the crossing share is far larger than the point share for high frequencies (0.37 against 0.012 in the interior), so the calibrated brightness (exponent 0.25, W) is then wrong by 1.5-2.4 times for tones and has to be refitted. The best compromise (exponent 0.25, brightness 0.85) lowers the tone mean profile error from 39.8 to 37.5 (Q2a 36 to 29, Q3c 63 to 52, Q6 35 to 28) but raises it on the sine tones (Q4 25 to 28, Q7 21 to 25) and on Progress Paradox (5.5 to 6.1); nothing dominates. **Not adopted** (the option stays in the script, off). The edge ramp is a drawn-line effect; a refit of the magnitude model on counts of crossed rows, not shares of samples, is the next step if the tone profile matters.
+
+**Fit after adopting the window** (profile error / outline r; colour is unchanged; before in brackets):
+
+| Item | Profile | Outline r |
+|---|---|---|
+| Gigando | 8.2 (8.9) | 0.977 (0.971) |
+| Braindrain intro | 16.0 (18.5) | 0.962 (0.928) |
+| Spiritual | 8.2 (9.1) | 0.981 (0.950) |
+| Progress Paradox | 5.5 (6.2) | 0.981 (0.967) |
+| Q2a | 36.0 (36.1) | 0.957 (0.956) |
+| Q2b | 29.1 (29.1) | 0.970 (0.973) |
+| Q3c | 63.0 (63.3) | 0.998 (0.995) |
+| Q4 | 24.7 (24.8) | 0.987 (0.988) |
+| Q6 | 35.0 (35.1) | 0.988 (0.989) |
+| Q7 | 21.8 (21.7) | 0.994 (0.994) |
+| Q5 | 86.7 (92.6) | 0.791 (0.759) |
+| Q9 | 29.8 (29.9) | 0.983 (0.984) |
+
+Mean width bias of the extent on the four tracks: from -0.76..-1.40 rows (Braindrain -4.2) to -0.11..+0.03 (Braindrain -0.03). The tone profile error does not change; it stays dominated by the brightness scale and the one-row offset. The stored layout is unchanged; the overview version is 1.1.
 
 ### Q1: band data or a rendered image?
 

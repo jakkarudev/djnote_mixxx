@@ -50,7 +50,10 @@ class AnalyzerPhosphorOverview : public Analyzer {
     /// Stored data of the track, if current; deletes stale rows. Null if none.
     mixxx::phosphor::PhosphorOverviewPointer loadStored(
             TrackId trackId, int sampleRate, SINT frameLength);
-    void finishColumn();
+    using Histogram = std::array<int, mixxx::phosphor::kOverviewRows>;
+    /// Writes the density of every column whose window is complete (all, if
+    /// `finished`).
+    void writeReadyDensity(bool finished);
     void writeReadyColumns(bool finished);
 
     UserSettingsPointer m_pConfig;
@@ -61,9 +64,14 @@ class AnalyzerPhosphorOverview : public Analyzer {
     std::vector<int16_t> m_mono;
     std::vector<uint16_t> m_color; // 3 per 1 ms block, all so far
     std::vector<uint16_t> m_colorOut;
-    std::array<int, mixxx::phosphor::kOverviewRows> m_histogram;
+    // Per column: the rows of its own samples, of its first and of its last
+    // n/2 samples. A column's window is the previous column's last half, its
+    // own samples and the next column's first half (ticket #58).
+    std::vector<Histogram> m_own;
+    std::vector<Histogram> m_first;
+    std::vector<Histogram> m_last;
+    std::vector<bool> m_ownNonzero;
     int m_colorBlockFrames;
-    int m_columnFill;     // samples in the column being counted
     int m_densityColumns; // columns whose density is final
     int m_writtenColumns; // columns whose levels are final too
     SINT m_framesSeen;

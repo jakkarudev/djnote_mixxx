@@ -125,7 +125,9 @@ All numbers are little-endian, except the `qCompress` length prefix.
 - **Input to the analyzer:** feed the samples (mono sum `(L+R)/2`, int16 scaled by 1/32768 for Mixxx floats)
   at `rate`. The analyzer must produce `COLS` : `n` = samples per column, `levels` = `round(255 * peak hold of
   the 1 ms colour track)` (colour track fixed at the calibrated constants), `density` = `round(255 * (d / 0.8)^0.25)`
-  clipped, `d` the share of the column's samples in the row; rows are `clip(floor(31 v + 31), 0, 61)`, positive
+  clipped, `d` the share of the column's window in the row. The window is the column's samples plus the
+  `n / 2` (floor) samples before and after them, clipped to the track (a two-column window; ticket #58). A column
+  whose own samples are all zero uses only them (a one-row line). Rows are `clip(floor(31 v + 31), 0, 61)`, positive
   downward. Zero outside the extent and in columns past the end. Tolerances: levels within 1, density within 1.
 - **Images:** `pixels` is `height` rows of 1920 pixels, bytes B, G, R, A (Qt `Format_ARGB32` on little-endian),
   row 0 = -1.0 (top). They are drawn from the stored bytes in `COLS` only (not the unquantised density), for the

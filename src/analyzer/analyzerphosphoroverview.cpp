@@ -34,9 +34,7 @@ AnalyzerPhosphorOverview::AnalyzerPhosphorOverview(
         UserSettingsPointer pConfig, const QSqlDatabase& dbConnection)
         : m_pConfig(pConfig),
           m_analysisDao(pConfig),
-          m_histogram{},
           m_colorBlockFrames(1),
-          m_columnFill(0),
           m_densityColumns(0),
           m_writtenColumns(0),
           m_framesSeen(0),
@@ -131,18 +129,40 @@ bool AnalyzerPhosphorOverview::initialize(const AnalyzerTrack& track,
     // Fixed calibrated constants, never the scrolling waveform's settings.
     m_pColor = std::make_unique<ColorTrackBuilder>(sampleRate.value());
     m_colorBlockFrames = colorBlockFrames(sampleRate.value());
+    m_own.assign(kOverviewColumns, Histogram{});
+    m_first.assign(kOverviewColumns, Histogram{});
+    m_last.assign(kOverviewColumns, Histogram{});
+    m_ownNonzero.assign(kOverviewColumns, false);
     return true;
 }
 
-void AnalyzerPhosphorOverview::finishColumn() {
-    uint8_t* pDensity = m_pData->writableDensity(m_densityColumns);
-    const double count = std::max(1, m_columnFill);
-    for (int r = 0; r < kOverviewRows; ++r) {
-        pDensity[r] = roundU8(255.0 * std::pow(m_histogram[r] / count / 0.8, 0.25));
+void AnalyzerPhosphorOverview::writeReadyDensity(bool finished) {
+    const int n = m_pData->samplesPerColumn();
+    const int over = n / 2; // the window extends half a column on each side
+    while (m_densityColumns < kOverviewColumns) {
+        const int k = m_densityColumns;
+        const SINT a = static_cast<SINT>(k) * n;
+        if (finished ? a >= m_framesSeen : a + n + over > m_framesSeen) {
+            break;
+        }
+        Histogram window = m_own[k];
+        if (m_ownNonzero[k]) {
+            // A digitally silent column stays a one-row line instead.
+            for (int r = 0; r < kOverviewRows; ++r) {
+                window[r] += (k > 0 ? m_last[k - 1][r] : 0) +
+                        (k + 1 < kOverviewColumns ? m_first[k + 1][r] : 0);
+            }
+        }
+        int count = 0;
+        for (int r = 0; r < kOverviewRows; ++r) {
+            count += window[r];
+        }
+        uint8_t* pDensity = m_pData->writableDensity(k);
+        for (int r = 0; r < kOverviewRows; ++r) {
+            pDensity[r] = roundU8(255.0 * std::pow(static_cast<double>(window[r]) / std::max(1, count) / 0.8, 0.25));
+        }
+        ++m_densityColumns;
     }
-    m_histogram.fill(0);
-    m_columnFill = 0;
-    ++m_densityColumns;
 }
 
 void AnalyzerPhosphorOverview::writeReadyColumns(bool finished) {
@@ -179,19 +199,28 @@ bool AnalyzerPhosphorOverview::processSamples(const CSAMPLE* pIn, SINT count) {
     for (SINT i = 0; i < frames; ++i) {
         const int16_t mono = monoSample(pIn[2 * i], pIn[2 * i + 1]);
         m_mono[static_cast<size_t>(i)] = mono;
-        if (m_densityColumns < kOverviewColumns) {
+        const SINT frame = m_framesSeen + i;
+        const SINT column = frame / n;
+        if (column < kOverviewColumns) {
             const int row = std::clamp(
                     static_cast<int>(std::floor(mono / 32768.0 * 31 + 31)),
                     0,
                     kOverviewRows - 1);
-            ++m_histogram[row];
-            ++m_columnFill;
-            if (m_columnFill == n) {
-                finishColumn();
+            const SINT start = column * n;
+            ++m_own[column][row];
+            if (mono != 0) {
+                m_ownNonzero[column] = true;
+            }
+            if (frame - start < n / 2) {
+                ++m_first[column][row];
+            }
+            if (frame - start >= n - n / 2) {
+                ++m_last[column][row];
             }
         }
     }
     m_framesSeen += frames;
+    writeReadyDensity(false);
     // The color track trails the samples (filter delay, look-ahead).
     m_colorOut.clear();
     m_pColor->append(m_mono.data(), frames, &m_colorOut);
@@ -208,9 +237,7 @@ void AnalyzerPhosphorOverview::storeResults(TrackPointer pTrack) {
     m_colorOut.clear();
     m_pColor->finish(&m_colorOut);
     m_color.insert(m_color.end(), m_colorOut.begin(), m_colorOut.end());
-    if (m_columnFill > 0 && m_densityColumns < kOverviewColumns) {
-        finishColumn(); // the track was shorter than announced
-    }
+    writeReadyDensity(true);
     writeReadyColumns(true);
     // Columns past the end of the track stay empty.
     m_pData->setCompletedColumns(kOverviewColumns);
@@ -241,8 +268,10 @@ void AnalyzerPhosphorOverview::cleanup() {
     m_mono.clear();
     m_color.clear();
     m_colorOut.clear();
-    m_histogram.fill(0);
-    m_columnFill = 0;
+    m_own.clear();
+    m_first.clear();
+    m_last.clear();
+    m_ownNonzero.clear();
     m_densityColumns = 0;
     m_writtenColumns = 0;
     m_framesSeen = 0;

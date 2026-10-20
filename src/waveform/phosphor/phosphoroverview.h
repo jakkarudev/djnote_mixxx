@@ -18,8 +18,9 @@ constexpr int kOverviewRows = 62;
 constexpr int kOverviewColumnBytes = 3 + kOverviewRows; // levels + density
 
 /// Version of the stored columns: bump when the row map, the column count, the
-/// encoding or the color track constants change.
-constexpr const char* kOverviewVersion = "PhosphorOverview-1.0";
+/// encoding, the column window or the color track constants change (1.1:
+/// extent and density from a two-column window, ticket #58).
+constexpr const char* kOverviewVersion = "PhosphorOverview-1.1";
 constexpr const char* kOverviewDescription =
         "Phosphor overview: 1920 columns of 3 band levels and 62 density rows";
 

@@ -647,6 +647,7 @@ STRIPE_BLUE_POWER = 4
 ALPHA_PER_G = 2.0
 DENSITY_FULL = 0.8       # a share of 0.8 stores as 255
 DENSITY_STORE_POWER = 0.25
+OVERVIEW_OVERLAP = 0.5   # column window = 2 columns centred (ticket #58)
 
 
 @dataclass
@@ -706,11 +707,32 @@ def overview_columns(mono, rate, args, columns=OVERVIEW_COLUMNS, levels=None, n=
         lv = levels[l0:l1]
         if len(lv):
             lv_out[k] = _round_u8(lv.max(0) * 255)
-        idx = np.clip(np.floor(np.asarray(mono[a:b], np.float64) * 31 + STRIPE_CENTRE).astype(int),
-                      0, OVERVIEW_ROWS - 1)
-        share = np.bincount(idx, minlength=OVERVIEW_ROWS)[:OVERVIEW_ROWS] / (b - a)
-        d_out[k] = _round_u8(255 * (share / DENSITY_FULL) ** DENSITY_STORE_POWER)
+        over = int(getattr(args, "overview_overlap", OVERVIEW_OVERLAP) * n)
+        w0, w1 = max(a - over, 0), min(b + over, len(mono))
+        if not np.any(mono[a:b]):
+            w0, w1 = a, b  # a digitally silent column stays a one-row line
+        seg = getattr(args, "overview_segments", False)
+        idx = np.clip(np.floor(np.asarray(mono[w0:min(w1 + seg, len(mono))], np.float64) * 31
+                               + STRIPE_CENTRE).astype(int), 0, OVERVIEW_ROWS - 1)
+        if seg:
+            share = segment_share(idx)
+        else:
+            share = np.bincount(idx[:w1 - w0], minlength=OVERVIEW_ROWS)[:OVERVIEW_ROWS] / (w1 - w0)
+        d_out[k] = _round_u8(255 * (np.clip(share, 0, None) / DENSITY_FULL) ** DENSITY_STORE_POWER)
     return OverviewColumns(n, lv_out, d_out)
+
+
+def segment_share(idx):
+    """Experiment (ticket #58): the share of a window's line segments that cross
+    each row. `idx` are the rows of consecutive samples; the segment between two
+    of them adds 1 to every row from one to the other, as a drawn line does (a
+    long segment is not diluted over its rows, so a tone's interior is flat and
+    its edge falls off over about one segment length, as Traktor's does)."""
+    if len(idx) < 2:
+        return np.bincount(idx, minlength=OVERVIEW_ROWS)[:OVERVIEW_ROWS].astype(float)
+    lo, hi = np.minimum(idx[:-1], idx[1:]), np.maximum(idx[:-1], idx[1:])
+    acc = np.bincount(lo, minlength=OVERVIEW_ROWS + 1) - np.bincount(hi + 1, minlength=OVERVIEW_ROWS + 1)
+    return np.cumsum(acc)[:OVERVIEW_ROWS] / len(lo)
 
 
 def _height_weights(height):
@@ -1184,6 +1206,10 @@ def build_parser():
     p.add_argument("--tracks-dir", default=TRACKS_DIR)
     p.add_argument("--fit-overview", action="store_true",
                    help="render the overview of the five tracks and the test signals and fit them to Traktor's stripes")
+    p.add_argument("--overview-segments", action="store_true",
+                   help="experiment #58: overview density from the line segments between samples")
+    p.add_argument("--overview-overlap", type=float, default=OVERVIEW_OVERLAP,
+                   help="#58: the rows of a column (extent and density) come from its samples extended by this many columns on each side (Traktor: 0.5, a window of two columns)")
     p.add_argument("--traktor-dir",
                    default=os.path.join(os.path.expanduser("~"), "Documents", "Native Instruments", "Traktor 4.0.2"),
                    help="Traktor data folder (read only)")

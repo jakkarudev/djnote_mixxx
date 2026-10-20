@@ -275,10 +275,35 @@ class OverviewColumns(unittest.TestCase):
     def test_density_byte_is_the_quartic_root_of_share_over_0_8(self):
         # 3 of 4 samples in row 46 (v = 0.5), 1 of 4 in row 15 (v = -0.5).
         c = self.columns(np.tile([0.5, 0.5, 0.5, -0.5], 1920))
-        col = c.density[0]
+        col = c.density[1000]  # any 8-sample window holds 6 of the 0.5s
         self.assertEqual(col[46], round(255 * (0.75 / 0.8) ** 0.25))
         self.assertEqual(col[15], round(255 * (0.25 / 0.8) ** 0.25))
         self.assertEqual(np.count_nonzero(col), 2)  # gaps stay 0: the renderer adds the floor
+
+    def test_rows_come_from_a_window_of_two_columns(self):
+        # Ticket #58: extent and density use the column's samples plus half a
+        # column on each side (a 2-column window, Traktor's), so a peak in
+        # the next column's first half reaches this column.
+        mono = np.zeros(1920 * 8)
+        mono[8 * 5 + 1] = 0.5  # column 5, first half
+        mono[8 * 4:8 * 5] = 0.1
+        c = self.columns(mono)
+        self.assertEqual(c.n, 8)
+        self.assertIn(46, np.nonzero(c.density[4])[0])      # reached the previous column
+        self.assertNotIn(46, np.nonzero(c.density[3])[0])
+        wide = pw.overview_columns(mono, 44100, pw.default_args(), levels=np.zeros((400, 3)))
+        args = pw.default_args()
+        args.overview_overlap = 0.0
+        own = pw.overview_columns(mono, 44100, args, levels=np.zeros((400, 3)))
+        self.assertNotIn(46, np.nonzero(own.density[4])[0])
+        self.assertEqual(wide.density.shape, own.density.shape)
+
+    def test_a_silent_column_stays_a_one_row_line_next_to_a_loud_one(self):
+        mono = np.zeros(1920 * 8)
+        mono[8 * 5:8 * 6] = 0.5
+        c = self.columns(mono)
+        self.assertEqual(np.nonzero(c.density[4])[0].tolist(), [31])
+        self.assertEqual(np.nonzero(c.density[6])[0].tolist(), [31])
 
     def test_density_is_clipped_to_255(self):
         c = self.columns(np.full(1920, 0.5))  # share 1.0 > 0.8
