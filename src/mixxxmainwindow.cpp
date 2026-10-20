@@ -1307,7 +1307,10 @@ bool MixxxMainWindow::loadConfiguredSkin() {
         initializationProgressUpdate(100, "");
     }
     mixxx::KnobReadoutOverlay::onSkinLoaded( // DJNote
-            this, m_pCentralWidget, m_pCoreServices->getSettings());
+            this,
+            m_pCentralWidget,
+            m_pCoreServices->getSettings(),
+            m_pCoreServices->getEffectsManager());
     emit skinLoaded();
     return m_pCentralWidget != nullptr;
 }

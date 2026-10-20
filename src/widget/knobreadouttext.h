@@ -1,7 +1,9 @@
 #pragma once
 
 #include <QString>
+#include <optional>
 
+#include "effects/backends/effectmanifestparameter.h"
 #include "preferences/configobject.h"
 
 // Knob readout text: the text of the knob adjustment readout (see
@@ -11,10 +13,12 @@ namespace mixxx {
 namespace knobreadout {
 
 // What a knob is, as far as its readout is concerned. Resolved by the caller
-// from the knob's connected control. More facts (an effect parameter's units
-// hint, the EQ maximum) join here as the unit table grows.
+// from the knob's connected control.
 struct KnobIdentity {
     ConfigKey key;
+    // The units hint of the effect parameter's manifest; set for effect
+    // parameter knobs whose effect is loaded, empty for every other knob.
+    std::optional<EffectManifestParameter::UnitsHint> unitsHint = std::nullopt;
 };
 
 // A knob's state at the moment of the readout.
@@ -25,14 +29,29 @@ struct KnobValue {
     double parameter = 0.0;
 };
 
-// How the text is written. Simple/Precise mode and the compact (knob-face)
-// form join here.
-struct Options {};
+// Simple: deck EQ knobs read as a signed percent of the knob's travel from
+// the neutral centre. Precise: they read in dB. Gains read in dB either way.
+enum class Mode {
+    Simple,
+    Precise,
+};
 
-// Audio-taper gain controls (deck, sampler, microphone and auxiliary pregain;
-// main, headphone and booth gain) read in dB with one decimal place, "minus infinity
-// dB" at 0, with a true minus sign (U+2212). Every other knob reads as its 0-100% knob
-// position.
+// How the text is written. The compact (knob-face) form joins here.
+struct Options {
+    Mode mode = Mode::Simple;
+};
+
+// The unit table (true minus sign U+2212 throughout):
+// - Audio-taper gains (deck, sampler, microphone and auxiliary pregain; main,
+//   headphone and booth gain): dB, one decimal place, "minus infinity dB" at 0,
+//   in both modes.
+// - Deck EQ knobs (EQ-rack effect parameters): Simple, a signed percent of the
+//   knob's travel from the centre (-100% .. +100%); Precise, dB from the gain
+//   factor.
+// - Main balance: "L n%" / "C" / "R n%". Headphone mix: "Main n% / Cue m%".
+// - Effect parameter knobs with a units hint: the value with its unit.
+// - Every other knob (quick effect super knob, meta knobs, "Unknown" units):
+//   its 0-100% knob position.
 QString text(const KnobIdentity& knob,
         const KnobValue& value,
         const Options& options = Options{});

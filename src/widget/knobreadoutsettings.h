@@ -1,6 +1,7 @@
 #pragma once
 
 #include "preferences/usersettings.h"
+#include "widget/knobreadouttext.h"
 
 // The knob adjustment readout's settings (see GLOSSARY.md), shown on the
 // DJNote preferences page and stored under [DJNote] in DJNote's own keys.
@@ -13,6 +14,8 @@ namespace knobreadout {
 struct Settings {
     // Show knob adjustment readout.
     bool enabled = true;
+    // Simple or Precise readout of deck EQ knobs.
+    Mode mode = Mode::Simple;
 };
 
 // Missing keys fall back to the defaults above.
