@@ -20,8 +20,9 @@ What it does
 - --fit-overview: render the overview of the five tracks and the test signals
   and fit them to Traktor's stored stripes (--traktor-dir, read only;
   --overview-images PNG for a comparison sheet). Model: research section 9.
-- --fixtures DIR: write the deterministic fixtures for the C++ tests
-  (format: src/test/phosphor/README.md).
+- --fixtures DIR: write the deterministic fixtures for the C++ tests: *.phfx
+  (scrolling waveform) and *.phov (Phosphor overview: stored columns and
+  rendered images). Format: src/test/phosphor/README.md.
 
 Model, in this script's defaults (the calibrated values)
 --------------------------------------------------------
@@ -50,6 +51,7 @@ import struct
 import subprocess
 import sys
 import wave
+import zlib
 from dataclasses import dataclass
 
 import numpy as np
@@ -625,20 +627,44 @@ def write_fixtures(out_dir, signals_dir):
 # ---------------------------------------------------------------- overview
 
 # Overview (stripe) model, calibrated against Traktor's stored stripes
-# (research doc section 9). Column k covers samples [k*N, (k+1)*N) with
-# N = ceil(frames / 1024). Row y covers heights v in [(y-31)/31, (y+1-31)/31);
-# positive samples draw downward. The rows from the column's min to its max are
-# present. Their colour is the unit colour of the column's band levels times a
-# magnitude: (W . (R, G, B, B^4)) * |levels|^0.7 * density^0.25, where density
-# is the share of the column's samples that fall in the row (the "phosphor"
-# density of section 8.2). Alpha is ALPHA_PER_G times the green byte.
-STRIPE_COLUMNS, STRIPE_ROWS, STRIPE_HEADER = 1024, 64, 25
+# (research doc section 9) and used by DJNote's Phosphor overview (spec #50,
+# ADR-0005). The track is cut into OVERVIEW_COLUMNS columns of
+# N = ceil(frames / columns) samples; column k covers samples [k*N, (k+1)*N).
+# A sample v of the mono sum falls in row floor(31 v + 31), clipped to 0..61,
+# positive downward. What is *stored* per column (65 bytes): the peak hold of
+# the colour track's band levels, round(level * 255), and per row the share d
+# of the column's samples, round(255 * (d / 0.8)^0.25) clipped, 0 outside the
+# extent. Everything else (colour, brightness, settings) is applied when the
+# image is drawn, from the stored bytes only: rows inside the extent that no
+# sample hit get half a sample (0.5 / N), the unit colour of the (gained)
+# levels times a magnitude (W . (r, g, b, b^4)) * |levels|^level_exp *
+# d^density_exp * brightness; alpha is 2 x the green byte.
+OVERVIEW_COLUMNS, OVERVIEW_ROWS = 1920, 62
+STRIPE_COLUMNS, STRIPE_ROWS, STRIPE_HEADER = 1024, 64, 25  # Traktor's stored stripe
 STRIPE_CENTRE = 31.0
 STRIPE_W = np.array([83.5, 242.0, -37.4, 606.1])
 STRIPE_BLUE_POWER = 4
-STRIPE_POWER = 0.7
-DENSITY_POWER = 0.25
 ALPHA_PER_G = 2.0
+DENSITY_FULL = 0.8       # a share of 0.8 stores as 255
+DENSITY_STORE_POWER = 0.25
+
+
+@dataclass
+class OverviewSettings:
+    """The Phosphor overview's draw settings (defaults = calibrated model)."""
+    brightness: float = 1.0       # 0.1 - 4
+    level_exponent: float = 0.7   # 0.1 - 1.5
+    density_exponent: float = 0.25  # 0.05 - 1
+    gain_low: float = 1.0         # 0 - 4 each
+    gain_mid: float = 1.0
+    gain_high: float = 1.0
+
+
+@dataclass
+class OverviewColumns:
+    n: int
+    levels: np.ndarray   # (columns, 3) uint8, R G B = low mid high
+    density: np.ndarray  # (columns, 62) uint8
 
 
 @dataclass
@@ -657,46 +683,232 @@ def read_stripe(data):
     return Stripe(blocks, px.reshape(STRIPE_COLUMNS, STRIPE_ROWS, 4).copy())
 
 
-def stripe_column(samples, colour, rows=STRIPE_ROWS):
-    """One overview column (rows, 4) uint8, bytes B, G, R, A, from the column's
-    samples (floats in [-1, 1]) and its colour levels (R, G, B)."""
-    out = np.zeros((rows, 4), np.uint8)
-    samples = np.asarray(samples, np.float64)
-    colour = np.asarray(colour, float)
-    norm = np.linalg.norm(colour)
-    if len(samples) == 0 or norm <= 0:
-        return out
-    idx = np.clip(np.floor(samples * 31 + STRIPE_CENTRE).astype(int), 0, 61)
-    top, bottom = idx.min(), idx.max()
-    density = np.bincount(idx, minlength=rows)[:rows] / len(samples)
-    # Rows inside the extent that no sample reached get half a sample.
-    density = np.maximum(density, 0.5 / len(samples))
-    unit = colour / norm
-    mag = float(STRIPE_W @ np.append(unit, unit[2] ** STRIPE_BLUE_POWER)) * norm ** STRIPE_POWER
-    rgb = unit[None, :] * (mag * density ** DENSITY_POWER)[:, None]
-    px = np.zeros((rows, 4))
-    px[:, 0], px[:, 1], px[:, 2] = rgb[:, 2], rgb[:, 1], rgb[:, 0]
-    px[:, 3] = ALPHA_PER_G * rgb[:, 1]
-    px[:top] = 0
-    px[bottom + 1:] = 0
-    return np.clip(np.floor(px + 0.5), 0, 255).astype(np.uint8)
+def _round_u8(x):
+    return np.clip(np.floor(np.asarray(x, np.float64) + 0.5), 0, 255).astype(np.uint8)
 
 
-def render_overview(mono, rate, levels, blocks, args, columns=STRIPE_COLUMNS):
-    """The Phosphor overview of a track as a (columns, 64, 4) BGRA image.
-    `mono` is float in [-1, 1], `levels` the colour track (1 ms blocks, float
-    (n, 3), see colour_track), `blocks` N = ceil(frames / 1024)."""
+def overview_columns(mono, rate, args, columns=OVERVIEW_COLUMNS, levels=None, n=None):
+    """The stored overview data of a track. `mono` is float in [-1, 1] (the
+    (L+R)/2 sum); `levels` the colour track (1 ms blocks, float (n, 3), see
+    colour_track), computed from `mono` with `args` if not given. `n` is the
+    samples per column, ceil(len / columns) if not given (tests set it)."""
+    if levels is None:
+        levels = colour_track(mono, rate, args)
     block = colour_block(rate)
-    img = np.zeros((columns, STRIPE_ROWS, 4), np.uint8)
+    n = n or -(-len(mono) // columns)
+    lv_out = np.zeros((columns, 3), np.uint8)
+    d_out = np.zeros((columns, OVERVIEW_ROWS), np.uint8)
     for k in range(columns):
-        a, b = k * blocks, min((k + 1) * blocks, len(mono))
+        a, b = k * n, min((k + 1) * n, len(mono))
         if a >= len(mono):
             break
         l0, l1 = a // block, max(a // block + 1, b // block)
         lv = levels[l0:l1]
-        colour = lv.max(0) if len(lv) else np.zeros(3)
-        img[k] = stripe_column(mono[a:b], colour)
-    return img
+        if len(lv):
+            lv_out[k] = _round_u8(lv.max(0) * 255)
+        idx = np.clip(np.floor(np.asarray(mono[a:b], np.float64) * 31 + STRIPE_CENTRE).astype(int),
+                      0, OVERVIEW_ROWS - 1)
+        share = np.bincount(idx, minlength=OVERVIEW_ROWS)[:OVERVIEW_ROWS] / (b - a)
+        d_out[k] = _round_u8(255 * (share / DENSITY_FULL) ** DENSITY_STORE_POWER)
+    return OverviewColumns(n, lv_out, d_out)
+
+
+def _height_weights(height):
+    """(height, 62) overlap weights: output row y covers the source interval
+    [y * 62 / height, (y + 1) * 62 / height); each weight is the overlap share
+    of that interval, so rows sum to 1."""
+    lo = np.arange(height)[:, None] * OVERVIEW_ROWS / height
+    hi = lo + OVERVIEW_ROWS / height
+    r = np.arange(OVERVIEW_ROWS)[None, :]
+    overlap = np.clip(np.minimum(hi, r + 1) - np.maximum(lo, r), 0, None)
+    return overlap / (OVERVIEW_ROWS / height)
+
+
+def overview_image(levels, density, n, settings=None, height=OVERVIEW_ROWS, columns_done=None):
+    """The overview source image from stored data: (height, columns, 4) uint8,
+    bytes B, G, R, A (Qt's ARGB32 on little-endian), row 0 = -1.0 (top),
+    positive samples downward. `n` is the samples per column; `columns_done`
+    the number of columns built so far (the rest stay empty).
+
+    Drawn at 62 rows (float, per-channel clipped); other heights are the
+    area average of those rows (_height_weights), then rounded."""
+    s = settings or OverviewSettings()
+    columns = len(levels)
+    done = columns if columns_done is None else min(columns_done, columns)
+    out = np.zeros((OVERVIEW_ROWS, columns, 4))
+    dens = np.asarray(density[:done], np.float64)
+    lv = np.asarray(levels[:done], np.float64) / 255.0 * [s.gain_low, s.gain_mid, s.gain_high]
+    nz = dens > 0
+    has = nz.any(1)
+    top = nz.argmax(1)
+    bottom = OVERVIEW_ROWS - 1 - nz[:, ::-1].argmax(1)
+    rows = np.arange(OVERVIEW_ROWS)[None, :]
+    inside = has[:, None] & (rows >= top[:, None]) & (rows <= bottom[:, None])
+    d = np.where(inside, np.maximum(DENSITY_FULL * (dens / 255.0) ** 4, 0.5 / n), 0.0)
+    norm = np.linalg.norm(lv, axis=1)
+    live = norm > 0
+    unit = lv / np.where(live, norm, 1.0)[:, None]
+    blue4 = unit[:, 2] ** STRIPE_BLUE_POWER
+    mag = ((unit @ STRIPE_W[:3] + blue4 * STRIPE_W[3]) * norm ** s.level_exponent * s.brightness)
+    rgb = unit[:, None, :] * (mag[:, None] * d ** s.density_exponent)[:, :, None]  # (cols, rows, 3)
+    px = np.zeros((done, OVERVIEW_ROWS, 4))
+    px[..., 0], px[..., 1], px[..., 2] = rgb[..., 2], rgb[..., 1], rgb[..., 0]
+    px[..., 3] = ALPHA_PER_G * rgb[..., 1]
+    px = np.clip(px, 0, 255)
+    px[inside & ~live[:, None]] = (0, 0, 0, 255)  # silence: an opaque black line
+    px[~inside] = 0
+    out[:, :done] = px.transpose(1, 0, 2)
+    if height != OVERVIEW_ROWS:
+        out = np.einsum("yr,rcb->ycb", _height_weights(height), out)
+    return _round_u8(out)
+
+
+def render_overview(mono, rate, levels, blocks, args, columns=STRIPE_COLUMNS):
+    """The Phosphor overview of a track in the shape of Traktor's stored stripe,
+    for fitting: (columns, 64, 4) BGRA, column-major, from the model above.
+    `blocks` is N (ceil(frames / columns))."""
+    data = overview_columns(mono, rate, args, columns, levels, n=blocks)
+    img = overview_image(data.levels, data.density, data.n)
+    out = np.zeros((columns, STRIPE_ROWS, 4), np.uint8)
+    out[:, :OVERVIEW_ROWS] = img.transpose(1, 0, 2)
+    return out
+
+
+# ---------------------------------------------------------------- overview fixtures
+
+OVERVIEW_FIXTURE_VERSION = 1
+
+
+def _qcompress(raw):
+    """Qt's qCompress format (big-endian raw length + zlib), read by qUncompress."""
+    return struct.pack(">I", len(raw)) + zlib.compress(raw, 9)
+
+
+def _qdecompress(data):
+    (size,) = struct.unpack_from(">I", data)
+    raw = zlib.decompress(data[4:])
+    assert len(raw) == size
+    return raw
+
+
+_SETTINGS_FIELDS = ("brightness", "level_exponent", "density_exponent",
+                    "gain_low", "gain_mid", "gain_high")
+
+
+def build_overview_fixture(name, rate, left, right, image_cases, args=None):
+    """Bytes of one .phov file: the int16 stereo input (a complete track), the
+    stored columns the analyzer must produce, and rendered images.
+    image_cases: list of (case name, OverviewSettings, height, columns_done or None)."""
+    args = args or default_args()
+    left, right = np.asarray(left, np.int16), np.asarray(right, np.int16)
+    is_mono = bool((left == right).all())
+    mono = mono_int16(left, right) / 32768.0
+    data = overview_columns(mono, rate, args)
+    inpt = struct.pack("<III", rate, 1 if is_mono else 2, len(left))
+    inpt += _qcompress(left.astype("<i2").tobytes() if is_mono
+                       else np.stack([left, right], 1).astype("<i2").tobytes())
+    cols = struct.pack("<III", OVERVIEW_COLUMNS, OVERVIEW_ROWS, data.n)
+    cols += _qcompress(data.levels.tobytes() + data.density.tobytes())
+    out = b"PHOV" + struct.pack("<I", OVERVIEW_FIXTURE_VERSION)
+    out += _section("INPT", inpt) + _section("COLS", cols)
+    for case, settings, height, done in image_cases:
+        done = OVERVIEW_COLUMNS if done is None else done
+        img = overview_image(data.levels, data.density, data.n, settings, height, done)
+        label_bytes = case.encode("utf-8")
+        p = struct.pack("<H", len(label_bytes)) + label_bytes
+        p += struct.pack("<II", height, done)
+        p += struct.pack("<6d", *(getattr(settings, f) for f in _SETTINGS_FIELDS))
+        p += _qcompress(np.ascontiguousarray(img).tobytes())
+        out += _section("IMAG", p)
+    return out
+
+
+def read_overview_fixture(data):
+    """Parse a .phov file (the format reader, for tests)."""
+    assert data[:4] == b"PHOV"
+    assert struct.unpack_from("<I", data, 4)[0] == OVERVIEW_FIXTURE_VERSION
+    pos, out = 8, dict(images=[])
+    while pos < len(data):
+        tag = data[pos:pos + 4].decode("ascii")
+        (size,) = struct.unpack_from("<I", data, pos + 4)
+        p = data[pos + 8:pos + 8 + size]
+        pos += 8 + size
+        if tag == "INPT":
+            rate, ch, frames = struct.unpack_from("<III", p)
+            out.update(rate=rate, channels=ch, frames=frames,
+                       samples=np.frombuffer(_qdecompress(p[12:]), "<i2").reshape(frames, ch))
+        elif tag == "COLS":
+            columns, rows, n = struct.unpack_from("<III", p)
+            raw = np.frombuffer(_qdecompress(p[12:]), np.uint8)
+            out.update(n=n, levels=raw[:columns * 3].reshape(columns, 3),
+                       density=raw[columns * 3:].reshape(columns, rows))
+        elif tag == "IMAG":
+            (ln,) = struct.unpack_from("<H", p)
+            case = p[2:2 + ln].decode("utf-8")
+            o = 2 + ln
+            height, done = struct.unpack_from("<II", p, o)
+            vals = struct.unpack_from("<6d", p, o + 8)
+            pixels = np.frombuffer(_qdecompress(p[o + 56:]), np.uint8)
+            out["images"].append(dict(name=case, height=height, columns_done=done,
+                                      settings=dict(zip(_SETTINGS_FIELDS, vals)),
+                                      pixels=pixels.reshape(height, OVERVIEW_COLUMNS, 4)))
+        else:
+            raise ValueError(tag)
+    return out
+
+
+# Test signals as complete (shortened) tracks: (fixture name, wav, start s, length s,
+# image set). The WAVs are 20-70 s; a few seconds around the interesting parts keep
+# the committed total small, and the excerpt is the whole track (N = ceil(frames/1920)).
+OVERVIEW_SIGNALS = [
+    ("q2a_crossover_steps", "Q2a crossover steps.wav", 0.0, 12.0, "basic"),
+    ("q2b_sweep", "Q2b sweep 20Hz-20kHz.wav", 20.0, 6.0, "basic"),
+    ("q3a_amplitude_steps_100hz", "Q3a amplitude steps 100Hz.wav", 0.0, 10.0, "basic"),
+    ("q3b_amplitude_steps_1khz", "Q3b amplitude steps 1kHz.wav", 0.0, 10.0, "basic"),
+    ("q3c_amplitude_steps_8khz", "Q3c amplitude steps 8kHz.wav", 0.0, 10.0, "basic"),
+    ("q4_sine_vs_square", "Q4 sine vs square.wav", 0.0, 12.0, "limits"),
+    ("q5_clicks_and_kicks", "Q5 clicks and kicks.wav", 0.0, 8.0, "basic"),
+    ("q5_kicks", "Q5 clicks and kicks.wav", 18.0, 8.0, "basic"),
+    ("q6_sine_vs_noise", "Q6 sine vs noise.wav", 6.0, 8.0, "basic"),
+    ("q7_stereo_inverted", "Q7 stereo L R both inverted.wav", 4.0, 12.0, "basic"),
+    ("q9_two_tone_mixtures", "Q9 two-tone mixtures.wav", 9.0, 8.0, "limits"),
+]
+
+OVERVIEW_HEIGHTS = (62, 31, 124)
+NON_DEFAULT = OverviewSettings(brightness=1.7, level_exponent=0.5, density_exponent=0.4,
+                               gain_low=1.5, gain_mid=0.8, gain_high=2.0)
+# Each setting at both ends of its range, the others at their defaults.
+LIMIT_SETTINGS = [
+    (f"{field}_{end}", OverviewSettings(**{field: value}))
+    for field, lo, hi in (("brightness", 0.1, 4.0), ("level_exponent", 0.1, 1.5),
+                          ("density_exponent", 0.05, 1.0), ("gain_low", 0.0, 4.0),
+                          ("gain_mid", 0.0, 4.0), ("gain_high", 0.0, 4.0))
+    for end, value in (("min", lo), ("max", hi))
+]
+
+
+def overview_image_cases(image_set):
+    cases = [(f"default_h{h}", OverviewSettings(), h, None) for h in OVERVIEW_HEIGHTS]
+    cases.append(("non_default_h62", NON_DEFAULT, 62, None))
+    cases.append(("partial_h62", OverviewSettings(), 62, 960))
+    if image_set == "limits":
+        cases += [(f"limit_{n}_h62", s, 62, None) for n, s in LIMIT_SETTINGS]
+    return cases
+
+
+def write_overview_fixtures(out_dir, signals_dir):
+    os.makedirs(out_dir, exist_ok=True)
+    cache = {}
+    for name, wav, start, length, image_set in OVERVIEW_SIGNALS:
+        if wav not in cache:
+            cache[wav] = read_wav(os.path.join(signals_dir, wav))
+        rate, left, right = cache[wav]
+        a = int(round(start * rate))
+        b = a + int(round(length * rate))
+        data = build_overview_fixture(name, rate, left[a:b], right[a:b], overview_image_cases(image_set))
+        with open(os.path.join(out_dir, name + ".phov"), "wb") as f:
+            f.write(data)
+        print(f"wrote {name}.phov ({len(data)} bytes)")
 
 
 def _corr(x, y):
@@ -992,6 +1204,7 @@ def main():
     args = parser.parse_args()
     if args.fixtures:
         write_fixtures(args.fixtures, args.signals_dir)
+        write_overview_fixtures(args.fixtures, args.signals_dir)
         return
     if args.check_fir:
         check_fir(args)

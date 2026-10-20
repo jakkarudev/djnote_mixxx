@@ -2186,6 +2186,7 @@ if(BUILD_TESTING)
   src/test/overviewsettingstest.cpp
     src/test/phosphorheighttest.cpp
     src/test/phosphorlanemodeltest.cpp
+    src/test/phosphoroverviewfixturetest.cpp
     src/test/phosphorsettingstest.cpp
     src/test/phosphorslipoverlaytest.cpp
     src/test/waveformgainstest.cpp

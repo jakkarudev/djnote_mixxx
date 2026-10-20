@@ -181,7 +181,7 @@ class StripeReader(unittest.TestCase):
 class Overview(unittest.TestCase):
     def render(self, mono, levels=None, blocks=None):
         mono = np.asarray(mono, np.float64)
-        n = blocks or -(-len(mono) // 1024)
+        n = blocks or -(-len(mono) // 1920)
         if levels is None:
             levels = np.tile([0.1, 0.3, 0.5], (len(mono) // 44 + 1, 1))
         return pw.render_overview(mono, 44100, levels, n, pw.default_args())
@@ -248,6 +248,202 @@ class Overview(unittest.TestCase):
         a = img[0, :, 3].astype(float)
         self.assertGreater(a[r[0]], 3 * a[r[len(r) // 2]])
         self.assertGreater(a[r[-1]], 3 * a[r[len(r) // 2]])
+
+
+class OverviewColumns(unittest.TestCase):
+    def columns(self, mono, rate=44100, levels=None):
+        mono = np.asarray(mono, np.float64)
+        if levels is None:
+            levels = np.tile([0.1, 0.3, 0.5], (len(mono) // 44 + 1, 1))
+        return pw.overview_columns(mono, rate, pw.default_args(), levels=levels)
+
+    def test_1920_columns_of_ceil_frames_over_1920_samples(self):
+        c = self.columns(np.full(1920 * 3 + 1, 0.5))
+        self.assertEqual(c.n, 4)
+        self.assertEqual(c.levels.shape, (1920, 3))
+        self.assertEqual(c.density.shape, (1920, 62))
+        self.assertEqual(c.levels.dtype, np.uint8)
+        self.assertEqual(c.density.dtype, np.uint8)
+
+    def test_columns_past_the_end_are_empty(self):
+        c = pw.overview_columns(np.full(2000, 0.5), 44100, pw.default_args(),
+                                levels=np.full((100, 3), 0.1), n=1000)
+        self.assertTrue(c.density[:2].any())
+        self.assertFalse(c.density[2:].any())
+        self.assertFalse(c.levels[2:].any())
+
+    def test_density_byte_is_the_quartic_root_of_share_over_0_8(self):
+        # 3 of 4 samples in row 46 (v = 0.5), 1 of 4 in row 15 (v = -0.5).
+        c = self.columns(np.tile([0.5, 0.5, 0.5, -0.5], 1920))
+        col = c.density[0]
+        self.assertEqual(col[46], round(255 * (0.75 / 0.8) ** 0.25))
+        self.assertEqual(col[15], round(255 * (0.25 / 0.8) ** 0.25))
+        self.assertEqual(np.count_nonzero(col), 2)  # gaps stay 0: the renderer adds the floor
+
+    def test_density_is_clipped_to_255(self):
+        c = self.columns(np.full(1920, 0.5))  # share 1.0 > 0.8
+        self.assertEqual(c.density[0, 46], 255)
+
+    def test_levels_are_the_peak_hold_over_the_column_as_bytes(self):
+        levels = np.zeros((1920 * 100 + 2, 3))
+        levels[10] = (0.2, 0.9, 0.4)
+        mono = np.full(1920 * 4410, 0.1)  # N = 4410 -> 100 colour blocks per column
+        c = pw.overview_columns(mono, 44100, pw.default_args(), levels=levels)
+        self.assertEqual(c.n, 4410)
+        self.assertEqual(c.levels[0].tolist(), [51, 230, 102])
+        self.assertEqual(c.levels[1].tolist(), [0, 0, 0])
+
+    def test_digital_silence_is_a_one_row_line_at_row_31(self):
+        c = self.columns(np.zeros(1920 * 2))
+        self.assertEqual(np.nonzero(c.density[0])[0].tolist(), [31])
+
+    def test_real_colour_track_levels_follow_a_tone(self):
+        t = np.arange(44100 * 2) / 44100
+        mono = 0.5 * np.sin(2 * np.pi * 100 * t)
+        c = pw.overview_columns(mono, 44100, pw.default_args())
+        mid = c.levels[960]
+        self.assertGreater(mid[0], mid[2])  # 100 Hz is mostly red (low)
+
+
+class OverviewImage(unittest.TestCase):
+    def cols(self, samples, levels=(0.1, 0.4, 0.2)):
+        samples = np.asarray(samples, np.float64)
+        lv = np.tile(levels, (len(samples) * 1920 // 44 + 1, 1))
+        return pw.overview_columns(np.tile(samples, 1920), 44100, pw.default_args(), levels=lv)
+
+    def square(self, amp, n=1024):
+        x = np.full(n, amp)
+        x[1::2] = -amp
+        return x
+
+    def image(self, c, height=62, **kw):
+        s = pw.OverviewSettings(**kw)
+        return pw.overview_image(c.levels, c.density, c.n, s, height)
+
+    def rows(self, img, col):
+        return np.nonzero(img[:, col].any(1))[0]
+
+    W = np.array([83.5, 242.0, -37.4, 606.1])
+
+    def magnitude(self, level_bytes, d):
+        lv = level_bytes / 255.0
+        norm = np.linalg.norm(lv)
+        u = lv / norm
+        return u, float(self.W @ np.append(u, u[2] ** 4) * norm ** 0.7 * d ** 0.25)
+
+    def test_shape_is_height_by_1920_bgra(self):
+        c = self.cols(self.square(0.5))
+        self.assertEqual(self.image(c).shape, (62, 1920, 4))
+        self.assertEqual(self.image(c, height=31).shape, (31, 1920, 4))
+
+    def test_defaults_match_the_model(self):
+        s = pw.OverviewSettings()
+        self.assertEqual((s.brightness, s.level_exponent, s.density_exponent), (1.0, 0.7, 0.25))
+        self.assertEqual((s.gain_low, s.gain_mid, s.gain_high), (1.0, 1.0, 1.0))
+
+    def test_extent_rows_and_hollow_square(self):
+        img = self.image(self.cols(self.square(0.5)))
+        r = self.rows(img, 0)
+        self.assertEqual((r[0], r[-1]), (15, 46))
+        a = img[:, 0, 3].astype(float)
+        self.assertGreater(a[15], 3 * a[30])  # hollow: edges bright
+
+    def test_pixel_value_follows_the_stored_density_byte_and_the_formula(self):
+        c = self.cols(self.square(0.5))
+        img = self.image(c)
+        d = 0.8 * (c.density[0, 15] / 255.0) ** 4
+        u, mag = self.magnitude(c.levels[0].astype(float), d)
+        want = np.clip(np.floor(u * mag + 0.5), 0, 255)
+        self.assertEqual(img[15, 0, :3].tolist(), [want[2], want[1], want[0]])
+        self.assertEqual(img[15, 0, 3], min(255, int(np.floor(2 * u[1] * mag + 0.5))))
+
+    def test_gaps_inside_the_extent_get_half_a_sample(self):
+        c = self.cols(self.square(0.5))
+        img = self.image(c)
+        u, mag = self.magnitude(c.levels[0].astype(float), 0.5 / c.n)
+        self.assertEqual(img[30, 0, 1], int(np.floor(u[1] * mag + 0.5)))
+
+    def test_nothing_outside_the_extent(self):
+        img = self.image(self.cols(self.square(0.5)))
+        self.assertFalse(img[:15, 0].any())
+        self.assertFalse(img[47:, 0].any())
+
+    def test_columns_done_leaves_the_rest_empty(self):
+        c = self.cols(self.square(0.5))
+        img = pw.overview_image(c.levels, c.density, c.n, pw.OverviewSettings(), 62, columns_done=100)
+        self.assertTrue(img[:, 99].any())
+        self.assertFalse(img[:, 100:].any())
+
+    def test_silence_is_an_opaque_black_centre_line(self):
+        c = pw.overview_columns(np.zeros(1920 * 2), 44100, pw.default_args(),
+                                levels=np.zeros((100, 3)))
+        img = self.image(c)
+        self.assertEqual(self.rows(img, 0).tolist(), [31])
+        self.assertEqual(img[31, 0].tolist(), [0, 0, 0, 255])
+
+    def test_brightness_scales_the_colour_and_clips(self):
+        c = self.cols(self.square(0.5))
+        a = self.image(c, brightness=0.5)[15, 0, :3].astype(float)
+        b = self.image(c, brightness=1.0)[15, 0, :3].astype(float)
+        self.assertLess(np.abs(a * 2 - b).max(), 2)
+        self.assertEqual(self.image(c, brightness=4.0)[15, 0, :3].max(), 255)
+
+    def test_gains_change_the_hue_and_zero_gains_leave_a_black_line(self):
+        c = self.cols(self.square(0.5))
+        base = self.image(c)[15, 0]
+        red = self.image(c, gain_low=4.0)[15, 0]
+        self.assertGreater(int(red[2]) / max(1, int(red[1])), 2 * int(base[2]) / int(base[1]))
+        off = self.image(c, gain_low=0, gain_mid=0, gain_high=0)
+        self.assertEqual(off[15, 0].tolist(), [0, 0, 0, 255])
+
+    def test_density_exponent_one_makes_the_pixel_proportional_to_density(self):
+        rng = np.random.default_rng(3)
+        x = np.clip(rng.normal(0, 0.1, 1024), -1, 1)
+        c = self.cols(x)
+        img = self.image(c, density_exponent=1.0).astype(float)
+        d = 0.8 * (c.density[0] / 255.0) ** 4
+        ratio = d[31] / d[33]
+        self.assertLess(abs(img[31, 0, 1] / img[33, 0, 1] - ratio), 0.05 * ratio)
+
+    def test_height_resampling_averages_source_rows(self):
+        c = self.cols(self.square(0.5))
+        full = self.image(c).astype(float)
+        half = self.image(c, height=31).astype(float)
+        want = (full[0:62:2] + full[1:62:2]) / 2
+        self.assertLess(np.abs(half - want).max(), 1.01)
+        double = self.image(c, height=124).astype(float)
+        self.assertLess(np.abs(double[0::2] - full).max(), 0.01)
+        self.assertLess(np.abs(double[1::2] - full).max(), 0.01)
+
+
+class OverviewFixtures(unittest.TestCase):
+    def build(self):
+        t = np.arange(44100 * 2)
+        left = (0.5 * 32767 * np.sin(2 * np.pi * 440 * t / 44100)).astype(np.int16)
+        return pw.build_overview_fixture("tone", 44100, left, left,
+                                         [("default_h62", pw.OverviewSettings(), 62, None),
+                                          ("dim_h31", pw.OverviewSettings(brightness=0.5), 31, 900)])
+
+    def test_is_deterministic(self):
+        self.assertEqual(self.build(), self.build())
+
+    def test_contains_input_columns_and_images_that_match_the_functions(self):
+        f = pw.read_overview_fixture(self.build())
+        self.assertEqual(f["frames"], 88200)
+        self.assertEqual(f["channels"], 1)
+        self.assertEqual(f["samples"].shape, (88200, 1))
+        mono = pw.mono_int16(f["samples"][:, 0], f["samples"][:, 0]) / 32768.0
+        cols = pw.overview_columns(mono, 44100, pw.default_args())
+        self.assertEqual(f["n"], cols.n)
+        self.assertTrue((f["levels"] == cols.levels).all())
+        self.assertTrue((f["density"] == cols.density).all())
+        a, b = f["images"]
+        self.assertEqual((a["name"], a["height"], a["columns_done"]), ("default_h62", 62, 1920))
+        self.assertEqual(b["settings"]["brightness"], 0.5)
+        self.assertEqual(b["columns_done"], 900)
+        want = pw.overview_image(f["levels"], f["density"], f["n"],
+                                 pw.OverviewSettings(brightness=0.5), 31, columns_done=900)
+        self.assertTrue((b["pixels"] == want).all())
 
 
 class OverviewFit(unittest.TestCase):
