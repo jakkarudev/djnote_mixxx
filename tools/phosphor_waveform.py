@@ -20,8 +20,9 @@ What it does
 - --fit-overview: render the overview of the five tracks and the test signals
   and fit them to Traktor's stored stripes (--traktor-dir, read only;
   --overview-images PNG for a comparison sheet). Model: research section 9.
-- --fixtures DIR: write the deterministic fixtures for the C++ tests
-  (format: src/test/phosphor/README.md).
+- --fixtures DIR: write the deterministic fixtures for the C++ tests: *.phfx
+  (scrolling waveform) and *.phov (Phosphor overview: stored columns and
+  rendered images). Format: src/test/phosphor/README.md.
 
 Model, in this script's defaults (the calibrated values)
 --------------------------------------------------------
@@ -50,6 +51,7 @@ import struct
 import subprocess
 import sys
 import wave
+import zlib
 from dataclasses import dataclass
 
 import numpy as np
@@ -625,20 +627,63 @@ def write_fixtures(out_dir, signals_dir):
 # ---------------------------------------------------------------- overview
 
 # Overview (stripe) model, calibrated against Traktor's stored stripes
-# (research doc section 9). Column k covers samples [k*N, (k+1)*N) with
-# N = ceil(frames / 1024). Row y covers heights v in [(y-31)/31, (y+1-31)/31);
-# positive samples draw downward. The rows from the column's min to its max are
-# present. Their colour is the unit colour of the column's band levels times a
-# magnitude: (W . (R, G, B, B^4)) * |levels|^0.7 * density^0.25, where density
-# is the share of the column's samples that fall in the row (the "phosphor"
-# density of section 8.2). Alpha is ALPHA_PER_G times the green byte.
-STRIPE_COLUMNS, STRIPE_ROWS, STRIPE_HEADER = 1024, 64, 25
+# (research doc section 9) and used by DJNote's Phosphor overview (spec #50,
+# ADR-0005). The track is cut into OVERVIEW_COLUMNS columns of
+# N = ceil(frames / columns) samples; column k covers samples [k*N, (k+1)*N).
+# A sample v of the mono sum falls in row floor(31 v + 31), clipped to 0..61,
+# positive downward. What is *stored* per column (65 bytes): the peak hold of
+# the colour track's band levels, round(level * 255), and per row the share d
+# of the column's samples, round(255 * (d / 0.8)^0.25) clipped, 0 outside the
+# extent. Everything else (colour, brightness, settings) is applied when the
+# image is drawn, from the stored bytes only: rows inside the extent that no
+# sample hit get half a sample (0.5 / N), the unit colour of the (gained)
+# levels times a magnitude (W . (r, g, b, b^4)) * |levels|^level_exp *
+# d^density_exp * brightness; alpha is 2 x the green byte.
+OVERVIEW_COLUMNS, OVERVIEW_ROWS = 1920, 62
+STRIPE_COLUMNS, STRIPE_ROWS, STRIPE_HEADER = 1024, 64, 25  # Traktor's stored stripe
 STRIPE_CENTRE = 31.0
 STRIPE_W = np.array([83.5, 242.0, -37.4, 606.1])
 STRIPE_BLUE_POWER = 4
-STRIPE_POWER = 0.7
-DENSITY_POWER = 0.25
 ALPHA_PER_G = 2.0
+DENSITY_FULL = 0.8       # a share of 0.8 stores as 255
+DENSITY_STORE_POWER = 0.25
+OVERVIEW_OVERLAP = 0.5   # column window = 2 columns centred (ticket #58)
+# Colour tails (research section 9, ticket #57): after a click or kick Traktor
+# keeps the colour for several columns. The stored low and high band levels
+# release across columns with these time constants (seconds); mid has none (its
+# colour track release already matches). 0 = no hold.
+OVERVIEW_HOLD = (0.7, 0.0, 0.1)
+# On-screen recolouring (research 10): Traktor draws the stored stripe colour p
+# (R, G, B, 0..255) as a vivid colour over its background. The colour is
+# SCREEN_GAIN * ((p - SCREEN_DESAT * min(p)) / 255)^SCREEN_EXPONENT per channel
+# (times SCREEN_BALANCE), divided by max(1, its largest channel / 255) so a bright
+# pixel keeps its hue. How much of it shows (the coverage, alpha) is
+# (SCREEN_COVER_GAIN * max(p) / 255)^SCREEN_COVER_POWER, clipped to 1: the column
+# fades from the centre to the background at the edges, as Traktor's does.
+SCREEN_GAIN = 114.0
+SCREEN_EXPONENT = 2.5
+SCREEN_DESAT = 0.32
+SCREEN_BALANCE = (1.0, 0.79, 1.07)
+SCREEN_COVER_GAIN = 3.6
+SCREEN_COVER_POWER = 2.18
+
+
+@dataclass
+class OverviewSettings:
+    """The Phosphor overview's draw settings (defaults = calibrated model)."""
+    brightness: float = 1.0       # 0.1 - 4
+    level_exponent: float = 0.7   # 0.1 - 1.5
+    density_exponent: float = 0.25  # 0.05 - 1
+    gain_low: float = 1.0         # 0 - 4 each
+    gain_mid: float = 1.0
+    gain_high: float = 1.0
+
+
+@dataclass
+class OverviewColumns:
+    n: int
+    levels: np.ndarray   # (columns, 3) uint8, R G B = low mid high
+    density: np.ndarray  # (columns, 62) uint8
 
 
 @dataclass
@@ -657,46 +702,327 @@ def read_stripe(data):
     return Stripe(blocks, px.reshape(STRIPE_COLUMNS, STRIPE_ROWS, 4).copy())
 
 
-def stripe_column(samples, colour, rows=STRIPE_ROWS):
-    """One overview column (rows, 4) uint8, bytes B, G, R, A, from the column's
-    samples (floats in [-1, 1]) and its colour levels (R, G, B)."""
-    out = np.zeros((rows, 4), np.uint8)
-    samples = np.asarray(samples, np.float64)
-    colour = np.asarray(colour, float)
-    norm = np.linalg.norm(colour)
-    if len(samples) == 0 or norm <= 0:
-        return out
-    idx = np.clip(np.floor(samples * 31 + STRIPE_CENTRE).astype(int), 0, 61)
-    top, bottom = idx.min(), idx.max()
-    density = np.bincount(idx, minlength=rows)[:rows] / len(samples)
-    # Rows inside the extent that no sample reached get half a sample.
-    density = np.maximum(density, 0.5 / len(samples))
-    unit = colour / norm
-    mag = float(STRIPE_W @ np.append(unit, unit[2] ** STRIPE_BLUE_POWER)) * norm ** STRIPE_POWER
-    rgb = unit[None, :] * (mag * density ** DENSITY_POWER)[:, None]
-    px = np.zeros((rows, 4))
-    px[:, 0], px[:, 1], px[:, 2] = rgb[:, 2], rgb[:, 1], rgb[:, 0]
-    px[:, 3] = ALPHA_PER_G * rgb[:, 1]
-    px[:top] = 0
-    px[bottom + 1:] = 0
-    return np.clip(np.floor(px + 0.5), 0, 255).astype(np.uint8)
+def _round_u8(x):
+    return np.clip(np.floor(np.asarray(x, np.float64) + 0.5), 0, 255).astype(np.uint8)
+
+
+def hold_levels(levels, n, rate, hold=OVERVIEW_HOLD):
+    """Release the band levels across columns: column k keeps at least the
+    previous column's held level times exp(-column seconds / tau), per band.
+    `levels` is float (columns, 3) in 0..255, only the built columns. Causal,
+    so it can run while the columns are produced."""
+    out = np.array(levels, np.float64)
+    ratio = np.array([np.exp(-(n / rate) / t) if t > 0 else 0.0 for t in hold])
+    for k in range(1, len(out)):
+        out[k] = np.maximum(out[k], out[k - 1] * ratio)
+    return out
+
+
+def overview_columns(mono, rate, args, columns=OVERVIEW_COLUMNS, levels=None, n=None, hold=OVERVIEW_HOLD):
+    """The stored overview data of a track. `mono` is float in [-1, 1] (the
+    (L+R)/2 sum); `levels` the colour track (1 ms blocks, float (n, 3), see
+    colour_track), computed from `mono` with `args` if not given. `n` is the
+    samples per column, ceil(len / columns) if not given (tests set it).
+    `hold` are the colour tail time constants (OVERVIEW_HOLD); () for none."""
+    if levels is None:
+        levels = colour_track(mono, rate, args)
+    block = colour_block(rate)
+    n = n or -(-len(mono) // columns)
+    lv_out = np.zeros((columns, 3), np.uint8)
+    built = 0
+    d_out = np.zeros((columns, OVERVIEW_ROWS), np.uint8)
+    for k in range(columns):
+        a, b = k * n, min((k + 1) * n, len(mono))
+        if a >= len(mono):
+            break
+        built = k + 1
+        l0, l1 = a // block, max(a // block + 1, b // block)
+        lv = levels[l0:l1]
+        if len(lv):
+            lv_out[k] = _round_u8(lv.max(0) * 255)
+        over = int(getattr(args, "overview_overlap", OVERVIEW_OVERLAP) * n)
+        w0, w1 = max(a - over, 0), min(b + over, len(mono))
+        if not np.any(mono[a:b]):
+            w0, w1 = a, b  # a digitally silent column stays a one-row line
+        seg = getattr(args, "overview_segments", False)
+        idx = np.clip(np.floor(np.asarray(mono[w0:min(w1 + seg, len(mono))], np.float64) * 31
+                               + STRIPE_CENTRE).astype(int), 0, OVERVIEW_ROWS - 1)
+        if seg:
+            share = segment_share(idx)
+        else:
+            share = np.bincount(idx[:w1 - w0], minlength=OVERVIEW_ROWS)[:OVERVIEW_ROWS] / (w1 - w0)
+        d_out[k] = _round_u8(255 * (np.clip(share, 0, None) / DENSITY_FULL) ** DENSITY_STORE_POWER)
+    if hold:
+        lv_out[:built] = _round_u8(hold_levels(lv_out[:built], n, rate, hold))
+    return OverviewColumns(n, lv_out, d_out)
+
+
+def segment_share(idx):
+    """Experiment (ticket #58): the share of a window's line segments that cross
+    each row. `idx` are the rows of consecutive samples; the segment between two
+    of them adds 1 to every row from one to the other, as a drawn line does (a
+    long segment is not diluted over its rows, so a tone's interior is flat and
+    its edge falls off over about one segment length, as Traktor's does)."""
+    if len(idx) < 2:
+        return np.bincount(idx, minlength=OVERVIEW_ROWS)[:OVERVIEW_ROWS].astype(float)
+    lo, hi = np.minimum(idx[:-1], idx[1:]), np.maximum(idx[:-1], idx[1:])
+    acc = np.bincount(lo, minlength=OVERVIEW_ROWS + 1) - np.bincount(hi + 1, minlength=OVERVIEW_ROWS + 1)
+    return np.cumsum(acc)[:OVERVIEW_ROWS] / len(lo)
+
+
+def _height_weights(height):
+    """(height, 62) overlap weights: output row y covers the source interval
+    [y * 62 / height, (y + 1) * 62 / height); each weight is the overlap share
+    of that interval, so rows sum to 1."""
+    lo = np.arange(height)[:, None] * OVERVIEW_ROWS / height
+    hi = lo + OVERVIEW_ROWS / height
+    r = np.arange(OVERVIEW_ROWS)[None, :]
+    overlap = np.clip(np.minimum(hi, r + 1) - np.maximum(lo, r), 0, None)
+    return overlap / (OVERVIEW_ROWS / height)
+
+
+def overview_image(levels, density, n, settings=None, height=OVERVIEW_ROWS, columns_done=None):
+    """The overview source image from stored data: (height, columns, 4) uint8,
+    bytes B, G, R, A (Qt's ARGB32 on little-endian), row 0 = -1.0 (top),
+    positive samples downward. `n` is the samples per column; `columns_done`
+    the number of columns built so far (the rest stay empty).
+
+    Drawn at 62 rows (float, per-channel clipped); other heights are the
+    area average of those rows (_height_weights), then rounded."""
+    s = settings or OverviewSettings()
+    columns = len(levels)
+    done = columns if columns_done is None else min(columns_done, columns)
+    out = np.zeros((OVERVIEW_ROWS, columns, 4))
+    dens = np.asarray(density[:done], np.float64)
+    lv = np.asarray(levels[:done], np.float64) / 255.0 * [s.gain_low, s.gain_mid, s.gain_high]
+    nz = dens > 0
+    has = nz.any(1)
+    top = nz.argmax(1)
+    bottom = OVERVIEW_ROWS - 1 - nz[:, ::-1].argmax(1)
+    rows = np.arange(OVERVIEW_ROWS)[None, :]
+    inside = has[:, None] & (rows >= top[:, None]) & (rows <= bottom[:, None])
+    # The floor for a row no sample hit is 0.5 / N. Density is now a share of
+    # a ~2N-sample window, so this is about one sample of it. Tried at half a
+    # sample of the window (0.25 / N): the four tracks move by 0.01 at most,
+    # Q4 gets worse (24.4 to 28.1) and Q2a slightly (35.9 to 36.4), so it is
+    # kept as a calibrated floor (research 9).
+    d = np.where(inside, np.maximum(DENSITY_FULL * (dens / 255.0) ** 4, 0.5 / n), 0.0)
+    norm = np.linalg.norm(lv, axis=1)
+    unit = lv / np.where(norm > 0, norm, 1.0)[:, None]
+    blue4 = unit[:, 2] ** STRIPE_BLUE_POWER
+    mag = ((unit @ STRIPE_W[:3] + blue4 * STRIPE_W[3]) * norm ** s.level_exponent * s.brightness)
+    rgb = unit[:, None, :] * (mag[:, None] * d ** s.density_exponent)[:, :, None]  # (cols, rows, 3)
+    px = np.zeros((done, OVERVIEW_ROWS, 4))
+    px[..., 0], px[..., 1], px[..., 2] = rgb[..., 2], rgb[..., 1], rgb[..., 0]
+    px[..., 3] = ALPHA_PER_G * rgb[..., 1]
+    px = np.clip(px, 0, 255)
+    px[~inside] = 0
+    # Silence is judged from the audio, not from the gained levels: stored
+    # levels all zero and the extent a single row at the centre. Gains of 0
+    # only darken a column. Traktor draws the silence line one row above the
+    # row map's centre (row 30, research 9), while the map itself stays.
+    sil = has & (top == bottom) & (top == OVERVIEW_ROWS // 2) & ~np.asarray(levels[:done]).any(1)
+    px[sil] = 0
+    px[sil, OVERVIEW_ROWS // 2 - 1] = (0, 0, 0, 255)
+    out[:, :done] = px.transpose(1, 0, 2)
+    if height != OVERVIEW_ROWS:
+        out = np.einsum("yr,rcb->ycb", _height_weights(height), out)
+    return _round_u8(out)
+
+
+def screen_colour(rgb, gain=SCREEN_GAIN, exponent=SCREEN_EXPONENT, desat=SCREEN_DESAT,
+                  balance=SCREEN_BALANCE):
+    """The on-screen colour of overview pixels: `rgb` is float (..., 3), R, G, B
+    0..255 (the stripe colour). The grey part (desat x the smallest channel) is
+    removed, the rest goes through a power, a gain and a per-channel balance, and
+    the pixel is divided by max(1, largest channel / 255) to keep its hue.
+    Returns float 0..255."""
+    p = np.clip(np.asarray(rgb, np.float64), 0, 255)
+    p = p - desat * p.min(-1, keepdims=True)
+    pre = gain * np.asarray(balance) * (p / 255.0) ** exponent * 255.0
+    return pre / np.maximum(1.0, pre.max(-1, keepdims=True) / 255.0)
+
+
+def screen_cover(rgb, gain=SCREEN_COVER_GAIN, power=SCREEN_COVER_POWER):
+    """How much of the on-screen colour shows over the background, 0..1, from the
+    brightest channel of the stripe colour `rgb` (float (..., 3))."""
+    m = np.clip(np.asarray(rgb, np.float64), 0, 255).max(-1) / 255.0
+    return np.clip(gain * m, 0, 1) ** power
+
+
+def overview_display(img):
+    """What the widget draws from an overview image (height, columns, 4) uint8
+    B, G, R, A (research 10): the colour is screen_colour of the pixel's colour,
+    its alpha screen_cover (a pixel with alpha but no colour, the silence line,
+    stays opaque black); an empty pixel stays 0. Straight (not premultiplied)
+    uint8 B, G, R, A."""
+    img = np.asarray(img)
+    rgb = img[..., 2::-1].astype(np.float64)         # R, G, B
+    has_colour = rgb.any(-1)
+    cover = np.where(has_colour, screen_cover(rgb), np.where(img[..., 3] > 0, 1.0, 0.0))
+    res = np.zeros(img.shape, np.uint8)
+    res[..., :3] = _round_u8(screen_colour(rgb)[..., ::-1] * has_colour[..., None])
+    res[..., 3] = _round_u8(cover * 255.0)
+    res[cover == 0] = 0
+    return res
 
 
 def render_overview(mono, rate, levels, blocks, args, columns=STRIPE_COLUMNS):
-    """The Phosphor overview of a track as a (columns, 64, 4) BGRA image.
-    `mono` is float in [-1, 1], `levels` the colour track (1 ms blocks, float
-    (n, 3), see colour_track), `blocks` N = ceil(frames / 1024)."""
-    block = colour_block(rate)
-    img = np.zeros((columns, STRIPE_ROWS, 4), np.uint8)
-    for k in range(columns):
-        a, b = k * blocks, min((k + 1) * blocks, len(mono))
-        if a >= len(mono):
-            break
-        l0, l1 = a // block, max(a // block + 1, b // block)
-        lv = levels[l0:l1]
-        colour = lv.max(0) if len(lv) else np.zeros(3)
-        img[k] = stripe_column(mono[a:b], colour)
-    return img
+    """The Phosphor overview of a track in the shape of Traktor's stored stripe,
+    for fitting: (columns, 64, 4) BGRA, column-major, from the model above.
+    `blocks` is N (ceil(frames / columns))."""
+    data = overview_columns(mono, rate, args, columns, levels, n=blocks)
+    img = overview_image(data.levels, data.density, data.n)
+    out = np.zeros((columns, STRIPE_ROWS, 4), np.uint8)
+    out[:, :OVERVIEW_ROWS] = img.transpose(1, 0, 2)
+    return out
+
+
+# ---------------------------------------------------------------- overview fixtures
+
+OVERVIEW_FIXTURE_VERSION = 1
+DISPLAY_CASES = ("default_h62", "default_h31", "non_default_h62", "partial_h62")
+
+
+def _qcompress(raw):
+    """Qt's qCompress format (big-endian raw length + zlib), read by qUncompress."""
+    return struct.pack(">I", len(raw)) + zlib.compress(raw, 9)
+
+
+def _qdecompress(data):
+    (size,) = struct.unpack_from(">I", data)
+    raw = zlib.decompress(data[4:])
+    assert len(raw) == size
+    return raw
+
+
+_SETTINGS_FIELDS = ("brightness", "level_exponent", "density_exponent",
+                    "gain_low", "gain_mid", "gain_high")
+
+
+def build_overview_fixture(name, rate, left, right, image_cases, args=None):
+    """Bytes of one .phov file: the int16 stereo input (a complete track), the
+    stored columns the analyzer must produce, and rendered images.
+    image_cases: list of (case name, OverviewSettings, height, columns_done or None)."""
+    args = args or default_args()
+    left, right = np.asarray(left, np.int16), np.asarray(right, np.int16)
+    is_mono = bool((left == right).all())
+    mono = mono_int16(left, right) / 32768.0
+    data = overview_columns(mono, rate, args)
+    inpt = struct.pack("<III", rate, 1 if is_mono else 2, len(left))
+    inpt += _qcompress(left.astype("<i2").tobytes() if is_mono
+                       else np.stack([left, right], 1).astype("<i2").tobytes())
+    cols = struct.pack("<III", OVERVIEW_COLUMNS, OVERVIEW_ROWS, data.n)
+    cols += _qcompress(data.levels.tobytes() + data.density.tobytes())
+    out = b"PHOV" + struct.pack("<I", OVERVIEW_FIXTURE_VERSION)
+    out += _section("INPT", inpt) + _section("COLS", cols)
+    for case, settings, height, done in image_cases:
+        done = OVERVIEW_COLUMNS if done is None else done
+        img = overview_image(data.levels, data.density, data.n, settings, height, done)
+        label_bytes = case.encode("utf-8")
+        p = struct.pack("<H", len(label_bytes)) + label_bytes
+        p += struct.pack("<II", height, done)
+        p += struct.pack("<6d", *(getattr(settings, f) for f in _SETTINGS_FIELDS))
+        p += _qcompress(np.ascontiguousarray(img).tobytes())
+        out += _section("IMAG", p)
+        if case in DISPLAY_CASES:
+            d = struct.pack("<H", len(label_bytes)) + label_bytes
+            d += _qcompress(np.ascontiguousarray(overview_display(img)).tobytes())
+            out += _section("DISP", d)
+    return out
+
+
+def read_overview_fixture(data):
+    """Parse a .phov file (the format reader, for tests)."""
+    assert data[:4] == b"PHOV"
+    assert struct.unpack_from("<I", data, 4)[0] == OVERVIEW_FIXTURE_VERSION
+    pos, out = 8, dict(images=[])
+    while pos < len(data):
+        tag = data[pos:pos + 4].decode("ascii")
+        (size,) = struct.unpack_from("<I", data, pos + 4)
+        p = data[pos + 8:pos + 8 + size]
+        pos += 8 + size
+        if tag == "INPT":
+            rate, ch, frames = struct.unpack_from("<III", p)
+            out.update(rate=rate, channels=ch, frames=frames,
+                       samples=np.frombuffer(_qdecompress(p[12:]), "<i2").reshape(frames, ch))
+        elif tag == "COLS":
+            columns, rows, n = struct.unpack_from("<III", p)
+            raw = np.frombuffer(_qdecompress(p[12:]), np.uint8)
+            out.update(n=n, levels=raw[:columns * 3].reshape(columns, 3),
+                       density=raw[columns * 3:].reshape(columns, rows))
+        elif tag == "IMAG":
+            (ln,) = struct.unpack_from("<H", p)
+            case = p[2:2 + ln].decode("utf-8")
+            o = 2 + ln
+            height, done = struct.unpack_from("<II", p, o)
+            vals = struct.unpack_from("<6d", p, o + 8)
+            pixels = np.frombuffer(_qdecompress(p[o + 56:]), np.uint8)
+            out["images"].append(dict(name=case, height=height, columns_done=done,
+                                      settings=dict(zip(_SETTINGS_FIELDS, vals)),
+                                      pixels=pixels.reshape(height, OVERVIEW_COLUMNS, 4)))
+        elif tag == "DISP":
+            (ln,) = struct.unpack_from("<H", p)
+            case = p[2:2 + ln].decode("utf-8")
+            out.setdefault("display", {})[case] = np.frombuffer(
+                _qdecompress(p[2 + ln:]), np.uint8).reshape(-1, OVERVIEW_COLUMNS, 4)
+        else:
+            raise ValueError(tag)
+    return out
+
+
+# Test signals as complete (shortened) tracks: (fixture name, wav, start s, length s,
+# image set). The WAVs are 20-70 s; a few seconds around the interesting parts keep
+# the committed total small, and the excerpt is the whole track (N = ceil(frames/1920)).
+OVERVIEW_SIGNALS = [
+    ("q2a_crossover_steps", "Q2a crossover steps.wav", 0.0, 12.0, "basic"),
+    ("q2b_sweep", "Q2b sweep 20Hz-20kHz.wav", 20.0, 6.0, "basic"),
+    ("q3a_amplitude_steps_100hz", "Q3a amplitude steps 100Hz.wav", 0.0, 10.0, "basic"),
+    ("q3b_amplitude_steps_1khz", "Q3b amplitude steps 1kHz.wav", 0.0, 10.0, "basic"),
+    ("q3c_amplitude_steps_8khz", "Q3c amplitude steps 8kHz.wav", 0.0, 10.0, "basic"),
+    ("q4_sine_vs_square", "Q4 sine vs square.wav", 0.0, 12.0, "limits"),
+    ("q5_clicks_and_kicks", "Q5 clicks and kicks.wav", 0.0, 8.0, "basic"),
+    ("q5_kicks", "Q5 clicks and kicks.wav", 18.0, 8.0, "basic"),
+    ("q6_sine_vs_noise", "Q6 sine vs noise.wav", 6.0, 8.0, "basic"),
+    ("q7_stereo_inverted", "Q7 stereo L R both inverted.wav", 4.0, 12.0, "basic"),
+    ("q9_two_tone_mixtures", "Q9 two-tone mixtures.wav", 9.0, 8.0, "limits"),
+]
+
+OVERVIEW_HEIGHTS = (62, 31, 124)
+NON_DEFAULT = OverviewSettings(brightness=1.7, level_exponent=0.5, density_exponent=0.4,
+                               gain_low=1.5, gain_mid=0.8, gain_high=2.0)
+# Each setting at both ends of its range, the others at their defaults.
+LIMIT_SETTINGS = [
+    (f"{field}_{end}", OverviewSettings(**{field: value}))
+    for field, lo, hi in (("brightness", 0.1, 4.0), ("level_exponent", 0.1, 1.5),
+                          ("density_exponent", 0.05, 1.0), ("gain_low", 0.0, 4.0),
+                          ("gain_mid", 0.0, 4.0), ("gain_high", 0.0, 4.0))
+    for end, value in (("min", lo), ("max", hi))
+]
+
+
+def overview_image_cases(image_set):
+    cases = [(f"default_h{h}", OverviewSettings(), h, None) for h in OVERVIEW_HEIGHTS]
+    cases.append(("non_default_h62", NON_DEFAULT, 62, None))
+    cases.append(("partial_h62", OverviewSettings(), 62, 960))
+    if image_set == "limits":
+        cases += [(f"limit_{n}_h62", s, 62, None) for n, s in LIMIT_SETTINGS]
+    return cases
+
+
+def write_overview_fixtures(out_dir, signals_dir):
+    os.makedirs(out_dir, exist_ok=True)
+    cache = {}
+    for name, wav, start, length, image_set in OVERVIEW_SIGNALS:
+        if wav not in cache:
+            cache[wav] = read_wav(os.path.join(signals_dir, wav))
+        rate, left, right = cache[wav]
+        a = int(round(start * rate))
+        b = a + int(round(length * rate))
+        data = build_overview_fixture(name, rate, left[a:b], right[a:b], overview_image_cases(image_set))
+        with open(os.path.join(out_dir, name + ".phov"), "wb") as f:
+            f.write(data)
+        print(f"wrote {name}.phov ({len(data)} bytes)")
 
 
 def _corr(x, y):
@@ -914,6 +1240,98 @@ def fit_overview(args):
         print("wrote", args.overview_images)
 
 
+# Traktor's on-screen deck overview in 1920 x 1050 screenshots: 672 px wide for
+# the 1024 columns. Its bounds are measured from the background colour (the
+# widget is 33 grey between 24-grey borders; Q2a's is taller), not guessed.
+SCREEN_W = 672
+SCREEN_BG = 33.0
+
+
+def widget_bounds(shot):
+    """(x0, y0, h) of the deck-overview widget in a float (h, w, 3) screenshot:
+    its rows run from the first 33-grey (background) row under a 24-grey border
+    to the 24-grey border below, the most common answer over several columns; its right edge is the
+    last 33-grey pixel of the first row, and the width is SCREEN_W."""
+    found = []
+    for px in range(600, 708, 6):
+        col = shot[:, px, 0]
+        ys = [y for y in range(250, shot.shape[0] - 1) if col[y] == 33.0 and col[y - 1] == 24.0]
+        if not ys:
+            continue
+        y0, h = ys[0], 1
+        while col[y0 + h] != 24.0:
+            h += 1
+        found.append((y0, h))
+    y0, h = max(set(found), key=found.count)
+    row = shot[y0, :, 0]
+    x1 = max(x for x in range(600, 760) if row[x] == 33.0)
+    return x1 + 1 - SCREEN_W, y0, h
+
+
+def _area_rows(col, h):
+    """Resample (rows, k) to h rows by area average."""
+    rows = col.shape[0]
+    out = np.zeros((h, col.shape[1]))
+    for y in range(h):
+        lo, hi = y * rows / h, (y + 1) * rows / h
+        r = np.arange(int(lo), min(int(np.ceil(hi)), rows))
+        w = np.minimum(hi, r + 1) - np.maximum(lo, r)
+        out[y] = (col[r] * w[:, None]).sum(0) / w.sum()
+    return out
+
+
+def screen_compare(img, shot, valid_from=0):
+    """Our overview image (1024, 64, 4) BGRA, drawn as the widget does, against
+    Traktor's pixels in `shot`, per pixel over the whole widget. Returns
+    (mean abs error 0-255, Traktor centre, ours centre, Traktor edge, ours edge)
+    where centre is max(R,G,B) of the middle rows, edge that of the rows 2 inside
+    Traktor's drawn extent, over the loud columns right of `valid_from`."""
+    x0, y0, h = widget_bounds(shot)
+    t = shot[y0:y0 + h, x0:x0 + SCREEN_W]
+    disp = overview_display(np.ascontiguousarray(img.transpose(1, 0, 2))).transpose(1, 0, 2).astype(float)
+    err, ct, co, et, eo = [], [], [], [], []
+    for x in range(SCREEN_W):
+        if x0 + x <= valid_from + 4 or x >= SCREEN_W - 4:
+            continue
+        lo, hi = x * 1024 / SCREEN_W, (x + 1) * 1024 / SCREEN_W
+        cs = np.arange(int(lo), min(int(np.ceil(hi)), 1024))
+        w = np.minimum(hi, cs + 1) - np.maximum(lo, cs)
+        col = _area_rows((disp[cs] * w[:, None, None]).sum(0) / w.sum(), h)
+        a = col[:, 3:4] / 255.0
+        ours = SCREEN_BG * (1 - a) + a * col[:, 2::-1]
+        tr = t[:, x]
+        err.append(np.abs(ours - tr).mean())
+        c = h // 2
+        if tr[c - 1:c + 2].max(1).mean() > 60:
+            nz = np.nonzero(np.abs(tr - SCREEN_BG).max(1) > 6)[0]
+            top, bot = nz.min() + 2, nz.max() - 2
+            if bot > top + 2:
+                ct.append(tr[c - 1:c + 2].max(1).mean()); co.append(ours[c - 1:c + 2].max(1).mean())
+                et.append((tr[top].max() + tr[bot].max()) / 2); eo.append((ours[top].max() + ours[bot].max()) / 2)
+    return float(np.mean(err)), *(float(np.mean(v)) for v in (ct, co, et, eo))
+
+
+def fit_screen(args):
+    """Compare Traktor's on-screen overview with ours (overview_display) on Q2a,
+    Dilema and Gigando, per pixel over the whole widget height: mean absolute
+    error, centre and edge brightness, and the edge / centre ratio."""
+    jobs = [("Q2a crossover steps", os.path.join(args.signals_dir, "Q2a crossover steps.wav"),
+             os.path.join(args.signals_dir, "Q2a crossover steps", "Screenshot 2026-10-17 225716.png")),
+            ("Dilema", os.path.join(args.tracks_dir, "01 - Dilema.flac"), args.dilema_shot),
+            ("Gigando", os.path.join(args.tracks_dir, TRACKS[0][1]), args.gigando_shot)]
+    for name, wav, shotpath in jobs:
+        audio = decode(wav)
+        mono = mono_int16(audio[:, 0], audio[:, 1]) / 32768.0
+        n = stripe_blocks(len(mono))
+        img = render_overview(mono, RATE, colour_track(mono, RATE, args), n, args)
+        shot = np.array(Image.open(shotpath).convert("RGB")).astype(float)
+        red = ((shot[336:400, 30:730, 0] > 200) & (shot[336:400, 30:730, 1] < 110)).sum(0)
+        playhead = int(np.argmax(red)) + 30 if red.max() >= 20 else 0
+        err, ct, co, et, eo = screen_compare(img, shot, playhead)
+        print(f"{name}: mean |error| {err:.1f}; centre Traktor {ct:.0f}, ours {co:.0f}; "
+              f"edge Traktor {et:.0f}, ours {eo:.0f}; edge/centre Traktor {et / ct:.2f}, ours {eo / co:.2f}")
+
+
 # ---------------------------------------------------------------- cli
 
 # Section 8 numbers as measured on the stripe, with no screenshot tuning.
@@ -972,10 +1390,18 @@ def build_parser():
     p.add_argument("--tracks-dir", default=TRACKS_DIR)
     p.add_argument("--fit-overview", action="store_true",
                    help="render the overview of the five tracks and the test signals and fit them to Traktor's stripes")
+    p.add_argument("--overview-segments", action="store_true",
+                   help="experiment #58: overview density from the line segments between samples")
+    p.add_argument("--overview-overlap", type=float, default=OVERVIEW_OVERLAP,
+                   help="#58: the rows of a column (extent and density) come from its samples extended by this many columns on each side (Traktor: 0.5, a window of two columns)")
     p.add_argument("--traktor-dir",
                    default=os.path.join(os.path.expanduser("~"), "Documents", "Native Instruments", "Traktor 4.0.2"),
                    help="Traktor data folder (read only)")
     p.add_argument("--overview-images", metavar="PNG", help="with --fit-overview: write a comparison sheet")
+    p.add_argument("--fit-screen", action="store_true",
+                   help="compare Traktor's on-screen overview colours with ours before and after the on-screen mapping (research 10)")
+    p.add_argument("--gigando-shot", default=r"D:\Coding Projects\DJNote_Mixxx\SCREENSHOTS\waveforms\Screenshot 2026-10-17 203136.png")
+    p.add_argument("--dilema-shot", default=os.path.join(os.path.expanduser("~"), "Pictures", "Screenshots", "Screenshot 2026-10-20 165754.png"))
     p.add_argument("--tier-images", default="docs/research/phosphor-detail-tiers")
     p.add_argument("--fixtures", metavar="DIR", help="write the C++ test fixtures to DIR")
     p.add_argument("--signals-dir", default="waveform-tests",
@@ -992,6 +1418,7 @@ def main():
     args = parser.parse_args()
     if args.fixtures:
         write_fixtures(args.fixtures, args.signals_dir)
+        write_overview_fixtures(args.fixtures, args.signals_dir)
         return
     if args.check_fir:
         check_fir(args)
@@ -1001,6 +1428,9 @@ def main():
         return
     if args.fit_overview:
         fit_overview(args)
+        return
+    if args.fit_screen:
+        fit_screen(args)
         return
     if not args.audio:
         parser.error("audio file required")

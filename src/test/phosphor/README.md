@@ -96,3 +96,56 @@ Definitions (the C++ lane model must match):
   (clamped to the first and last block). Zero for status 0.
 - Tolerances for the tests: outline rows exact, status exact, density within 1/255 per row,
   levels within 1 %.
+
+# Phosphor overview fixtures (`*.phov`)
+
+Written by the same command (`--fixtures`) from the same WAVs; reader: `src/test/phosphoroverviewfixture.h`
+(`phosphoroverviewfixture::load`), Python reader `read_overview_fixture`. Byte-identical on regeneration.
+They pin the overview model (research section 9, ADR-0005, spec #50) in two seams: the analyzer's stored
+columns, and the image function's pixels.
+
+**Self-contained input.** Each file carries a shortened signal (6-12 s, listed in `OVERVIEW_SIGNALS` in the
+script) that the tests treat as a *complete track* (N = ceil(frames / 1920)), the same trick as the `.phfx`
+excerpts. The samples are stored as `qCompress` blocks (4-byte big-endian raw length + zlib), read with
+`qUncompress`. Total for all 11 files is about 1.9 MB (`q2b_sweep` and `q6_sine_vs_noise` are the largest,
+as sweeps and noise do not compress). The WAVs are not needed.
+
+All numbers are little-endian, except the `qCompress` length prefix.
+
+    "PHOV"            4 bytes magic
+    u32               version (1)
+    section*          INPT, COLS, IMAG*, DISP*   (section = char[4] tag, u32 payload size, payload)
+
+| Tag | Payload |
+|---|---|
+| `INPT` | `u32 rate, u32 channels (1 = L equals R, or 2), u32 frames`, then `qCompress(int16 samples, interleaved)` |
+| `COLS` | `u32 columns (1920), u32 rows (62), u32 n`, then `qCompress(levels u8[columns][3] ++ density u8[columns][rows])` |
+| `IMAG` | `u16 name_length, char name[]`, `u32 height, u32 columns_done`, `f64 brightness, level_exponent, density_exponent, gain_low, gain_mid, gain_high`, then `qCompress(pixels)` |
+
+- **Display images (`DISP`, ticket #60):** after the `IMAG` of the cases `default_h62`, `default_h31`, `non_default_h62` and `partial_h62`: `u16 name_length, char name[]` (that image's name), then `qCompress(pixels)`, the display image the widget draws from that image (`overviewDisplayImage`, research section 10), same size, straight (not premultiplied) bytes B, G, R, A; the C++ test compares premultiplied. Tolerance 2 per channel.
+- **Input to the analyzer:** feed the samples (mono sum `(L+R)/2`, int16 scaled by 1/32768 for Mixxx floats)
+  at `rate`. The analyzer must produce `COLS` : `n` = samples per column, `levels` = `round(255 * peak hold of
+  the 1 ms color track)` (color track fixed at the calibrated constants), then released across columns
+  (`level[k] = max(level[k], held[k-1] * exp(-n / rate / tau))`, tau 0.7 s low, none mid, 0.1 s high, built columns only), `density` = `round(255 * (d / 0.8)^0.25)`
+  clipped, `d` the share of the column's window in the row. The window is the column's samples plus the
+  `n / 2` (floor) samples before and after them, clipped to the track (a two-column window; ticket #58). A column
+  whose own samples are all zero uses only them (a one-row line). Rows are `clip(floor(31 v + 31), 0, 61)`, positive
+  downward. Zero outside the extent and in columns past the end. Tolerances: levels within 1, density within 1.
+- **Images:** `pixels` is `height` rows of 1920 pixels, bytes B, G, R, A (Qt `Format_ARGB32` on little-endian),
+  row 0 = -1.0 (top). They are drawn from the stored bytes in `COLS` only (not the unquantised density), for the
+  settings in the record. Tolerance: 2 per channel. Image cases per file: `default_h62`, `default_h31`,
+  `default_h124`, `non_default_h62` (brightness 1.7, level exp 0.5, density exp 0.4, gains 1.5/0.8/2.0),
+  `partial_h62` (`columns_done` = 960: columns from 960 on are empty); `q4_sine_vs_square` and
+  `q9_two_tone_mixtures` also have `limit_<setting>_<min|max>_h62` for every setting at its range limits.
+- **Image function (what the C++ must do):**
+  1. Per column: `lv = levels / 255 * (gain_low, gain_mid, gain_high)`, `norm = |lv|`, `unit = lv / norm`.
+  2. The extent is the first to last non-zero density byte. Inside it, `d = max(0.8 * (byte / 255)^4, 0.5 / n)`
+     (a calibrated floor for gaps: 0.5 / n is about one sample of the two-column window; half a sample of the window made Q4 worse, see research 9; `n` for every column including the last). Outside: transparent.
+  3. `mag = (83.5 r + 242.0 g - 37.4 b + 606.1 b^4) * norm^level_exponent * brightness`, with `(r, g, b) = unit`.
+     Pixel channels `= clip(unit * mag * d^density_exponent, 0, 255)` (B, G, R order in memory), alpha
+     `= clip(2 * green, 0, 255)`.
+  4. Silence is judged from the stored bytes, not the gained levels: all three level bytes are 0 and the extent is the single row 31 (digital silence). The line is one opaque black pixel `(0, 0, 0, 255)` at row 30. Any other column with `norm == 0` (all gains 0, or levels 0 with a wider extent) has `mag = 0`: transparent.
+  5. Heights other than 62: the 62-row float image, then output row `y` is the average of the source rows over
+     `[y * 62 / height, (y + 1) * 62 / height)`, weighted by overlap, then rounded half up (`floor(x + 0.5)`).
+     So 31 averages row pairs and 124 repeats each row twice.
+  6. `columns_done`: columns from that index on are all zero (including alpha).

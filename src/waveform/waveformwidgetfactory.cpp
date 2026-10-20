@@ -427,6 +427,7 @@ bool WaveformWidgetFactory::setConfig(UserSettingsPointer config) {
     setFollowsGain(m_config->getValue(ConfigKey("[Waveform]", "FollowsGain"), true));
     setFollowsEq(m_config->getValue(ConfigKey("[Waveform]", "FollowsEq"), true));
     m_phosphorSettings = mixxx::phosphor::loadSettings(m_config);
+    m_phosphorOverviewSettings = mixxx::phosphor::loadOverviewSettings(m_config);
 
     int overviewNormalized = m_config->getValueString(ConfigKey("[Waveform]","OverviewNormalized")).toInt(&ok);
     if (ok) {
@@ -762,6 +763,21 @@ void WaveformWidgetFactory::setPhosphorSettings(const mixxx::phosphor::PhosphorS
     m_phosphorSettings = mixxx::phosphor::clampSettings(settings);
     if (m_config) {
         mixxx::phosphor::saveSettings(m_config, m_phosphorSettings);
+    }
+}
+
+void WaveformWidgetFactory::setPhosphorOverviewSettings(
+        const mixxx::phosphor::PhosphorOverviewSettings& settings) {
+    m_phosphorOverviewSettings = mixxx::phosphor::clampOverviewSettings(settings);
+    if (m_config) {
+        mixxx::phosphor::saveOverviewSettings(m_config, m_phosphorOverviewSettings);
+    }
+    emit phosphorOverviewSettingsChanged();
+}
+
+void WaveformWidgetFactory::setOverviewType(WOverview::Type type) {
+    if (type == WOverview::Type::Phosphor) {
+        emit phosphorOverviewSelected();
     }
 }
 

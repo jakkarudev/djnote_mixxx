@@ -280,6 +280,12 @@ void MixxxMainWindow::initialize() {
     WaveformWidgetFactory::instance()->setConfig(m_pCoreServices->getSettings());
     WaveformWidgetFactory::instance()->startVSync(m_pGuiTick, m_pVisualsManager);
 
+    // Switching the overview type rebuilds the decks' loaded tracks.
+    connect(WaveformWidgetFactory::instance(),
+            &WaveformWidgetFactory::phosphorOverviewSelected,
+            m_pCoreServices->getPlayerManager().get(),
+            &PlayerManager::slotAnalyzeLoadedDeckTracks);
+
     connect(this,
             &MixxxMainWindow::skinLoaded,
             m_pCoreServices->getLibrary().get(),
