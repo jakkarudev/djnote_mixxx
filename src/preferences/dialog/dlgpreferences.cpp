@@ -25,6 +25,7 @@
 #include "preferences/dialog/dlgprefautodj.h"
 #include "preferences/dialog/dlgprefcolors.h"
 #include "preferences/dialog/dlgprefdeck.h"
+#include "preferences/dialog/dlgprefdjnote.h" // DJNote
 #include "preferences/dialog/dlgprefeffects.h"
 #include "preferences/dialog/dlgprefinterface.h"
 #include "preferences/dialog/dlgprefmixer.h"
@@ -235,6 +236,13 @@ DlgPreferences::DlgPreferences(
             tr("Modplug Decoder"),
             "ic_preferences_modplug.svg");
 #endif // __MODPLUG__
+
+    // DJNote: the DJNote page (knob adjustment readout, ...).
+    addPageWidget(PreferencesPage(
+                          new DlgPrefDJNote(this, m_pConfig),
+                          new QTreeWidgetItem(contentsTreeWidget, QTreeWidgetItem::Type)),
+            tr("DJNote"),
+            "ic_preferences_interface.svg");
 
     // Find accept and apply buttons
     const auto buttons = buttonBox->buttons();
