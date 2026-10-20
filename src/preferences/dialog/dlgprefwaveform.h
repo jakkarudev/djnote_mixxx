@@ -50,6 +50,8 @@ class DlgPrefWaveform : public DlgPreferencePage, public Ui::DlgPrefWaveformDlg 
     void slotSetPhosphorDetail(int index);
     void slotPhosphorAdvancedChanged();
     void slotResetPhosphorAdvanced();
+    void slotPhosphorOverviewChanged();
+    void slotResetPhosphorOverview();
     void slotSetOverviewLinesMode(int index);
     void slotSetOverviewPhraseBars(int index);
     void slotSetOverviewLineOpacity(int percent);
@@ -68,6 +70,8 @@ class DlgPrefWaveform : public DlgPreferencePage, public Ui::DlgPrefWaveformDlg 
     void initWaveformControl();
     void buildPhosphorAdvanced();
     void showPhosphorSettings(const mixxx::phosphor::PhosphorSettings& settings);
+    void buildPhosphorOverviewAdvanced();
+    void showPhosphorOverviewSettings(const mixxx::phosphor::PhosphorOverviewSettings& settings);
     void showHoverReadoutControls(const mixxx::overviewlayout::HoverReadoutSettings& settings);
     void calculateCachedWaveformDiskUsage();
     void notifyRebootNecessary();
@@ -89,6 +93,13 @@ class DlgPrefWaveform : public DlgPreferencePage, public Ui::DlgPrefWaveformDlg 
     QDoubleSpinBox* m_pPhosphorRelease[3] = {};
     QDoubleSpinBox* m_pPhosphorLookAhead = nullptr;
     QPushButton* m_pPhosphorResetButton = nullptr;
+    // Phosphor overview advanced settings (see buildPhosphorOverviewAdvanced).
+    QWidget* m_pPhosphorOverviewWidget = nullptr;
+    QDoubleSpinBox* m_pOverviewBrightness = nullptr;
+    QDoubleSpinBox* m_pOverviewLevelExponent = nullptr;
+    QDoubleSpinBox* m_pOverviewDensityExponent = nullptr;
+    QDoubleSpinBox* m_pOverviewGain[3] = {};
+    QPushButton* m_pOverviewResetButton = nullptr;
 
     UserSettingsPointer m_pConfig;
     std::shared_ptr<Library> m_pLibrary;

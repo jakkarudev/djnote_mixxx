@@ -89,6 +89,7 @@ class WOverview : public WWidget, public TrackDropTarget {
 
     void slotTypeControlChanged(double v);
     void slotNormalizeOrVisualGainChanged();
+    void slotPhosphorOverviewSettingsChanged();
     void slotHoverReadoutSettingsChanged();
 
   private:

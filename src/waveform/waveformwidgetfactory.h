@@ -163,6 +163,12 @@ class WaveformWidgetFactory : public QObject, public Singleton<WaveformWidgetFac
         return m_phosphorSettings;
     }
     void setPhosphorSettings(const mixxx::phosphor::PhosphorSettings& settings);
+    /// The Phosphor overview draw settings (a separate group). Setting them
+    /// saves them and tells every overview to draw again.
+    const mixxx::phosphor::PhosphorOverviewSettings& phosphorOverviewSettings() const {
+        return m_phosphorOverviewSettings;
+    }
+    void setPhosphorOverviewSettings(const mixxx::phosphor::PhosphorOverviewSettings& settings);
 
     void setOverviewNormalized(bool normalize);
     int isOverviewNormalized() const { return m_overviewNormalized;}
@@ -211,6 +217,7 @@ class WaveformWidgetFactory : public QObject, public Singleton<WaveformWidgetFac
     void swapVuMeters();
 
     void overviewNormalizeChanged();
+    void phosphorOverviewSettingsChanged();
     void overviewLinesChanged();
     void overallVisualGainChanged();
 
@@ -265,6 +272,7 @@ class WaveformWidgetFactory : public QObject, public Singleton<WaveformWidgetFac
     bool m_followsGain;
     bool m_followsEq;
     mixxx::phosphor::PhosphorSettings m_phosphorSettings;
+    mixxx::phosphor::PhosphorOverviewSettings m_phosphorOverviewSettings;
     bool m_overviewNormalized;
     mixxx::overviewlayout::LineSettings m_overviewLineSettings;
     void saveOverviewLineSettings();

@@ -113,6 +113,11 @@ WOverview::WOverview(
             &WaveformWidgetFactory::overallVisualGainChanged,
             this,
             &WOverview::slotNormalizeOrVisualGainChanged);
+    // Phosphor overview settings: draw the stored columns again.
+    connect(widgetFactory,
+            &WaveformWidgetFactory::phosphorOverviewSettingsChanged,
+            this,
+            &WOverview::slotPhosphorOverviewSettingsChanged);
     // Bar and phrase line settings; no need to reload the track.
     connect(widgetFactory,
             &WaveformWidgetFactory::overviewLinesChanged,
@@ -516,6 +521,15 @@ void WOverview::slotTypeControlChanged(double v) {
     m_waveformPeak = -1.0;
     m_pixmapDone = false;
     slotWaveformSummaryUpdated();
+}
+
+void WOverview::slotPhosphorOverviewSettingsChanged() {
+    if (m_type == Type::Phosphor && m_pPhosphorOverview) {
+        // Draw everything built so far again; the stored data is not touched.
+        m_actualCompletion = 0;
+        drawNextPhosphorPart();
+    }
+    update();
 }
 
 void WOverview::slotNormalizeOrVisualGainChanged() {
@@ -1561,7 +1575,7 @@ void WOverview::drawPassthroughOverlay(QPainter* pPainter) {
 }
 
 mixxx::phosphor::OverviewDrawSettings WOverview::phosphorDrawSettings() const {
-    return mixxx::phosphor::OverviewDrawSettings();
+    return WaveformWidgetFactory::instance()->phosphorOverviewSettings();
 }
 
 bool WOverview::drawNextPhosphorPart() {
