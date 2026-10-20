@@ -738,6 +738,16 @@ void PlayerManager::slotAnalyzeDeckTrack(TrackPointer track) {
     analyzeLoadedTrack(std::move(track), options);
 }
 
+void PlayerManager::slotAnalyzeLoadedDeckTracks() {
+    for (Deck* pDeck : std::as_const(m_decks)) {
+        TrackPointer pTrack = pDeck->getLoadedTrack();
+        // Tracks outside the library have no id and cannot be scheduled.
+        if (pTrack && pTrack->getId().isValid()) {
+            slotAnalyzeDeckTrack(std::move(pTrack));
+        }
+    }
+}
+
 void PlayerManager::analyzeLoadedTrack(TrackPointer track, AnalyzerTrack::Options options) {
     VERIFY_OR_DEBUG_ASSERT(track) {
         return;

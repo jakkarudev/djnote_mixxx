@@ -22,6 +22,8 @@
 #include "track/track.h"
 #include "util/cmdlineargs.h"
 #include "waveform/phosphor/phosphordata.h"
+#include "waveform/phosphor/phosphoroverview.h"
+#include "widget/woverview.h"
 
 namespace {
 
@@ -271,4 +273,45 @@ TEST_F(PlayerManagerTest, OnlyDeckLoadsBuildPhosphorData) {
     ASSERT_TRUE(pDeckTrack->getPhosphorData());
     EXPECT_TRUE(pDeckTrack->getPhosphorData()->isFinished());
     EXPECT_FALSE(pSamplerTrack->getPhosphorData());
+}
+
+namespace {
+void waitForOverview(const TrackPointer& pTrack) {
+    for (int i = 0; i < 200; ++i) {
+        const auto pData = pTrack->getPhosphorOverview();
+        if (pData && pData->completedColumns() >= mixxx::phosphor::kOverviewColumns) {
+            return;
+        }
+        QTest::qWait(50);
+    }
+}
+} // namespace
+
+// Switching the overview type to Phosphor rebuilds the decks' loaded tracks
+// without reloading them (ticket #54); tracks with current data are not
+// rebuilt.
+TEST_F(PlayerManagerTest, SwitchingToPhosphorOverviewRebuildsDeckTracks) {
+    config()->setValue(ConfigKey("[Waveform]", "WaveformOverviewType"), WOverview::Type::RGB);
+    TrackPointer pTrack = getOrAddTrackByLocation(getTestDir().filePath(kTrackLocationTest1));
+    ASSERT_TRUE(pTrack && pTrack->getId().isValid());
+    m_pPlayerManager->getDeck(0)->slotLoadTrack(pTrack, false);
+    m_pEngine->process(1024);
+    for (int i = 0; i < 40; ++i) {
+        QTest::qWait(50);
+    }
+    EXPECT_FALSE(pTrack->getPhosphorOverview());
+
+    config()->setValue(ConfigKey("[Waveform]", "WaveformOverviewType"), WOverview::Type::Phosphor);
+    m_pPlayerManager->slotAnalyzeLoadedDeckTracks();
+    waitForOverview(pTrack);
+    const auto pFirst = pTrack->getPhosphorOverview();
+    ASSERT_TRUE(pFirst);
+    EXPECT_EQ(pFirst->completedColumns(), mixxx::phosphor::kOverviewColumns);
+
+    // Switching away and back (or again) does not start a second build.
+    m_pPlayerManager->slotAnalyzeLoadedDeckTracks();
+    for (int i = 0; i < 20; ++i) {
+        QTest::qWait(50);
+    }
+    EXPECT_EQ(pFirst, pTrack->getPhosphorOverview());
 }
