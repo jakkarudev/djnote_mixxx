@@ -107,6 +107,18 @@ QImage overviewImage(const OverviewColumnsView& columns,
     return image;
 }
 
+QImage overviewDisplayImage(const QImage& overview) {
+    QImage out = overview.convertToFormat(QImage::Format_ARGB32);
+    for (int y = 0; y < out.height(); ++y) {
+        QRgb* line = reinterpret_cast<QRgb*>(out.scanLine(y));
+        for (int x = 0; x < out.width(); ++x) {
+            const QRgb p = line[x];
+            line[x] = p == 0 ? 0 : (p | 0xFF000000u);
+        }
+    }
+    return out.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+}
+
 int overviewExtentRows(const OverviewColumnsView& columns) {
     const int done = std::clamp(columns.columnsDone, 0, kOverviewColumns);
     int extent = 0;

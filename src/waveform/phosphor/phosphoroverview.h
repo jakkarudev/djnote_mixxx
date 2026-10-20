@@ -62,6 +62,12 @@ QImage overviewImage(const OverviewColumnsView& columns,
         const PhosphorOverviewSettings& settings,
         int height = kOverviewRows);
 
+/// What the widget draws from overviewImage(): the same colour, opaque (alpha
+/// 255) for every pixel with any alpha or colour, transparent elsewhere,
+/// Format_ARGB32_Premultiplied. The stripe's alpha (2 x green) is a model
+/// output for the fit; drawing it would darken the colour a second time. Pure.
+QImage overviewDisplayImage(const QImage& overview);
+
 /// The outermost non-empty row of the built columns, as a distance from the
 /// center line in rows (0..31): 31 is a track that reaches 0 dBFS. Normalize
 /// crops to this once the data is complete.

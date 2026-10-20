@@ -455,7 +455,7 @@ Means over the four tracks: colour 0.068, profile 10.7, outline 0.954. The compa
 - Brightness comes from the **density raised to 0.25**, not linear density added up and clipped. That is why the overview is smooth and the scrolling waveform grainy.
 - Colour is the **peak hold over the column** of the same smoothed band levels; the scrolling waveform samples the levels per pixel.
 - Magnitude depends on hue (blue is brighter) and on `norm(levels)^0.7`; the scrolling waveform's brightness is its own fit (section 8.5).
-- Alpha is a separate channel (2 x the green byte). The Phosphor renderer can use the colour alone.
+- Alpha is a separate channel (2 x the green byte). The Phosphor renderer can use the colour alone. The widget draws the colour opaque (`overviewDisplayImage`), because premultiplying by that alpha darkens the colour a second time (red and blue columns, low G, nearly vanish) while the model was fitted against the RGB as is.
 
 ### Remaining gaps
 

@@ -105,6 +105,23 @@ TEST_F(PhosphorOverviewTest, SilenceIsAudioNotGain) {
     }
 }
 
+// The widget shows the colour as is: the stripe's alpha (2 x green) would
+// darken it a second time.
+TEST_F(PhosphorOverviewTest, DisplayImageIsOpaqueInsideTheExtent) {
+    QImage src(4, 1, QImage::Format_ARGB32);
+    src.setPixel(0, 0, qRgba(10, 20, 30, 40));  // faint, low alpha
+    src.setPixel(1, 0, qRgba(0, 0, 0, 255));    // the silence line
+    src.setPixel(2, 0, qRgba(0, 0, 0, 0));      // outside the extent
+    src.setPixel(3, 0, qRgba(200, 0, 0, 0));    // colour without alpha (red/blue)
+    const QImage out = overviewDisplayImage(src);
+    ASSERT_EQ(src.size(), out.size());
+    EXPECT_EQ(QImage::Format_ARGB32_Premultiplied, out.format());
+    EXPECT_EQ(qRgba(10, 20, 30, 255), out.pixel(0, 0));
+    EXPECT_EQ(qRgba(0, 0, 0, 255), out.pixel(1, 0));
+    EXPECT_EQ(0u, out.pixel(2, 0));
+    EXPECT_EQ(qRgba(200, 0, 0, 255), out.pixel(3, 0));
+}
+
 TEST_F(PhosphorOverviewTest, ExtentIsTheOutermostNonEmptyRow) {
     std::vector<uint8_t> levels(kOverviewColumns * 3, 0);
     std::vector<uint8_t> density(static_cast<size_t>(kOverviewColumns) * kOverviewRows, 0);

@@ -1593,9 +1593,8 @@ bool WOverview::drawNextPhosphorPart() {
     }
     // The source image has the height the other types use (2 * 255), so the
     // crop of Normalize and visual gain is the same code for every type.
-    m_waveformSourceImage = mixxx::phosphor::overviewImage(
-            view, phosphorDrawSettings(), 2 * 255)
-                                    .convertToFormat(QImage::Format_ARGB32_Premultiplied);
+    m_waveformSourceImage = mixxx::phosphor::overviewDisplayImage(
+            mixxx::phosphor::overviewImage(view, phosphorDrawSettings(), 2 * 255));
     // Peak in the 0..255 units of the other types.
     m_waveformPeak = static_cast<float>(
             mixxx::phosphor::overviewExtentRows(view) * 255.0 / (mixxx::phosphor::kOverviewRows / 2));
