@@ -63,11 +63,15 @@ QImage overviewImage(const OverviewColumnsView& columns,
                     std::pow(norm, settings.levelExponent) * settings.brightness;
         }
         for (int r = top; r <= bottom; ++r) {
-            double* px = &src[(static_cast<size_t>(r) * kOverviewColumns + c) * 4];
             if (!live) {
-                px[3] = 255.0; // silence: an opaque black line
+                // Silence: an opaque black line, drawn one row above the row map
+                // as Traktor does (row 30 for digital silence, research 9).
+                if (r > 0) {
+                    src[(static_cast<size_t>(r - 1) * kOverviewColumns + c) * 4 + 3] = 255.0;
+                }
                 continue;
             }
+            double* px = &src[(static_cast<size_t>(r) * kOverviewColumns + c) * 4];
             const double d = std::max(
                     kDensityFull * std::pow(density[r] / 255.0, 4), halfSample);
             const double k = mag * std::pow(d, settings.densityExponent);
