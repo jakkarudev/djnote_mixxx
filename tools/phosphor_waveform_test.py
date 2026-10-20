@@ -496,9 +496,29 @@ class OverviewFixtures(unittest.TestCase):
 
 class ScreenColour(unittest.TestCase):
     def test_a_dim_stripe_pixel_reads_vivid_and_keeps_its_hue(self):
-        out = pw.screen_colour(np.array([60.0, 30.0, 10.0]), desat=0.0)
-        self.assertEqual(out.max(), 255.0)
+        out = pw.screen_colour(np.array([60.0, 30.0, 10.0]), desat=0.0, balance=(1, 1, 1))
+        self.assertAlmostEqual(out.max(), 255.0, places=6)
         self.assertAlmostEqual(out[1] / out[0], (0.5) ** pw.SCREEN_EXPONENT, places=6)
+
+    def test_a_column_fades_from_the_centre_to_the_background(self):
+        # the same hue at falling brightness: the colour stays vivid, the
+        # coverage (alpha) falls, so the edge of a column blends into the background
+        img = np.zeros((3, 1, 4), np.uint8)
+        img[0, 0] = (60, 40, 40, 80)   # edge
+        img[1, 0] = (30, 20, 20, 40)   # fainter edge
+        img[2, 0] = (90, 60, 60, 120)  # centre
+        out = pw.overview_display(img)
+        self.assertLess(out[1, 0, 3], out[0, 0, 3])
+        self.assertLess(out[0, 0, 3], out[2, 0, 3])
+        self.assertEqual(out[2, 0, 3], 255)
+        self.assertGreater(out[1, 0, :3].max(), 0)
+
+    def test_a_pixel_with_colour_but_no_alpha_still_shows(self):
+        img = np.zeros((1, 1, 4), np.uint8)
+        img[0, 0] = (0, 0, 120, 0)  # red only: alpha (2 x green) is 0
+        out = pw.overview_display(img)
+        self.assertGreater(out[0, 0, 3], 0)
+        self.assertGreater(out[0, 0, 2], 0)
 
     def test_silence_line_stays_black_and_opaque(self):
         img = np.zeros((4, 2, 4), np.uint8)

@@ -105,22 +105,27 @@ TEST_F(PhosphorOverviewTest, SilenceIsAudioNotGain) {
     }
 }
 
-// The widget shows the colour as is: the stripe's alpha (2 x green) would
-// darken it a second time.
-TEST_F(PhosphorOverviewTest, DisplayImageIsOpaqueInsideTheExtent) {
-    QImage src(4, 1, QImage::Format_ARGB32);
-    src.setPixel(0, 0, qRgba(10, 20, 30, 40));  // faint, low alpha
-    src.setPixel(1, 0, qRgba(0, 0, 0, 255));    // the silence line
-    src.setPixel(2, 0, qRgba(0, 0, 0, 0));      // outside the extent
-    src.setPixel(3, 0, qRgba(200, 0, 0, 0));    // colour without alpha (red/blue)
+// The widget shows a vivid colour whose coverage (alpha) follows the pixel's
+// brightness: a column fades from the centre into the background at its edges.
+TEST_F(PhosphorOverviewTest, DisplayImageFadesFaintPixelsAndKeepsBrightOnesOpaque) {
+    QImage src(6, 1, QImage::Format_ARGB32);
+    src.setPixel(0, 0, qRgba(60, 40, 40, 80));    // edge
+    src.setPixel(1, 0, qRgba(30, 20, 20, 40));    // fainter edge
+    src.setPixel(2, 0, qRgba(90, 60, 60, 120));   // centre
+    src.setPixel(3, 0, qRgba(0, 0, 0, 255));      // the silence line
+    src.setPixel(4, 0, qRgba(0, 0, 0, 0));        // outside the extent
+    src.setPixel(5, 0, qRgba(200, 0, 0, 0));      // colour without alpha (red/blue)
     const QImage out = overviewDisplayImage(src);
     ASSERT_EQ(src.size(), out.size());
     EXPECT_EQ(QImage::Format_ARGB32_Premultiplied, out.format());
-    EXPECT_EQ(255, qAlpha(out.pixel(0, 0)));
-    EXPECT_EQ(qRgba(0, 0, 0, 255), out.pixel(1, 0));
-    EXPECT_EQ(0u, out.pixel(2, 0));
-    EXPECT_EQ(255, qAlpha(out.pixel(3, 0)));
-    EXPECT_GT(qRed(out.pixel(3, 0)), 0);
+    EXPECT_LT(qAlpha(out.pixel(1, 0)), qAlpha(out.pixel(0, 0)));
+    EXPECT_LT(qAlpha(out.pixel(0, 0)), qAlpha(out.pixel(2, 0)));
+    EXPECT_EQ(255, qAlpha(out.pixel(2, 0)));
+    EXPECT_GT(qAlpha(out.pixel(1, 0)), 0);
+    EXPECT_EQ(qRgba(0, 0, 0, 255), out.pixel(3, 0));
+    EXPECT_EQ(0u, out.pixel(4, 0));
+    EXPECT_GT(qAlpha(out.pixel(5, 0)), 0);
+    EXPECT_GT(qRed(out.pixel(5, 0)), 0);
 }
 
 // The on-screen colours (research 10): the display image of each fixture image
@@ -141,15 +146,21 @@ TEST_F(PhosphorOverviewTest, DisplayImageMatchesFixtures) {
             view.samplesPerColumn = static_cast<int>(f.samplesPerColumn);
             view.columnsDone = static_cast<int>(im.columnsDone);
             const QImage src = overviewImage(view, toDrawSettings(im.settings), static_cast<int>(im.height));
-            const QImage out = overviewDisplayImage(src).convertToFormat(QImage::Format_ARGB32);
+            const QImage out = overviewDisplayImage(src);  // premultiplied
             ASSERT_EQ(src.size(), out.size());
             ASSERT_EQ(want->second.size(), static_cast<size_t>(out.width()) * out.height() * 4);
             int worst = 0;
             for (int y = 0; y < out.height(); ++y) {
                 const uint8_t* got = out.constScanLine(y);
                 const uint8_t* ref = &want->second[static_cast<size_t>(y) * out.width() * 4];
-                for (int i = 0; i < out.width() * 4; ++i) {
-                    worst = std::max(worst, std::abs(int(got[i]) - int(ref[i])));
+                for (int x = 0; x < out.width(); ++x) {
+                    // The fixture is straight B, G, R, A; compare premultiplied.
+                    const int a = ref[x * 4 + 3];
+                    for (int ch = 0; ch < 3; ++ch) {
+                        const int want = (ref[x * 4 + ch] * a + 127) / 255;
+                        worst = std::max(worst, std::abs(int(got[x * 4 + ch]) - want));
+                    }
+                    worst = std::max(worst, std::abs(int(got[x * 4 + 3]) - a));
                 }
             }
             EXPECT_LE(worst, 2) << file.toStdString() << " " << im.name.toStdString();

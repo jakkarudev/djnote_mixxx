@@ -16,14 +16,17 @@ constexpr double kWeightB = -37.4;
 constexpr double kWeightB4 = 606.1;
 constexpr double kAlphaPerGreen = 2.0;
 
-// On-screen colours (research 10): out = gain * ((p - desat * min(p)) / 255)^exponent
-// per channel, after each pixel is pulled toward its column's brightest pixel
-// (p * (peak / |p|)^flatten); the pixel is divided by its largest channel if that
-// passes 255, so a bright pixel keeps its hue.
-constexpr double kScreenGain = 23.9;
-constexpr double kScreenExponent = 2.17;
-constexpr double kScreenDesat = 0.33;
-constexpr double kScreenFlatten = 0.8;
+// On-screen colours (research 10): the colour is
+// gain * balance * ((p - desat * min(p)) / 255)^exponent per channel, divided by
+// its largest channel if that passes 255 so a bright pixel keeps its hue; its
+// coverage (alpha) is (coverGain * max(p) / 255)^coverPower, clipped to 1, so a
+// column fades from the centre into the background at its edges.
+constexpr double kScreenGain = 114.0;
+constexpr double kScreenExponent = 2.5;
+constexpr double kScreenDesat = 0.32;
+constexpr double kScreenBalance[3] = {1.0, 0.79, 1.07}; // R, G, B
+constexpr double kScreenCoverGain = 3.6;
+constexpr double kScreenCoverPower = 2.18;
 
 inline double clamp255(double v) {
     return std::clamp(v, 0.0, 255.0);
@@ -118,49 +121,56 @@ QImage overviewImage(const OverviewColumnsView& columns,
 
 QImage overviewDisplayImage(const QImage& overview) {
     const QImage in = overview.convertToFormat(QImage::Format_ARGB32);
-    QImage out(in.size(), QImage::Format_ARGB32);
+    QImage out(in.size(), QImage::Format_ARGB32_Premultiplied);
     const int w = in.width();
     const int h = in.height();
-    for (int x = 0; x < w; ++x) {
-        // The column's brightest pixel, to flatten the column toward it.
-        double peak = 0;
-        for (int y = 0; y < h; ++y) {
-            const QRgb p = reinterpret_cast<const QRgb*>(in.constScanLine(y))[x];
-            peak = std::max(peak,
-                    std::sqrt(static_cast<double>(qRed(p)) * qRed(p) +
-                            static_cast<double>(qGreen(p)) * qGreen(p) +
-                            static_cast<double>(qBlue(p)) * qBlue(p)));
-        }
-        for (int y = 0; y < h; ++y) {
-            const QRgb p = reinterpret_cast<const QRgb*>(in.constScanLine(y))[x];
-            QRgb* dst = &reinterpret_cast<QRgb*>(out.scanLine(y))[x];
+    for (int y = 0; y < h; ++y) {
+        const QRgb* src = reinterpret_cast<const QRgb*>(in.constScanLine(y));
+        QRgb* dst = reinterpret_cast<QRgb*>(out.scanLine(y));
+        for (int x = 0; x < w; ++x) {
+            const QRgb p = src[x];
             if (p == 0) {
-                *dst = 0;
+                dst[x] = 0;
                 continue;
             }
-            double c[3] = {static_cast<double>(qRed(p)),
+            const double c[3] = {static_cast<double>(qRed(p)),
                     static_cast<double>(qGreen(p)),
                     static_cast<double>(qBlue(p))};
-            const double norm = std::sqrt(c[0] * c[0] + c[1] * c[1] + c[2] * c[2]);
-            if (norm > 0) {
-                const double pull = std::pow(peak / norm, kScreenFlatten);
-                for (double& v : c) {
-                    v *= pull;
-                }
+            const double brightest = std::max({c[0], c[1], c[2]});
+            if (brightest <= 0) {
+                // Alpha without colour (the silence line): opaque black.
+                dst[x] = qRgba(0, 0, 0, qAlpha(p) > 0 ? 255 : 0);
+                continue;
             }
             const double grey = kScreenDesat * std::min({c[0], c[1], c[2]});
             double pre[3];
             double top = 0;
             for (int i = 0; i < 3; ++i) {
-                const double v = std::clamp(c[i], 0.0, 255.0) - grey;
-                pre[i] = kScreenGain * std::pow(std::max(v, 0.0) / 255.0, kScreenExponent) * 255.0;
+                const double v = std::max(c[i] - grey, 0.0);
+                pre[i] = kScreenGain * kScreenBalance[i] *
+                        std::pow(v / 255.0, kScreenExponent) * 255.0;
                 top = std::max(top, pre[i]);
             }
             const double scale = top > 255.0 ? 255.0 / top : 1.0;
-            *dst = qRgba(roundU8(pre[0] * scale), roundU8(pre[1] * scale), roundU8(pre[2] * scale), 255);
+            const double cover = std::pow(
+                    std::min(1.0, kScreenCoverGain * brightest / 255.0), kScreenCoverPower);
+            const uint8_t a = roundU8(cover * 255.0);
+            if (a == 0) {
+                dst[x] = 0;
+                continue;
+            }
+            // The straight colour, rounded as the reference script does, then
+            // premultiplied.
+            const auto premul = [a](uint8_t v) {
+                return static_cast<int>((v * a + 127) / 255);
+            };
+            dst[x] = qRgba(premul(roundU8(pre[0] * scale)),
+                    premul(roundU8(pre[1] * scale)),
+                    premul(roundU8(pre[2] * scale)),
+                    a);
         }
     }
-    return out.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+    return out;
 }
 
 int overviewExtentRows(const OverviewColumnsView& columns) {

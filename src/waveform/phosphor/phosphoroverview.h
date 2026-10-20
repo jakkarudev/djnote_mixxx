@@ -63,11 +63,11 @@ QImage overviewImage(const OverviewColumnsView& columns,
         int height = kOverviewRows);
 
 /// What the widget draws from overviewImage(): the colours Traktor shows on
-/// screen (research 10: desaturate, a steep power and a gain, flattened toward
-/// each column's brightest pixel, hue-preserving clamp), opaque (alpha 255) for
-/// every pixel with any alpha or colour, transparent elsewhere,
-/// Format_ARGB32_Premultiplied. The stripe's alpha (2 x green) is a model
-/// output for the fit; drawing it would darken the colour a second time. Pure.
+/// screen (research 10): a vivid colour (desaturate, a steep power, a gain and a
+/// balance, hue-preserving clamp) whose alpha is its coverage, from the pixel's
+/// brightest channel, so a column fades from the centre into the background at
+/// its edges. A pixel with alpha but no colour (the silence line) is opaque
+/// black, an empty pixel stays transparent. Format_ARGB32_Premultiplied. Pure.
 QImage overviewDisplayImage(const QImage& overview);
 
 /// The outermost non-empty row of the built columns, as a distance from the
