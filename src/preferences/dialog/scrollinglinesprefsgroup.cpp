@@ -1,0 +1,137 @@
+#include "preferences/dialog/scrollinglinesprefsgroup.h"
+
+#include <QCheckBox>
+#include <QGridLayout>
+#include <QLabel>
+#include <QSignalBlocker>
+#include <QSlider>
+#include <QSpinBox>
+
+#include "moc_scrollinglinesprefsgroup.cpp"
+
+using mixxx::scrollinglinelayout::LineSettings;
+using mixxx::scrollinglinelayout::OpacityPercent;
+
+namespace {
+
+void addExplanation(QGridLayout* pGrid, int& row, const QString& explanation) {
+    auto* pExplanation = new QLabel(explanation);
+    pExplanation->setWordWrap(true);
+    pExplanation->setToolTip(explanation);
+    QFont font = pExplanation->font();
+    font.setItalic(true);
+    pExplanation->setFont(font);
+    pGrid->addWidget(pExplanation, row++, 0, 1, 3);
+}
+
+} // namespace
+
+ScrollingLinesPrefsGroup::ScrollingLinesPrefsGroup(
+        const QList<QWidget*>& upstreamBeatGridControls, QWidget* pParent)
+        : QGroupBox(tr("Beat, bar and step lines"), pParent),
+          m_upstreamBeatGridControls(upstreamBeatGridControls) {
+    setObjectName(QStringLiteral("scrollingLinesGroupBox"));
+    auto* pGrid = new QGridLayout(this);
+    pGrid->setColumnStretch(1, 1);
+    int row = 0;
+
+    m_pEnabledCheckBox = new QCheckBox(tr("DJNote beat, bar and step lines"));
+    m_pEnabledCheckBox->setObjectName(QStringLiteral("scrollingLinesEnabledCheckBox"));
+    const QString enabledExplanation =
+            tr("Draw bar lines on each downbeat and beat lines on the other beats "
+               "of the scrolling waveforms, with the settings below. Off: the "
+               "lines are drawn as in Mixxx, with the beat grid opacity above.");
+    m_pEnabledCheckBox->setToolTip(enabledExplanation);
+    pGrid->addWidget(m_pEnabledCheckBox, row++, 0, 1, 3);
+    addExplanation(pGrid, row, enabledExplanation);
+
+    m_barOpacity = addOpacityRow(pGrid,
+            row,
+            tr("Bar line opacity"),
+            QStringLiteral("scrollingBarLineOpacity"),
+            tr("Opacity of the line on each bar's first beat (downbeat)."));
+    m_beatOpacity = addOpacityRow(pGrid,
+            row,
+            tr("Beat line opacity"),
+            QStringLiteral("scrollingBeatLineOpacity"),
+            tr("Opacity of the lines on the other beats."));
+
+    showSettings(m_settings);
+
+    connect(m_pEnabledCheckBox,
+            &QCheckBox::toggled,
+            this,
+            &ScrollingLinesPrefsGroup::slotControlChanged);
+    for (const OpacityControls& controls : {m_barOpacity, m_beatOpacity}) {
+        connect(controls.pSpinBox,
+                QOverload<int>::of(&QSpinBox::valueChanged),
+                this,
+                &ScrollingLinesPrefsGroup::slotControlChanged);
+    }
+}
+
+ScrollingLinesPrefsGroup::OpacityControls ScrollingLinesPrefsGroup::addOpacityRow(
+        QGridLayout* pGrid,
+        int& row,
+        const QString& name,
+        const QString& objectNamePrefix,
+        const QString& explanation) {
+    OpacityControls controls;
+    controls.pSlider = new QSlider(Qt::Horizontal);
+    controls.pSlider->setObjectName(objectNamePrefix + QStringLiteral("Slider"));
+    controls.pSlider->setRange(0, 100);
+    controls.pSpinBox = new QSpinBox();
+    controls.pSpinBox->setObjectName(objectNamePrefix + QStringLiteral("SpinBox"));
+    controls.pSpinBox->setRange(0, 100);
+    controls.pSpinBox->setSuffix(QStringLiteral("%"));
+    // The spin box carries the value; the slider follows it both ways.
+    connect(controls.pSlider, &QSlider::valueChanged, controls.pSpinBox, &QSpinBox::setValue);
+    connect(controls.pSpinBox,
+            QOverload<int>::of(&QSpinBox::valueChanged),
+            controls.pSlider,
+            &QSlider::setValue);
+
+    auto* pLabel = new QLabel(name);
+    pLabel->setBuddy(controls.pSlider);
+    for (QWidget* pWidget : {static_cast<QWidget*>(pLabel),
+                 static_cast<QWidget*>(controls.pSlider),
+                 static_cast<QWidget*>(controls.pSpinBox)}) {
+        pWidget->setToolTip(explanation);
+    }
+    pGrid->addWidget(pLabel, row, 0);
+    pGrid->addWidget(controls.pSlider, row, 1);
+    pGrid->addWidget(controls.pSpinBox, row, 2);
+    ++row;
+    return controls;
+}
+
+void ScrollingLinesPrefsGroup::showSettings(const LineSettings& settings) {
+    m_settings = settings;
+    {
+        const QSignalBlocker blockEnabled(m_pEnabledCheckBox);
+        m_pEnabledCheckBox->setChecked(settings.enabled);
+    }
+    const auto show = [](const OpacityControls& controls, OpacityPercent opacity) {
+        const QSignalBlocker blockSlider(controls.pSlider);
+        const QSignalBlocker blockSpinBox(controls.pSpinBox);
+        controls.pSlider->setValue(opacity.percent());
+        controls.pSpinBox->setValue(opacity.percent());
+    };
+    show(m_barOpacity, settings.barOpacity);
+    show(m_beatOpacity, settings.beatOpacity);
+    updateUpstreamControls();
+}
+
+void ScrollingLinesPrefsGroup::slotControlChanged() {
+    m_settings.enabled = m_pEnabledCheckBox->isChecked();
+    m_settings.barOpacity = OpacityPercent(m_barOpacity.pSpinBox->value());
+    m_settings.beatOpacity = OpacityPercent(m_beatOpacity.pSpinBox->value());
+    updateUpstreamControls();
+    emit settingsChanged(m_settings);
+}
+
+void ScrollingLinesPrefsGroup::updateUpstreamControls() {
+    for (QWidget* pControl : std::as_const(m_upstreamBeatGridControls)) {
+        pControl->setEnabled(!m_settings.enabled);
+    }
+}
