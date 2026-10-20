@@ -34,4 +34,5 @@ class DlgPrefDJNote : public DlgPreferencePage {
     QCheckBox* m_pKnobReadoutEnabled;
     QLabel* m_pKnobReadoutModeLabel;
     QComboBox* m_pKnobReadoutMode;
+    QComboBox* m_pKnobReadoutStyle;
 };

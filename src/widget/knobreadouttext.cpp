@@ -1,5 +1,6 @@
 #include "widget/knobreadouttext.h"
 
+#include <QRegularExpression>
 #include <algorithm>
 #include <cmath>
 
@@ -189,16 +190,13 @@ QString knobPositionText(double parameter) {
     return QString::number(percent) + QStringLiteral("%");
 }
 
-} // namespace
-
-QString text(const KnobIdentity& knob,
-        const KnobValue& value,
-        const Options& options) {
+// The full (not compact) text, by the unit table in knobreadouttext.h.
+QString readoutText(const KnobIdentity& knob, const KnobValue& value, Mode mode) {
     if (isAudioTaperGain(knob.key)) {
         return decibelText(value.value);
     }
     if (isDeckEq(knob.key)) {
-        return options.mode == Mode::Precise
+        return mode == Mode::Precise
                 ? decibelText(value.value)
                 : neutralCentrePercentText(value.parameter);
     }
@@ -217,6 +215,27 @@ QString text(const KnobIdentity& knob,
         }
     }
     return knobPositionText(value.parameter);
+}
+
+} // namespace
+
+QString text(const KnobIdentity& knob,
+        const KnobValue& value,
+        const Options& options) {
+    const QString full = readoutText(knob, value, options.mode);
+    return options.compact ? compactForm(full) : full;
+}
+
+QString compactForm(const QString& fullText) {
+    // [label ][sign]number-or-infinity[ unit]
+    static const QRegularExpression kPattern(QStringLiteral(
+            "^(?:(\\p{L}+)\\s+)?([+\\x{2212}-]?)(\\d+(?:\\.\\d+)?|\\x{221E})\\s*\\D*$"));
+    const QRegularExpressionMatch match = kPattern.match(fullText);
+    if (!match.hasMatch()) {
+        return fullText;
+    }
+    const QString sign = match.captured(2) == QStringLiteral("+") ? QString() : match.captured(2);
+    return match.captured(1) + sign + match.captured(3);
 }
 
 } // namespace knobreadout

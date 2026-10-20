@@ -16,7 +16,8 @@ std::vector<Line> layoutLines(const Beats* pBeats,
         audio::FramePos end,
         const std::function<double(audio::FramePos)>& frameToX,
         const LineSettings& settings,
-        int upstreamOpacity) {
+        int upstreamOpacity,
+        const QColor& skinColor) {
     std::vector<Line> lines;
     if (!pBeats || !frameToX || !start.isValid() || !end.isValid() || end < start) {
         return lines;
@@ -30,12 +31,17 @@ std::vector<Line> layoutLines(const Beats* pBeats,
         if (!settings.enabled) {
             line.kind = LineKind::Beat;
             line.opacityPercent = upstreamPercent;
+            line.color = skinColor;
         } else if (positiveMod(it - first, kBeatsPerBar) == 0) {
             line.kind = LineKind::Bar;
             line.opacityPercent = settings.barOpacity.percent();
+            line.widthPx = settings.barWidth.px();
+            line.color = settings.barColor.value_or(skinColor);
         } else {
             line.kind = LineKind::Beat;
             line.opacityPercent = settings.beatOpacity.percent();
+            line.widthPx = settings.beatWidth.px();
+            line.color = settings.beatColor.value_or(skinColor);
         }
         if (line.opacityPercent > 0) {
             lines.push_back(line);

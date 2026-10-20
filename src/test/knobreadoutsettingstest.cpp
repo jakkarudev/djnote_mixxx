@@ -69,3 +69,37 @@ TEST_F(KnobReadoutSettingsTest, UnknownModeFallsBackToSimple) {
             QStringLiteral("bogus"));
     EXPECT_EQ(Mode::Simple, loadSettings(config()).mode);
 }
+
+// Style (ticket #70): Under the knob (default) or On the knob face.
+TEST_F(KnobReadoutSettingsTest, StyleDefaultsToUnderTheKnob) {
+    EXPECT_EQ(Style::UnderKnob, loadSettings(config()).style);
+}
+
+TEST_F(KnobReadoutSettingsTest, StyleRoundTrip) {
+    Settings saved;
+    saved.style = Style::KnobFace;
+    saveSettings(config(), saved);
+    EXPECT_EQ(Style::KnobFace, loadSettings(config()).style);
+
+    saved.style = Style::UnderKnob;
+    saveSettings(config(), saved);
+    EXPECT_EQ(Style::UnderKnob, loadSettings(config()).style);
+}
+
+TEST_F(KnobReadoutSettingsTest, StyleStoredUnderADJNoteKey) {
+    Settings saved;
+    saved.style = Style::KnobFace;
+    saveSettings(config(), saved);
+
+    EXPECT_EQ(QStringLiteral("knobFace"),
+            config()->getValueString(
+                    ConfigKey(QStringLiteral("[DJNote]"),
+                            QStringLiteral("knobReadoutStyle"))));
+}
+
+TEST_F(KnobReadoutSettingsTest, UnknownStyleFallsBackToTheDefault) {
+    config()->setValue(ConfigKey(QStringLiteral("[DJNote]"),
+                               QStringLiteral("knobReadoutStyle")),
+            QStringLiteral("sideways"));
+    EXPECT_EQ(Style::UnderKnob, loadSettings(config()).style);
+}

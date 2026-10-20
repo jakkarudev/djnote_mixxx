@@ -4,6 +4,7 @@
 #include <QPointer>
 #include <QTimer>
 #include <memory>
+#include <optional>
 
 #include "preferences/usersettings.h"
 #include "widget/knobreadoutsettings.h"
@@ -17,12 +18,14 @@ class EffectsManager;
 namespace mixxx {
 
 // The knob adjustment readout (see GLOSSARY.md): a small label shown just
-// under a knob while it is being turned, hidden about 1 s after the last
-// change.
+// under a knob (or centred on its face, see knobreadout::Style) while it is
+// being turned, hidden about 1 s after the last change.
 //
 // The overlay observes upstream knob widgets (WKnob, WKnobComposed and their
 // effect subclasses) without editing them: an event filter on each knob tells
-// on-screen input (mouse drag, wheel) apart from hovering, and a ControlProxy
+// on-screen input (mouse drag, wheel) apart from hovering, a
+// ControllerInputWatch reports controller input (MIDI, HID, bulk), and a
+// ControlProxy
 // on the knob's connected control reports the changes. The label is a child of
 // the main window, so the knob's parent does not clip it.
 class KnobReadoutOverlay : public QObject {
@@ -53,10 +56,16 @@ class KnobReadoutOverlay : public QObject {
     knobreadout::KnobIdentity identify(const ConfigKey& key) const;
     void watchKnobs(QWidget* pSkinRoot);
     void watchKnob(QWidget* pKnob);
-    // Whether a change of pKnob's control comes from the user turning it.
+    // Whether a change of pKnob's control comes from the user turning it, on
+    // screen or on a controller.
     bool isOwnInput(QWidget* pKnob) const;
     void onKnobControlChanged(QWidget* pKnob, ControlProxy* pControl);
-    void showReadout(QWidget* pKnob, const QString& text);
+    // Shows text centred on the knob face at facePixelSize when given (the
+    // knob-face style), else just under the knob.
+    void showReadout(QWidget* pKnob,
+            const QString& text,
+            std::optional<int> facePixelSize = std::nullopt);
+    void setLabelStyleSheet(const QString& styleSheet);
 
     QWidget* const m_pMainWindow;
     const UserSettingsPointer m_pConfig;
@@ -66,6 +75,9 @@ class KnobReadoutOverlay : public QObject {
     QTimer m_hideTimer;
     // The knob receiving on-screen input in the current event-loop pass.
     QPointer<QWidget> m_pScreenInputKnob;
+    // The knob whose control a controller message just changed, set only
+    // while that change is handled (see ControllerInputWatch).
+    QPointer<QWidget> m_pControllerInputKnob;
 };
 
 } // namespace mixxx

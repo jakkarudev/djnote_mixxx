@@ -36,9 +36,11 @@ enum class Mode {
     Precise,
 };
 
-// How the text is written. The compact (knob-face) form joins here.
+// How the text is written.
 struct Options {
     Mode mode = Mode::Simple;
+    // The compact form for the knob-face style: see compactForm().
+    bool compact = false;
 };
 
 // The unit table (true minus sign U+2212 throughout):
@@ -55,6 +57,12 @@ struct Options {
 QString text(const KnobIdentity& knob,
         const KnobValue& value,
         const Options& options = Options{});
+
+// The compact form of a readout text, for the knob-face style: the unit is
+// dropped, and so are a "+" sign and the space after a leading label
+// ("+12.0 dB" -> "12.0", "40%" -> "40", "L 30%" -> "L30"). Generic, so it
+// applies to every unit family; text without a number is returned unchanged.
+QString compactForm(const QString& fullText);
 
 } // namespace knobreadout
 } // namespace mixxx

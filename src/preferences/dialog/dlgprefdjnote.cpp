@@ -14,7 +14,8 @@ DlgPrefDJNote::DlgPrefDJNote(QWidget* pParent, UserSettingsPointer pConfig)
           m_pConfig(pConfig),
           m_pKnobReadoutEnabled(nullptr),
           m_pKnobReadoutModeLabel(nullptr),
-          m_pKnobReadoutMode(nullptr) {
+          m_pKnobReadoutMode(nullptr),
+          m_pKnobReadoutStyle(nullptr) {
     auto* pPageLayout = new QVBoxLayout(this);
     pPageLayout->setContentsMargins(0, 0, 0, 0);
     createKnobReadoutGroup();
@@ -58,6 +59,22 @@ void DlgPrefDJNote::createKnobReadoutGroup() {
             &QCheckBox::toggled,
             m_pKnobReadoutModeLabel,
             &QWidget::setEnabled);
+
+    m_pKnobReadoutStyle = new QComboBox(pGroup);
+    m_pKnobReadoutStyle->setObjectName(QStringLiteral("knobReadoutStyleComboBox"));
+    m_pKnobReadoutStyle->addItem(tr("Under the knob"),
+            static_cast<int>(mixxx::knobreadout::Style::UnderKnob));
+    m_pKnobReadoutStyle->addItem(tr("On the knob face"),
+            static_cast<int>(mixxx::knobreadout::Style::KnobFace));
+    m_pKnobReadoutStyle->setToolTip(
+            tr("On the knob face, the value is drawn centred on the knob without "
+               "its unit, shrunk to fit. Knobs too small for it show the value "
+               "under the knob."));
+    auto* pStyleLabel = new QLabel(tr("Style"), pGroup);
+    pStyleLabel->setBuddy(m_pKnobReadoutStyle);
+    const int styleRow = pGrid->rowCount();
+    pGrid->addWidget(pStyleLabel, styleRow, 0);
+    pGrid->addWidget(m_pKnobReadoutStyle, styleRow, 1);
     pGrid->setColumnStretch(1, 1);
 
     layout()->addWidget(pGroup);
@@ -82,6 +99,8 @@ void DlgPrefDJNote::showKnobReadoutSettings(const mixxx::knobreadout::Settings& 
     m_pKnobReadoutMode->setEnabled(settings.enabled);
     m_pKnobReadoutModeLabel->setEnabled(settings.enabled);
     m_pKnobReadoutMode->setCurrentIndex(static_cast<int>(settings.mode));
+    m_pKnobReadoutStyle->setCurrentIndex(
+            m_pKnobReadoutStyle->findData(static_cast<int>(settings.style)));
 }
 
 mixxx::knobreadout::Settings DlgPrefDJNote::knobReadoutSettingsFromControls() const {
@@ -91,5 +110,7 @@ mixxx::knobreadout::Settings DlgPrefDJNote::knobReadoutSettingsFromControls() co
                     static_cast<int>(mixxx::knobreadout::Mode::Precise)
             ? mixxx::knobreadout::Mode::Precise
             : mixxx::knobreadout::Mode::Simple;
+    settings.style = static_cast<mixxx::knobreadout::Style>(
+            m_pKnobReadoutStyle->currentData().toInt());
     return settings;
 }

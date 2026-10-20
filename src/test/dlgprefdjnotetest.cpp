@@ -83,6 +83,53 @@ TEST_F(DlgPrefDJNoteTest, ResetRestoresTheDefault) {
     EXPECT_TRUE(mixxx::knobreadout::loadSettings(config()).enabled);
 }
 
+// Style (ticket #70).
+namespace {
+
+using mixxx::knobreadout::Style;
+
+QComboBox* styleComboBox(DlgPrefDJNote* pPage) {
+    auto* pComboBox = pPage->findChild<QComboBox*>(
+            QStringLiteral("knobReadoutStyleComboBox"));
+    EXPECT_NE(nullptr, pComboBox);
+    return pComboBox;
+}
+
+} // namespace
+
+TEST_F(DlgPrefDJNoteTest, StyleOffersBothStylesUnderTheKnobByDefault) {
+    auto pPage = openPage();
+    auto* pStyle = styleComboBox(pPage.get());
+    ASSERT_NE(nullptr, pStyle);
+    ASSERT_EQ(2, pStyle->count());
+    EXPECT_EQ(QStringLiteral("Under the knob"), pStyle->itemText(0));
+    EXPECT_EQ(QStringLiteral("On the knob face"), pStyle->itemText(1));
+    EXPECT_EQ(QStringLiteral("Under the knob"), pStyle->currentText());
+}
+
+TEST_F(DlgPrefDJNoteTest, StyleShowsAndStoresTheSetting) {
+    Settings stored;
+    stored.style = Style::KnobFace;
+    mixxx::knobreadout::saveSettings(config(), stored);
+    auto pPage = openPage();
+    auto* pStyle = styleComboBox(pPage.get());
+    ASSERT_NE(nullptr, pStyle);
+    EXPECT_EQ(QStringLiteral("On the knob face"), pStyle->currentText());
+
+    pStyle->setCurrentIndex(pStyle->findText(QStringLiteral("Under the knob")));
+    pPage->slotApply();
+    EXPECT_EQ(Style::UnderKnob, mixxx::knobreadout::loadSettings(config()).style);
+}
+
+TEST_F(DlgPrefDJNoteTest, ResetRestoresUnderTheKnob) {
+    Settings stored;
+    stored.style = Style::KnobFace;
+    mixxx::knobreadout::saveSettings(config(), stored);
+    auto pPage = openPage();
+    pPage->slotResetToDefaults();
+    EXPECT_EQ(QStringLiteral("Under the knob"), styleComboBox(pPage.get())->currentText());
+}
+
 // Mode (ticket #68): a Simple / Precise combo box, default Simple.
 namespace {
 
