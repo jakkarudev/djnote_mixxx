@@ -14,6 +14,7 @@ class QDoubleSpinBox;
 class QPushButton;
 class QWidget;
 class Library;
+class ScrollingLinesPrefsGroup;
 
 namespace mixxx::overviewlayout {
 struct HoverReadoutSettings;
@@ -100,6 +101,9 @@ class DlgPrefWaveform : public DlgPreferencePage, public Ui::DlgPrefWaveformDlg 
     QDoubleSpinBox* m_pOverviewDensityExponent = nullptr;
     QDoubleSpinBox* m_pOverviewGain[3] = {};
     QPushButton* m_pOverviewResetButton = nullptr;
+
+    // DJNote's "Beat, bar and step lines" group (built in its own class).
+    ScrollingLinesPrefsGroup* m_pScrollingLinesGroup = nullptr;
 
     UserSettingsPointer m_pConfig;
     std::shared_ptr<Library> m_pLibrary;

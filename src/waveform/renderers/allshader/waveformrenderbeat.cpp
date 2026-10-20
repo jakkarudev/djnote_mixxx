@@ -5,6 +5,7 @@
 #include "skin/legacy/skincontext.h"
 #include "track/track.h"
 #include "waveform/renderers/allshader/matrixforwidgetgeometry.h"
+#include "waveform/renderers/allshader/scrollinglinespainter.h"
 #include "waveform/renderers/waveformwidgetrenderer.h"
 #include "widget/wskincolor.h"
 
@@ -38,6 +39,18 @@ void WaveformRenderBeat::paintGL() {
 
     mixxx::BeatsPointer trackBeats = trackInfo->getBeats();
     if (!trackBeats) {
+        return;
+    }
+
+    // DJNote: beat, bar and step lines. Upstream's drawing below runs only
+    // while DJNote's lines are switched off.
+    if (paintScrollingLines(*this,
+                m_waveformRenderer,
+                m_isSlipRenderer,
+                *trackBeats,
+                m_shader,
+                m_vertices,
+                m_color)) {
         return;
     }
 

@@ -764,6 +764,7 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/controllers/controller.cpp
   src/controllers/controllerenumerator.cpp
   src/controllers/controllerinputmappingtablemodel.cpp
+  src/controllers/controllerinputscope.cpp
   src/controllers/controllerlearningeventfilter.cpp
   src/controllers/controllermanager.cpp
   src/controllers/controllermappinginfo.cpp
@@ -1090,6 +1091,7 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/preferences/dialog/dlgprefcolorsdlg.ui
   src/preferences/dialog/dlgprefdeck.cpp
   src/preferences/dialog/dlgprefdeckdlg.ui
+  src/preferences/dialog/dlgprefdjnote.cpp
   src/preferences/dialog/dlgprefeffects.cpp
   src/preferences/dialog/dlgprefeffectsdlg.ui
   src/preferences/dialog/dlgpreferencepage.cpp
@@ -1114,6 +1116,7 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/preferences/dialog/dlgprefvinyldlg.ui
   src/preferences/dialog/dlgprefwaveform.cpp
   src/preferences/dialog/dlgprefwaveformdlg.ui
+  src/preferences/dialog/scrollinglinesprefsgroup.cpp
   src/preferences/effectchainpresetlistmodel.cpp
   src/preferences/effectmanifesttablemodel.cpp
   src/preferences/replaygainsettings.cpp
@@ -1270,6 +1273,8 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/waveform/renderers/waveformrendermarkrange.cpp
   src/waveform/renderers/waveformsignalcolors.cpp
   src/waveform/renderers/waveformwidgetrenderer.cpp
+  src/waveform/scrollinglinelayout.cpp
+  src/waveform/scrollinglinesettings.cpp
   src/waveform/sharedglcontext.cpp
   src/waveform/visualplayposition.cpp
   src/waveform/visualsmanager.cpp
@@ -1306,6 +1311,10 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/widget/findonwebmenuservices/findonwebmenulastfm.cpp
   src/widget/findonwebmenuservices/findonwebmenusoundcloud.cpp
   src/widget/hexspinbox.cpp
+  src/widget/knobreadoutface.cpp
+  src/widget/knobreadoutoverlay.cpp
+  src/widget/knobreadoutsettings.cpp
+  src/widget/knobreadouttext.cpp
   src/widget/paintable.cpp
   src/widget/wanalysislibrarytableview.cpp
   src/widget/wbasewidget.cpp
@@ -1565,6 +1574,7 @@ if(QOPENGL)
     src/util/opengltexture2d.cpp
     src/waveform/renderers/allshader/digitsrenderer.cpp
     src/waveform/renderers/allshader/matrixforwidgetgeometry.cpp
+    src/waveform/renderers/allshader/scrollinglinespainter.cpp
     src/waveform/renderers/allshader/waveformrenderbackground.cpp
     src/waveform/renderers/allshader/waveformrenderbeat.cpp
     src/waveform/renderers/allshader/waveformrenderer.cpp
@@ -2166,6 +2176,7 @@ if(BUILD_TESTING)
     src/test/configobject_test.cpp
     src/test/controller_mapping_validation_test.cpp
     src/test/controller_mapping_settings_test.cpp
+    src/test/controllerinputscopetest.cpp
     src/test/controllers/controller_columnid_regression_test.cpp
     src/test/controllerscriptenginelegacy_test.cpp
     src/test/controlobjecttest.cpp
@@ -2181,6 +2192,8 @@ if(BUILD_TESTING)
     src/test/dbconnectionpool_test.cpp
     src/test/dbidtest.cpp
     src/test/directorydaotest.cpp
+    src/test/dlgprefdjnotetest.cpp
+    src/test/dlgprefwaveformscrollinglinestest.cpp
     src/test/duration_test.cpp
     src/test/durationutiltest.cpp
     src/test/overviewlayouttest.cpp
@@ -2211,6 +2224,11 @@ if(BUILD_TESTING)
     src/test/itunesxmlimportertest.cpp
     src/test/keyfactorytest.cpp
     src/test/keyutilstest.cpp
+    src/test/knobreadoutcompacttexttest.cpp
+    src/test/knobreadoutfacetest.cpp
+    src/test/knobreadoutinputtest.cpp
+    src/test/knobreadoutsettingstest.cpp
+    src/test/knobreadouttexttest.cpp
     src/test/lcstest.cpp
     src/test/learningutilstest.cpp
     src/test/libraryscannertest.cpp
@@ -2239,6 +2257,8 @@ if(BUILD_TESTING)
     src/test/rgbcolor_test.cpp
     src/test/samplebuffertest.cpp
     src/test/schemamanager_test.cpp
+    src/test/scrollinglinelayouttest.cpp
+    src/test/scrollinglinesettingstest.cpp
     src/test/searchqueryparsertest.cpp
     src/test/seratobeatgridtest.cpp
     src/test/seratomarkerstest.cpp

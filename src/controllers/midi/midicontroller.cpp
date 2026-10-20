@@ -4,6 +4,7 @@
 #include <algorithm>
 
 #include "control/controlobject.h"
+#include "controllers/controllerinputscope.h"
 #include "controllers/defs_controllers.h"
 #include "controllers/midi/midioutputhandler.h"
 #include "controllers/midi/midiutils.h"
@@ -283,6 +284,7 @@ void MidiController::receivedShortMessage(unsigned char status,
                                    timestamp);
 
     MidiKey mappingKey(status, control);
+    const mixxx::ControllerInputScope inputScope; // DJNote: knob readout
     triggerActivity();
     if (isLearning()) {
         emit messageReceived(status, control, value);
@@ -580,6 +582,7 @@ void MidiController::receive(const QByteArray& data, mixxx::Duration timestamp) 
                                    getName(), data, timestamp);
     MidiKey mappingKey(data.at(0), 0xFF);
 
+    const mixxx::ControllerInputScope inputScope; // DJNote: knob readout
     triggerActivity();
     // TODO(rryan): Need to review how MIDI learn works with sysex messages. I
     // don't think this actually does anything useful.

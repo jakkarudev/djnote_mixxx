@@ -20,6 +20,13 @@ enum class LinesMode {
 
 constexpr int kBeatsPerBar = 4;
 
+// Bars (and phrases) count from the beat grid's first beat and continue back
+// through the intro (ADR 0001); the one place that rule lives. Returns where
+// the beat at 'it' falls in a cycle of cycleBeats beats counted that way:
+// 0 on the cycle's first beat (a downbeat when cycleBeats is kBeatsPerBar),
+// up to cycleBeats - 1, also for beats before the first marker.
+int beatIndexInCycle(const Beats& beats, Beats::ConstIterator it, int cycleBeats);
+
 // The phrase lengths (in bars) offered in the preferences.
 constexpr std::array<int, 4> kPhraseBarsChoices = {4, 8, 16, 32};
 constexpr int kDefaultPhraseBars = 8;

@@ -29,7 +29,7 @@ The label next to the hover line that shows the beat distance, in beats or in ba
 _Avoid_: tooltip, beat counter
 
 **Knob adjustment readout**:
-The label shown just under a knob while it is being turned, from the screen or a controller, giving the knob's value in its own unit (for example dB or percent). It disappears shortly after the knob stops changing.
+The label shown while a knob is being turned, by mouse drag or wheel on screen or from a controller, giving the knob's value. Its style is set on the DJNote preferences page: under the knob (the default), the full value in its own unit (for example dB or percent); or on the knob face, the compact value without its unit, centred on the knob and shrunk to fit, falling back to under the knob when even that doesn't fit. It disappears shortly after the knob stops changing.
 _Avoid_: knob tooltip, value popup, knob label
 
 **Cue times**:
