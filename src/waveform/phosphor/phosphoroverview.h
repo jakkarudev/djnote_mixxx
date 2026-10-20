@@ -62,8 +62,10 @@ QImage overviewImage(const OverviewColumnsView& columns,
         const PhosphorOverviewSettings& settings,
         int height = kOverviewRows);
 
-/// What the widget draws from overviewImage(): the same colour, opaque (alpha
-/// 255) for every pixel with any alpha or colour, transparent elsewhere,
+/// What the widget draws from overviewImage(): the colours Traktor shows on
+/// screen (research 10: desaturate, a steep power and a gain, flattened toward
+/// each column's brightest pixel, hue-preserving clamp), opaque (alpha 255) for
+/// every pixel with any alpha or colour, transparent elsewhere,
 /// Format_ARGB32_Premultiplied. The stripe's alpha (2 x green) is a model
 /// output for the fit; drawing it would darken the colour a second time. Pure.
 QImage overviewDisplayImage(const QImage& overview);

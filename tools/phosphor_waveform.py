@@ -653,6 +653,13 @@ OVERVIEW_OVERLAP = 0.5   # column window = 2 columns centred (ticket #58)
 # release across columns with these time constants (seconds); mid has none (its
 # colour track release already matches). 0 = no hold.
 OVERVIEW_HOLD = (0.7, 0.0, 0.1)
+# On-screen recolouring (research 10): Traktor draws the stored stripe colour p
+# (R, G, B, 0..255) as out = SCREEN_GAIN * ((p - SCREEN_DESAT * min(p)) / 255)^SCREEN_EXPONENT,
+# the whole pixel divided by max(1, its largest channel) so a bright pixel keeps its hue.
+SCREEN_GAIN = 23.9
+SCREEN_EXPONENT = 2.17
+SCREEN_DESAT = 0.33
+SCREEN_FLATTEN = 0.8
 
 
 @dataclass
@@ -817,6 +824,47 @@ def overview_image(levels, density, n, settings=None, height=OVERVIEW_ROWS, colu
     return _round_u8(out)
 
 
+def screen_colour(rgb, gain=SCREEN_GAIN, exponent=SCREEN_EXPONENT, desat=SCREEN_DESAT):
+    """The on-screen colour of overview pixels: `rgb` is float (..., 3), R, G, B
+    0..255 (the stripe colour). The grey part (desat x the smallest channel) is
+    removed, the rest goes through a power and a gain, and the pixel is divided
+    by max(1, largest channel / 255) to keep its hue. Returns float 0..255."""
+    p = np.clip(np.asarray(rgb, np.float64), 0, 255)
+    p = p - desat * p.min(-1, keepdims=True)
+    pre = gain * (p / 255.0) ** exponent * 255.0
+    return pre / np.maximum(1.0, pre.max(-1, keepdims=True) / 255.0)
+
+
+def screen_image(rgb, inside, flatten=None, **kw):
+    """screen_colour over a (columns, rows, 3) stripe image: each pixel is first
+    pulled toward its column's brightest pixel, p * (peak / |p|)^flatten (the
+    hue is kept; 0 = as is, 1 = a flat column), `inside` marks the extent."""
+    flatten = SCREEN_FLATTEN if flatten is None else flatten
+    rgb = np.asarray(rgb, np.float64)
+    norm = np.linalg.norm(rgb, axis=-1, keepdims=True)
+    peak = np.where(inside[..., None], norm, 0).max(1, keepdims=True)
+    rgb = rgb * (np.maximum(peak, 1e-9) / np.maximum(norm, 1e-9)) ** flatten
+    return screen_colour(np.where(inside[..., None], rgb, 0), **kw)
+
+
+def overview_display(img):
+    """What the widget draws from an overview image (height, columns, 4) uint8
+    B, G, R, A: every pixel with any colour or alpha becomes opaque, its colour
+    goes through screen_image per column (research 10); empty pixels stay 0.
+    Returns uint8 B, G, R, A."""
+    img = np.asarray(img)
+    inside = (img != 0).any(-1)                      # (h, columns)
+    rgb = img[..., 2::-1].astype(np.float64)         # R, G, B
+    cols = np.moveaxis(rgb, 0, 1)                    # (columns, h, 3)
+    mask = inside.T
+    out = screen_image(cols, mask)                   # (columns, h, 3)
+    res = np.zeros(img.shape, np.uint8)
+    res[..., :3] = _round_u8(np.moveaxis(out, 0, 1)[..., ::-1])
+    res[..., 3] = np.where(inside, 255, 0)
+    res[~inside] = 0
+    return res
+
+
 def render_overview(mono, rate, levels, blocks, args, columns=STRIPE_COLUMNS):
     """The Phosphor overview of a track in the shape of Traktor's stored stripe,
     for fitting: (columns, 64, 4) BGRA, column-major, from the model above.
@@ -831,6 +879,7 @@ def render_overview(mono, rate, levels, blocks, args, columns=STRIPE_COLUMNS):
 # ---------------------------------------------------------------- overview fixtures
 
 OVERVIEW_FIXTURE_VERSION = 1
+DISPLAY_CASES = ("default_h62", "default_h31", "non_default_h62", "partial_h62")
 
 
 def _qcompress(raw):
@@ -874,6 +923,10 @@ def build_overview_fixture(name, rate, left, right, image_cases, args=None):
         p += struct.pack("<6d", *(getattr(settings, f) for f in _SETTINGS_FIELDS))
         p += _qcompress(np.ascontiguousarray(img).tobytes())
         out += _section("IMAG", p)
+        if case in DISPLAY_CASES:
+            d = struct.pack("<H", len(label_bytes)) + label_bytes
+            d += _qcompress(np.ascontiguousarray(overview_display(img)).tobytes())
+            out += _section("DISP", d)
     return out
 
 
@@ -906,6 +959,11 @@ def read_overview_fixture(data):
             out["images"].append(dict(name=case, height=height, columns_done=done,
                                       settings=dict(zip(_SETTINGS_FIELDS, vals)),
                                       pixels=pixels.reshape(height, OVERVIEW_COLUMNS, 4)))
+        elif tag == "DISP":
+            (ln,) = struct.unpack_from("<H", p)
+            case = p[2:2 + ln].decode("utf-8")
+            out.setdefault("display", {})[case] = np.frombuffer(
+                _qdecompress(p[2 + ln:]), np.uint8).reshape(-1, OVERVIEW_COLUMNS, 4)
         else:
             raise ValueError(tag)
     return out
@@ -1180,6 +1238,80 @@ def fit_overview(args):
         print("wrote", args.overview_images)
 
 
+# Traktor's on-screen deck overview in 1920 x 1050 screenshots: the widget spans
+# x 42..713 (672 px for the 1024 columns), centred on the given row.
+SCREEN_X0, SCREEN_W = 42, 672
+
+
+def screen_columns(shot, centre, half, tracked, start_x=0):
+    """Traktor's on-screen column colours for stored column c: (rows, 3) float,
+    the strip pixel column under it. `shot` is float (h, w, 3)."""
+    x = int(SCREEN_X0 + (tracked + 0.5) * SCREEN_W / STRIPE_COLUMNS)
+    return shot[centre - half:centre + half + 1, x]
+
+
+def fit_screen(args):
+    """Compare Traktor's on-screen overview with ours before (the stored colour
+    drawn opaque) and after (screen_colour) on Q2a and Gigando: mean brightness
+    (max(R, G, B) over the pixels inside the columns' extents), mean colour
+    error of the column means, and a sheet (--screen-sheet)."""
+    jobs = [("Q2a crossover steps", os.path.join(args.signals_dir, "Q2a crossover steps.wav"),
+             os.path.join(args.signals_dir, "Q2a crossover steps", "Screenshot 2026-10-17 225716.png"), 357, 13),
+            ("Dilema", os.path.join(args.tracks_dir, "01 - Dilema.flac"), args.dilema_shot, 384, 13),
+            ("Gigando", os.path.join(args.tracks_dir, TRACKS[0][1]), args.gigando_shot, 376, 12)]
+    sheet = []
+    for name, wav, shotpath, centre, half in jobs:
+        audio = decode(wav)
+        mono = mono_int16(audio[:, 0], audio[:, 1]) / 32768.0
+        n = stripe_blocks(len(mono))
+        levels = colour_track(mono, RATE, args)
+        img = render_overview(mono, RATE, levels, n, args)  # (1024, 64, 4) BGRA
+        shot = np.array(Image.open(shotpath).convert("RGB")).astype(float)
+        red = ((shot[336 - 20 + 20:400, 30:730, 0] > 200) & (shot[336:400, 30:730, 1] < 110)).sum(0)
+        playhead = int(np.argmax(red)) + 30 if red.max() >= 20 else 0
+        cols = [c for c in range(STRIPE_COLUMNS) if img[c, :OVERVIEW_ROWS, 3].any()
+                and SCREEN_X0 + (c + 0.5) * SCREEN_W / STRIPE_COLUMNS > playhead + 4
+                and c < int(np.ceil(len(mono) / n)) - 2]
+        alpha = img[:, :OVERVIEW_ROWS, 3] > 0
+        ext = max(OVERVIEW_ROWS // 2 - np.nonzero(alpha[c])[0].min() for c in cols)
+        r0, r1 = OVERVIEW_ROWS // 2 - ext, OVERVIEW_ROWS // 2 + ext - 1
+        rgb = img[:, :OVERVIEW_ROWS, 2::-1].astype(float)  # (cols, 62, RGB)
+        after = screen_image(rgb, alpha)
+        h = 2 * half + 1
+        trak, bef_m, aft_m, err_b, err_a = [], [], [], [], []
+        strip = {k: np.zeros((h, STRIPE_COLUMNS, 3)) for k in ("t", "b", "a")}
+        for c in range(STRIPE_COLUMNS):
+            x = int(SCREEN_X0 + (c + 0.5) * SCREEN_W / STRIPE_COLUMNS)
+            strip["t"][:, c] = shot[centre - half:centre + half + 1, x]
+        for key, arr in (("b", rgb), ("a", after)):
+            src = np.where(alpha[..., None], arr, 0)[:, r0:r1 + 1]
+            for c in range(STRIPE_COLUMNS):
+                for y in range(h):
+                    lo, hi = y * src.shape[1] / h, (y + 1) * src.shape[1] / h
+                    rows = np.arange(int(lo), min(int(np.ceil(hi)), src.shape[1]))
+                    w = np.minimum(hi, rows + 1) - np.maximum(lo, rows)
+                    strip[key][y, c] = (src[c, rows] * w[:, None]).sum(0) / (hi - lo)
+        t_px = [strip["t"][:, c][strip["t"][:, c].max(1) > 40] for c in cols]
+        b_px = [rgb[c][alpha[c]] for c in cols]
+        a_px = [after[c][alpha[c]] for c in cols]
+        mean_max = lambda px: float(np.concatenate([p.max(1) for p in px if len(p)]).mean())
+        mt, mb, ma = mean_max(t_px), mean_max(b_px), mean_max(a_px)
+        tm = np.array([p.mean(0) for p in t_px if len(p)])
+        bm = np.array([p.mean(0) for p in b_px])
+        am = np.array([p.mean(0) for p in a_px])
+        keep = np.array([len(p) > 0 for p in t_px])
+        eb = float(np.abs(bm[keep] - tm).mean()); ea = float(np.abs(am[keep] - tm).mean())
+        print(f"{name}: columns {len(cols)}; mean max(R,G,B) Traktor {mt:.1f}, ours before {mb:.1f}, after {ma:.1f}; "
+              f"mean |column mean colour - Traktor| before {eb:.1f}, after {ea:.1f} (0-255)")
+        for key, text in (("t", "Traktor on screen"), ("b", "ours before (stored colour drawn opaque)"),
+                          ("a", "ours after (on-screen mapping)")):
+            im = Image.fromarray(np.clip(strip[key] + 0.5, 0, 255).astype(np.uint8)).resize((STRIPE_COLUMNS, h * 3), Image.NEAREST)
+            sheet.append(label(im, f"{name}: {text}"))
+    if args.screen_sheet:
+        stack(sheet, 4).save(args.screen_sheet, optimize=True)
+        print("wrote", args.screen_sheet)
+
+
 # ---------------------------------------------------------------- cli
 
 # Section 8 numbers as measured on the stripe, with no screenshot tuning.
@@ -1246,6 +1378,11 @@ def build_parser():
                    default=os.path.join(os.path.expanduser("~"), "Documents", "Native Instruments", "Traktor 4.0.2"),
                    help="Traktor data folder (read only)")
     p.add_argument("--overview-images", metavar="PNG", help="with --fit-overview: write a comparison sheet")
+    p.add_argument("--fit-screen", action="store_true",
+                   help="compare Traktor's on-screen overview colours with ours before and after the on-screen mapping (research 10)")
+    p.add_argument("--screen-sheet", metavar="PNG", help="with --fit-screen: write the comparison sheet")
+    p.add_argument("--gigando-shot", default=r"D:\Coding Projects\DJNote_Mixxx\SCREENSHOTS\waveforms\Screenshot 2026-10-17 203136.png")
+    p.add_argument("--dilema-shot", default=os.path.join(os.path.expanduser("~"), "Pictures", "Screenshots", "Screenshot 2026-10-20 165754.png"))
     p.add_argument("--tier-images", default="docs/research/phosphor-detail-tiers")
     p.add_argument("--fixtures", metavar="DIR", help="write the C++ test fixtures to DIR")
     p.add_argument("--signals-dir", default="waveform-tests",
@@ -1272,6 +1409,9 @@ def main():
         return
     if args.fit_overview:
         fit_overview(args)
+        return
+    if args.fit_screen:
+        fit_screen(args)
         return
     if not args.audio:
         parser.error("audio file required")

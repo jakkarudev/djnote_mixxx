@@ -116,10 +116,47 @@ TEST_F(PhosphorOverviewTest, DisplayImageIsOpaqueInsideTheExtent) {
     const QImage out = overviewDisplayImage(src);
     ASSERT_EQ(src.size(), out.size());
     EXPECT_EQ(QImage::Format_ARGB32_Premultiplied, out.format());
-    EXPECT_EQ(qRgba(10, 20, 30, 255), out.pixel(0, 0));
+    EXPECT_EQ(255, qAlpha(out.pixel(0, 0)));
     EXPECT_EQ(qRgba(0, 0, 0, 255), out.pixel(1, 0));
     EXPECT_EQ(0u, out.pixel(2, 0));
-    EXPECT_EQ(qRgba(200, 0, 0, 255), out.pixel(3, 0));
+    EXPECT_EQ(255, qAlpha(out.pixel(3, 0)));
+    EXPECT_GT(qRed(out.pixel(3, 0)), 0);
+}
+
+// The on-screen colours (research 10): the display image of each fixture image
+// matches the reference script within 2 levels per channel.
+TEST_F(PhosphorOverviewTest, DisplayImageMatchesFixtures) {
+    int compared = 0;
+    for (const QString& file : fixtureFiles()) {
+        const auto f = load(file);
+        ASSERT_TRUE(f.ok) << file.toStdString();
+        for (const auto& im : f.images) {
+            const auto want = f.display.find(im.name);
+            if (want == f.display.end()) {
+                continue;
+            }
+            OverviewColumnsView view;
+            view.levels = f.levels.data();
+            view.density = f.density.data();
+            view.samplesPerColumn = static_cast<int>(f.samplesPerColumn);
+            view.columnsDone = static_cast<int>(im.columnsDone);
+            const QImage src = overviewImage(view, toDrawSettings(im.settings), static_cast<int>(im.height));
+            const QImage out = overviewDisplayImage(src).convertToFormat(QImage::Format_ARGB32);
+            ASSERT_EQ(src.size(), out.size());
+            ASSERT_EQ(want->second.size(), static_cast<size_t>(out.width()) * out.height() * 4);
+            int worst = 0;
+            for (int y = 0; y < out.height(); ++y) {
+                const uint8_t* got = out.constScanLine(y);
+                const uint8_t* ref = &want->second[static_cast<size_t>(y) * out.width() * 4];
+                for (int i = 0; i < out.width() * 4; ++i) {
+                    worst = std::max(worst, std::abs(int(got[i]) - int(ref[i])));
+                }
+            }
+            EXPECT_LE(worst, 2) << file.toStdString() << " " << im.name.toStdString();
+            ++compared;
+        }
+    }
+    EXPECT_GE(compared, 40);
 }
 
 TEST_F(PhosphorOverviewTest, ExtentIsTheOutermostNonEmptyRow) {

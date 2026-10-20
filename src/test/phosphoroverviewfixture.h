@@ -9,6 +9,7 @@
 #include <QString>
 #include <cstdint>
 #include <cstring>
+#include <map>
 #include <vector>
 
 namespace phosphoroverviewfixture {
@@ -44,6 +45,9 @@ struct Fixture {
     std::vector<uint8_t> levels;  // [kColumns][3] round(level * 255), R G B = low mid high
     std::vector<uint8_t> density; // [kColumns][kRows] round(255 * (d / 0.8)^0.25)
     std::vector<Image> images;
+    // Display images (what the widget draws), by the name of the Image they are made from:
+    // same size as that image, bytes B, G, R, A.
+    std::map<QString, std::vector<uint8_t>> display;
 };
 
 namespace detail {
@@ -162,6 +166,15 @@ inline Fixture load(const QString& path) {
                 return f;
             }
             f.images.push_back(std::move(im));
+        } else if (tag == "DISP") {
+            const uint16_t nameLength = r.get<uint16_t>();
+            const QString name = QString::fromUtf8(r.bytes(nameLength));
+            const QByteArray raw = qUncompress(r.rest());
+            if (raw.isEmpty()) {
+                return f;
+            }
+            f.display[name].assign(reinterpret_cast<const uint8_t*>(raw.constData()),
+                    reinterpret_cast<const uint8_t*>(raw.constData()) + raw.size());
         }
         if (r.bad()) {
             return f;

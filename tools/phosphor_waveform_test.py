@@ -491,6 +491,21 @@ class OverviewFixtures(unittest.TestCase):
         want = pw.overview_image(f["levels"], f["density"], f["n"],
                                  pw.OverviewSettings(brightness=0.5), 31, columns_done=900)
         self.assertTrue((b["pixels"] == want).all())
+        self.assertTrue((f["display"]["default_h62"] == pw.overview_display(a["pixels"])).all())
+
+
+class ScreenColour(unittest.TestCase):
+    def test_a_dim_stripe_pixel_reads_vivid_and_keeps_its_hue(self):
+        out = pw.screen_colour(np.array([60.0, 30.0, 10.0]), desat=0.0)
+        self.assertEqual(out.max(), 255.0)
+        self.assertAlmostEqual(out[1] / out[0], (0.5) ** pw.SCREEN_EXPONENT, places=6)
+
+    def test_silence_line_stays_black_and_opaque(self):
+        img = np.zeros((4, 2, 4), np.uint8)
+        img[1, 0] = (0, 0, 0, 255)
+        out = pw.overview_display(img)
+        self.assertEqual(tuple(out[1, 0]), (0, 0, 0, 255))
+        self.assertEqual(tuple(out[0, 0]), (0, 0, 0, 0))
 
 
 class OverviewFit(unittest.TestCase):

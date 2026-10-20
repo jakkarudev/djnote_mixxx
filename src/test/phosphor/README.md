@@ -114,7 +114,7 @@ All numbers are little-endian, except the `qCompress` length prefix.
 
     "PHOV"            4 bytes magic
     u32               version (1)
-    section*          INPT, COLS, IMAG*   (section = char[4] tag, u32 payload size, payload)
+    section*          INPT, COLS, IMAG*, DISP*   (section = char[4] tag, u32 payload size, payload)
 
 | Tag | Payload |
 |---|---|
@@ -122,6 +122,7 @@ All numbers are little-endian, except the `qCompress` length prefix.
 | `COLS` | `u32 columns (1920), u32 rows (62), u32 n`, then `qCompress(levels u8[columns][3] ++ density u8[columns][rows])` |
 | `IMAG` | `u16 name_length, char name[]`, `u32 height, u32 columns_done`, `f64 brightness, level_exponent, density_exponent, gain_low, gain_mid, gain_high`, then `qCompress(pixels)` |
 
+- **Display images (`DISP`, ticket #60):** after the `IMAG` of the cases `default_h62`, `default_h31`, `non_default_h62` and `partial_h62`: `u16 name_length, char name[]` (that image's name), then `qCompress(pixels)`, the display image the widget draws from that image (`overviewDisplayImage`, research section 10), same size, bytes B, G, R, A. Tolerance 2 per channel.
 - **Input to the analyzer:** feed the samples (mono sum `(L+R)/2`, int16 scaled by 1/32768 for Mixxx floats)
   at `rate`. The analyzer must produce `COLS` : `n` = samples per column, `levels` = `round(255 * peak hold of
   the 1 ms color track)` (color track fixed at the calibrated constants), then released across columns
