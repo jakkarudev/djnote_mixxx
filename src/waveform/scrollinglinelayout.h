@@ -124,5 +124,28 @@ std::vector<Line> layoutLines(const Beats* pBeats,
         int upstreamOpacity,
         const QColor& skinColor);
 
+// A line's horizontal extent on screen, left < right.
+struct LineSpan {
+    double left = 0.0;
+    double right = 0.0;
+};
+
+// The lines of one kind, drawn in one go with one colour.
+struct LineBatch {
+    LineKind kind = LineKind::Beat;
+    // The kind's colour with its opacity applied as alpha.
+    QColor color;
+    std::vector<LineSpan> spans;
+};
+
+// Groups lines into one batch per kind, in drawing order: steps, then bars,
+// then beats (so steps are drawn underneath); kinds without lines get no
+// batch. A line at x is centred on the middle of upstream's 1 px line
+// (x .. x + 1) and grows equally both ways with its width.
+//
+// Relies on every line of a kind sharing colour, width and opacity, as
+// layoutLines() returns them (a batch takes the colour of its first line).
+std::vector<LineBatch> lineBatches(const std::vector<Line>& lines);
+
 } // namespace scrollinglinelayout
 } // namespace mixxx

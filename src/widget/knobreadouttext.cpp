@@ -1,5 +1,6 @@
 #include "widget/knobreadouttext.h"
 
+#include <QCoreApplication>
 #include <QRegularExpression>
 #include <algorithm>
 #include <cmath>
@@ -10,7 +11,27 @@ namespace knobreadout {
 namespace {
 
 const QString kMinus = QString(QChar(0x2212));
-const QString kMinusInfinityDb = QString(QChar(0x2212)) + QChar(0x221E) + QStringLiteral(" dB");
+
+// User-visible words go through Qt's translation; untranslated (as in the
+// tests) the English source text is returned. Mark source strings with
+// QT_TRANSLATE_NOOP("KnobReadout", ...) so lupdate finds them.
+QString translated(const char* sourceText) {
+    return QCoreApplication::translate("KnobReadout", sourceText);
+}
+
+// A number with its unit, e.g. "%1 Hz".
+QString withUnit(const QString& number, const char* unitPattern) {
+    return translated(unitPattern).arg(number);
+}
+
+// The sign of a rounded value: a true minus sign below 0, "+" above 0 and
+// nothing on 0 (a value that rounds to 0 has no sign).
+QString signOf(double rounded) {
+    if (rounded < 0.0) {
+        return kMinus;
+    }
+    return rounded > 0.0 ? QStringLiteral("+") : QString();
+}
 
 // The main mixer's group; "[Main]" is its newer alias.
 bool isMainGroup(const QString& group) {
@@ -28,19 +49,19 @@ bool isAudioTaperGain(const ConfigKey& key) {
                     key.item == QStringLiteral("booth_gain"));
 }
 
-// One decimal place, a true minus sign, "+" above 0 dB and no sign on a value
-// that rounds to 0.0.
-QString decibelText(double factor) {
+// Decibels with one decimal place, signed (see signOf()).
+QString signedDecibelText(double decibels) {
+    const double tenths = std::round(decibels * 10.0);
+    return withUnit(signOf(tenths) + QString::number(std::abs(tenths) / 10.0, 'f', 1),
+            QT_TRANSLATE_NOOP("KnobReadout", "%1 dB"));
+}
+
+// A linear gain factor in dB; "minus infinity dB" at 0.
+QString gainDecibelText(double factor) {
     if (!(factor > 0.0)) {
-        return kMinusInfinityDb;
+        return withUnit(kMinus + QChar(0x221E), QT_TRANSLATE_NOOP("KnobReadout", "%1 dB"));
     }
-    const double tenths = std::round(20.0 * std::log10(factor) * 10.0);
-    if (tenths == 0.0) {
-        return QStringLiteral("0.0 dB");
-    }
-    const QString magnitude = QString::number(std::abs(tenths) / 10.0, 'f', 1);
-    return (tenths < 0.0 ? kMinus : QStringLiteral("+")) + magnitude +
-            QStringLiteral(" dB");
+    return signedDecibelText(20.0 * std::log10(factor));
 }
 
 // The knob parameters of a deck's EQ-rack effect, e.g.
@@ -51,15 +72,11 @@ bool isDeckEq(const ConfigKey& key) {
             key.item.startsWith(QStringLiteral("parameter"));
 }
 
-// A signed whole percent with a true minus sign, "+" above 0 and no sign on
-// a value that rounds to 0.
+// A whole percent, signed (see signOf()).
 QString signedPercentText(double percent) {
     const double rounded = std::round(percent);
-    if (rounded == 0.0) {
-        return QStringLiteral("0%");
-    }
-    return (rounded < 0.0 ? kMinus : QStringLiteral("+")) +
-            QString::number(static_cast<int>(std::abs(rounded))) + QStringLiteral("%");
+    return signOf(rounded) + QString::number(static_cast<int>(std::abs(rounded))) +
+            QStringLiteral("%");
 }
 
 // The knob's travel from its neutral centre: -100% fully left, +100% fully
@@ -72,17 +89,20 @@ QString neutralCentrePercentText(double parameter) {
 QString balanceText(double value) {
     const int percent = static_cast<int>(std::round(std::clamp(value, -1.0, 1.0) * 100.0));
     if (percent == 0) {
-        return QStringLiteral("C");
+        return translated(QT_TRANSLATE_NOOP("KnobReadout", "C"));
     }
-    return (percent < 0 ? QStringLiteral("L ") : QStringLiteral("R ")) +
-            QString::number(std::abs(percent)) + QStringLiteral("%");
+    return (percent < 0 ? translated(QT_TRANSLATE_NOOP("KnobReadout", "L %1%"))
+                        : translated(QT_TRANSLATE_NOOP("KnobReadout", "R %1%")))
+            .arg(std::abs(percent));
 }
 
 // The headphone mix: -1 (cue only) .. 1 (main only).
 QString headphoneMixText(double value) {
     const int mainPercent = static_cast<int>(
             std::round((std::clamp(value, -1.0, 1.0) + 1.0) * 50.0));
-    return QStringLiteral("Main %1% / Cue %2%").arg(mainPercent).arg(100 - mainPercent);
+    return translated(QT_TRANSLATE_NOOP("KnobReadout", "Main %1% / Cue %2%"))
+            .arg(mainPercent)
+            .arg(100 - mainPercent);
 }
 
 // About three significant digits (at most three decimals), trailing zeros
@@ -104,20 +124,8 @@ QString numberText(double number, bool signed_ = false) {
     if (digits == QStringLiteral("0")) {
         return digits;
     }
-    if (number < 0.0) {
-        return kMinus + digits;
-    }
-    return signed_ ? QStringLiteral("+") + digits : digits;
-}
-
-// One decimal place, signed, for a parameter already in dB.
-QString decibelValueText(double decibels) {
-    const double tenths = std::round(decibels * 10.0);
-    if (tenths == 0.0) {
-        return QStringLiteral("0.0 dB");
-    }
-    return (tenths < 0.0 ? kMinus : QStringLiteral("+")) +
-            QString::number(std::abs(tenths) / 10.0, 'f', 1) + QStringLiteral(" dB");
+    // Unsigned numbers still keep their minus sign.
+    return (signed_ || number < 0.0 ? signOf(number) : QString()) + digits;
 }
 
 // An effect parameter's value with its manifest's units hint; empty for the
@@ -128,53 +136,53 @@ QString effectParameterText(EffectManifestParameter::UnitsHint unitsHint, double
     case Unit::Unknown:
         return QString();
     case Unit::Decibel:
-        return decibelValueText(value);
+        return signedDecibelText(value);
     case Unit::Hertz:
         if (std::abs(value) >= 1000.0) {
-            return numberText(value / 1000.0) + QStringLiteral(" kHz");
+            return withUnit(numberText(value / 1000.0), QT_TRANSLATE_NOOP("KnobReadout", "%1 kHz"));
         }
-        return numberText(value) + QStringLiteral(" Hz");
+        return withUnit(numberText(value), QT_TRANSLATE_NOOP("KnobReadout", "%1 Hz"));
     case Unit::Beats:
     case Unit::Beat:
-        return numberText(value) + QStringLiteral(" beats");
+        return withUnit(numberText(value), QT_TRANSLATE_NOOP("KnobReadout", "%1 beats"));
     case Unit::Bar:
-        return numberText(value) + QStringLiteral(" bars");
+        return withUnit(numberText(value), QT_TRANSLATE_NOOP("KnobReadout", "%1 bars"));
     case Unit::BPM:
-        return numberText(value) + QStringLiteral(" BPM");
+        return withUnit(numberText(value), QT_TRANSLATE_NOOP("KnobReadout", "%1 BPM"));
     case Unit::Cent:
-        return numberText(value, true) + QStringLiteral(" cents");
+        return withUnit(numberText(value, true), QT_TRANSLATE_NOOP("KnobReadout", "%1 cents"));
     case Unit::Semitone12tet:
-        return numberText(value, true) + QStringLiteral(" st");
+        return withUnit(numberText(value, true), QT_TRANSLATE_NOOP("KnobReadout", "%1 st"));
     case Unit::Centimetre:
-        return numberText(value) + QStringLiteral(" cm");
+        return withUnit(numberText(value), QT_TRANSLATE_NOOP("KnobReadout", "%1 cm"));
     case Unit::Degree:
         return numberText(value) + QChar(0x00B0);
     case Unit::Frame:
-        return numberText(value) + QStringLiteral(" frames");
+        return withUnit(numberText(value), QT_TRANSLATE_NOOP("KnobReadout", "%1 frames"));
     case Unit::Inch:
-        return numberText(value) + QStringLiteral(" in");
+        return withUnit(numberText(value), QT_TRANSLATE_NOOP("KnobReadout", "%1 in"));
     case Unit::KiloHertz:
-        return numberText(value) + QStringLiteral(" kHz");
+        return withUnit(numberText(value), QT_TRANSLATE_NOOP("KnobReadout", "%1 kHz"));
     case Unit::Kilometer:
-        return numberText(value) + QStringLiteral(" km");
+        return withUnit(numberText(value), QT_TRANSLATE_NOOP("KnobReadout", "%1 km"));
     case Unit::Meter:
-        return numberText(value) + QStringLiteral(" m");
+        return withUnit(numberText(value), QT_TRANSLATE_NOOP("KnobReadout", "%1 m"));
     case Unit::MegaHertz:
-        return numberText(value) + QStringLiteral(" MHz");
+        return withUnit(numberText(value), QT_TRANSLATE_NOOP("KnobReadout", "%1 MHz"));
     case Unit::Mile:
-        return numberText(value) + QStringLiteral(" mi");
+        return withUnit(numberText(value), QT_TRANSLATE_NOOP("KnobReadout", "%1 mi"));
     case Unit::Minute:
-        return numberText(value) + QStringLiteral(" min");
+        return withUnit(numberText(value), QT_TRANSLATE_NOOP("KnobReadout", "%1 min"));
     case Unit::Millmeter:
-        return numberText(value) + QStringLiteral(" mm");
+        return withUnit(numberText(value), QT_TRANSLATE_NOOP("KnobReadout", "%1 mm"));
     case Unit::Millisecond:
-        return numberText(value) + QStringLiteral(" ms");
+        return withUnit(numberText(value), QT_TRANSLATE_NOOP("KnobReadout", "%1 ms"));
     case Unit::Octave:
-        return numberText(value) + QStringLiteral(" oct");
+        return withUnit(numberText(value), QT_TRANSLATE_NOOP("KnobReadout", "%1 oct"));
     case Unit::Percentage:
-        return numberText(value) + QStringLiteral("%");
+        return withUnit(numberText(value), QT_TRANSLATE_NOOP("KnobReadout", "%1%"));
     case Unit::Seconds:
-        return numberText(value) + QStringLiteral(" s");
+        return withUnit(numberText(value), QT_TRANSLATE_NOOP("KnobReadout", "%1 s"));
     case Unit::Coefficient:
     case Unit::SampleRate:
     case Unit::Midinote:
@@ -193,11 +201,11 @@ QString knobPositionText(double parameter) {
 // The full (not compact) text, by the unit table in knobreadouttext.h.
 QString readoutText(const KnobIdentity& knob, const KnobValue& value, Mode mode) {
     if (isAudioTaperGain(knob.key)) {
-        return decibelText(value.value);
+        return gainDecibelText(value.value);
     }
     if (isDeckEq(knob.key)) {
         return mode == Mode::Precise
-                ? decibelText(value.value)
+                ? gainDecibelText(value.value)
                 : neutralCentrePercentText(value.parameter);
     }
     if (isMainGroup(knob.key.group)) {

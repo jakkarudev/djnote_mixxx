@@ -47,21 +47,6 @@ const ControlParameterWidgetConnection* displayConnection(WBaseWidget* pWidget) 
     return nullptr;
 }
 
-bool isScreenInputEvent(const QEvent* pEvent) {
-    switch (pEvent->type()) {
-    case QEvent::MouseButtonPress:
-    case QEvent::MouseButtonDblClick:
-    case QEvent::MouseButtonRelease:
-    case QEvent::Wheel:
-        return true;
-    case QEvent::MouseMove:
-        // A move without a pressed button is hovering, not turning.
-        return static_cast<const QMouseEvent*>(pEvent)->buttons() != Qt::NoButton;
-    default:
-        return false;
-    }
-}
-
 // The label's look: under the knob, or on the knob face (no border, so the
 // padding matches the one knobreadoutface.h fits with).
 QString labelStyleSheet(int pixelSize, bool onFace) {
@@ -88,9 +73,60 @@ QString labelStyleSheet(int pixelSize, bool onFace) {
 // Under the knob, the label uses the full-size font.
 constexpr int kUnderKnobPixelSize = 11;
 
+// The units hint of knob parameter knobIndex (0-based) of the effect in slot
+// effectGroup of chain chainGroup, if that parameter is loaded.
+std::optional<EffectManifestParameter::UnitsHint> loadedKnobParameterUnitsHint(
+        const EffectsManager& effectsManager,
+        const QString& chainGroup,
+        const QString& effectGroup,
+        unsigned int knobIndex) {
+    const EffectChainPointer pChain = effectsManager.getEffectChain(chainGroup);
+    if (!pChain) {
+        return std::nullopt;
+    }
+    for (const EffectSlotPointer& pEffectSlot : pChain->getEffectSlots()) {
+        if (!pEffectSlot || pEffectSlot->getGroup() != effectGroup) {
+            continue;
+        }
+        const EffectParameterSlotBasePointer pParameterSlot =
+                pEffectSlot->getEffectParameterSlot(
+                        EffectManifestParameter::ParameterType::Knob, knobIndex);
+        if (pParameterSlot && pParameterSlot->isLoaded()) {
+            return pParameterSlot->getManifest()->unitsHint();
+        }
+        return std::nullopt;
+    }
+    return std::nullopt;
+}
+
 } // namespace
 
 namespace mixxx {
+
+namespace knobreadout {
+
+bool isScreenTurnEvent(const QEvent& event) {
+    // The buttons upstream's KnobEventHandler drags with.
+    constexpr Qt::MouseButtons kDragButtons = Qt::LeftButton | Qt::MiddleButton;
+    switch (event.type()) {
+    case QEvent::Wheel:
+        return true;
+    case QEvent::MouseMove: {
+        // Hovering has no button down; with the right button down the knob
+        // ignores the move.
+        const Qt::MouseButtons buttons = static_cast<const QMouseEvent&>(event).buttons();
+        return (buttons & kDragButtons) && !(buttons & Qt::RightButton);
+    }
+    case QEvent::MouseButtonRelease:
+        return kDragButtons.testFlag(static_cast<const QMouseEvent&>(event).button());
+    default:
+        // Presses only start a drag or reset the knob (right click, double
+        // click): not turning it.
+        return false;
+    }
+}
+
+} // namespace knobreadout
 
 // static
 void KnobReadoutOverlay::onSkinLoaded(QWidget* pMainWindow,
@@ -155,24 +191,10 @@ knobreadout::KnobIdentity KnobReadoutOverlay::identify(const ConfigKey& key) con
     if (!ControlObject::exists(ConfigKey(key.group, key.item + QStringLiteral("_loaded")))) {
         return knob;
     }
-    const EffectChainPointer pChain = pEffectsManager->getEffectChain(
-            groupMatch.captured(1) + QStringLiteral("]"));
-    if (!pChain) {
-        return knob;
-    }
-    for (const EffectSlotPointer& pEffectSlot : pChain->getEffectSlots()) {
-        if (!pEffectSlot || pEffectSlot->getGroup() != key.group) {
-            continue;
-        }
-        const EffectParameterSlotBasePointer pParameterSlot =
-                pEffectSlot->getEffectParameterSlot(
-                        EffectManifestParameter::ParameterType::Knob,
-                        itemMatch.captured(1).toUInt() - 1);
-        if (pParameterSlot && pParameterSlot->isLoaded()) {
-            knob.unitsHint = pParameterSlot->getManifest()->unitsHint();
-        }
-        break;
-    }
+    knob.unitsHint = loadedKnobParameterUnitsHint(*pEffectsManager,
+            groupMatch.captured(1) + QStringLiteral("]"),
+            key.group,
+            itemMatch.captured(1).toUInt() - 1);
     return knob;
 }
 
@@ -236,11 +258,15 @@ void KnobReadoutOverlay::watchKnob(QWidget* pKnob) {
 bool KnobReadoutOverlay::eventFilter(QObject* pWatched, QEvent* pEvent) {
     // Runs before the knob handles the event; the knob then sets its control
     // synchronously. The mark is cleared on the next event-loop pass.
-    if (isScreenInputEvent(pEvent)) {
+    if (knobreadout::isScreenTurnEvent(*pEvent)) {
         m_pScreenInputKnob = qobject_cast<QWidget*>(pWatched);
-        QTimer::singleShot(0, this, [this]() {
-            m_pScreenInputKnob.clear();
-        });
+        if (!m_screenInputClearQueued) {
+            m_screenInputClearQueued = true;
+            QTimer::singleShot(0, this, [this]() {
+                m_pScreenInputKnob.clear();
+                m_screenInputClearQueued = false;
+            });
+        }
     }
     return QObject::eventFilter(pWatched, pEvent);
 }

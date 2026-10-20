@@ -863,8 +863,7 @@ Select from different types of displays for the waveform, which differ primarily
       </widget>
      </item>
 
-     <!-- Row 19: DJNote's "Beat, bar and step lines" group, added in code (ScrollingLinesPrefsGroup) -->
-     <item row="20" column="0" colspan="4">
+     <item row="19" column="0" colspan="4">
       <widget class="QGroupBox" name="openGLStatus">
        <property name="title">
         <string>OpenGL status</string>

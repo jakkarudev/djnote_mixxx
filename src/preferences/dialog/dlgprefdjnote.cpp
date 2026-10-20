@@ -15,6 +15,7 @@ DlgPrefDJNote::DlgPrefDJNote(QWidget* pParent, UserSettingsPointer pConfig)
           m_pKnobReadoutEnabled(nullptr),
           m_pKnobReadoutModeLabel(nullptr),
           m_pKnobReadoutMode(nullptr),
+          m_pKnobReadoutStyleLabel(nullptr),
           m_pKnobReadoutStyle(nullptr) {
     auto* pPageLayout = new QVBoxLayout(this);
     pPageLayout->setContentsMargins(0, 0, 0, 0);
@@ -36,11 +37,12 @@ void DlgPrefDJNote::createKnobReadoutGroup() {
                "disappears about 1 s after the knob stops changing."));
     pGrid->addWidget(m_pKnobReadoutEnabled, 0, 0, 1, 2);
 
-    // Mode: items in Mode order, so the index is the Mode value.
     m_pKnobReadoutMode = new QComboBox(pGroup);
     m_pKnobReadoutMode->setObjectName(QStringLiteral("knobReadoutModeComboBox"));
-    m_pKnobReadoutMode->addItem(tr("Simple"));
-    m_pKnobReadoutMode->addItem(tr("Precise"));
+    m_pKnobReadoutMode->addItem(tr("Simple"),
+            static_cast<int>(mixxx::knobreadout::Mode::Simple));
+    m_pKnobReadoutMode->addItem(tr("Precise"),
+            static_cast<int>(mixxx::knobreadout::Mode::Precise));
     m_pKnobReadoutMode->setToolTip(
             tr("How deck EQ knobs read. Simple: percent of the knob's travel "
                "from the centre (-100% to +100%). Precise: dB. Gains always "
@@ -50,15 +52,6 @@ void DlgPrefDJNote::createKnobReadoutGroup() {
     const int modeRow = pGrid->rowCount();
     pGrid->addWidget(m_pKnobReadoutModeLabel, modeRow, 0);
     pGrid->addWidget(m_pKnobReadoutMode, modeRow, 1, Qt::AlignLeft);
-    // The mode means nothing while the readout is off.
-    connect(m_pKnobReadoutEnabled,
-            &QCheckBox::toggled,
-            m_pKnobReadoutMode,
-            &QWidget::setEnabled);
-    connect(m_pKnobReadoutEnabled,
-            &QCheckBox::toggled,
-            m_pKnobReadoutModeLabel,
-            &QWidget::setEnabled);
 
     m_pKnobReadoutStyle = new QComboBox(pGroup);
     m_pKnobReadoutStyle->setObjectName(QStringLiteral("knobReadoutStyleComboBox"));
@@ -70,14 +63,41 @@ void DlgPrefDJNote::createKnobReadoutGroup() {
             tr("On the knob face, the value is drawn centred on the knob without "
                "its unit, shrunk to fit. Knobs too small for it show the value "
                "under the knob."));
-    auto* pStyleLabel = new QLabel(tr("Style"), pGroup);
-    pStyleLabel->setBuddy(m_pKnobReadoutStyle);
+    m_pKnobReadoutStyleLabel = new QLabel(tr("Style"), pGroup);
+    m_pKnobReadoutStyleLabel->setBuddy(m_pKnobReadoutStyle);
     const int styleRow = pGrid->rowCount();
-    pGrid->addWidget(pStyleLabel, styleRow, 0);
+    pGrid->addWidget(m_pKnobReadoutStyleLabel, styleRow, 0);
     pGrid->addWidget(m_pKnobReadoutStyle, styleRow, 1);
     pGrid->setColumnStretch(1, 1);
 
+    connect(m_pKnobReadoutEnabled,
+            &QCheckBox::toggled,
+            this,
+            &DlgPrefDJNote::setKnobReadoutDetailsEnabled);
+
+    // Every change applies live.
+    connect(m_pKnobReadoutEnabled,
+            &QCheckBox::toggled,
+            this,
+            &DlgPrefDJNote::slotKnobReadoutControlChanged);
+    for (QComboBox* pComboBox : {m_pKnobReadoutMode, m_pKnobReadoutStyle}) {
+        connect(pComboBox,
+                QOverload<int>::of(&QComboBox::currentIndexChanged),
+                this,
+                &DlgPrefDJNote::slotKnobReadoutControlChanged);
+    }
+
     layout()->addWidget(pGroup);
+}
+
+void DlgPrefDJNote::setKnobReadoutDetailsEnabled(bool enabled) {
+    // Mode and style.
+    for (QWidget* pWidget : {static_cast<QWidget*>(m_pKnobReadoutModeLabel),
+                 static_cast<QWidget*>(m_pKnobReadoutMode),
+                 static_cast<QWidget*>(m_pKnobReadoutStyleLabel),
+                 static_cast<QWidget*>(m_pKnobReadoutStyle)}) {
+        pWidget->setEnabled(enabled);
+    }
 }
 
 void DlgPrefDJNote::slotUpdate() {
@@ -85,31 +105,41 @@ void DlgPrefDJNote::slotUpdate() {
 }
 
 void DlgPrefDJNote::slotApply() {
-    // The readout overlay reads the stored settings on every readout, so
-    // saving them applies them immediately.
+    // Changes are already stored as they are made; this only makes sure.
     mixxx::knobreadout::saveSettings(m_pConfig, knobReadoutSettingsFromControls());
 }
 
 void DlgPrefDJNote::slotResetToDefaults() {
     showKnobReadoutSettings(mixxx::knobreadout::Settings());
+    slotKnobReadoutControlChanged();
+}
+
+void DlgPrefDJNote::slotKnobReadoutControlChanged() {
+    if (m_showingKnobReadoutSettings) {
+        return;
+    }
+    // The readout overlay reads the stored settings on every readout, so
+    // storing them applies them immediately.
+    mixxx::knobreadout::saveSettings(m_pConfig, knobReadoutSettingsFromControls());
 }
 
 void DlgPrefDJNote::showKnobReadoutSettings(const mixxx::knobreadout::Settings& settings) {
+    m_showingKnobReadoutSettings = true;
     m_pKnobReadoutEnabled->setChecked(settings.enabled);
-    m_pKnobReadoutMode->setEnabled(settings.enabled);
-    m_pKnobReadoutModeLabel->setEnabled(settings.enabled);
-    m_pKnobReadoutMode->setCurrentIndex(static_cast<int>(settings.mode));
+    // setChecked() doesn't emit toggled() when the box already shows the value.
+    setKnobReadoutDetailsEnabled(settings.enabled);
+    m_pKnobReadoutMode->setCurrentIndex(
+            m_pKnobReadoutMode->findData(static_cast<int>(settings.mode)));
     m_pKnobReadoutStyle->setCurrentIndex(
             m_pKnobReadoutStyle->findData(static_cast<int>(settings.style)));
+    m_showingKnobReadoutSettings = false;
 }
 
 mixxx::knobreadout::Settings DlgPrefDJNote::knobReadoutSettingsFromControls() const {
     mixxx::knobreadout::Settings settings;
     settings.enabled = m_pKnobReadoutEnabled->isChecked();
-    settings.mode = m_pKnobReadoutMode->currentIndex() ==
-                    static_cast<int>(mixxx::knobreadout::Mode::Precise)
-            ? mixxx::knobreadout::Mode::Precise
-            : mixxx::knobreadout::Mode::Simple;
+    settings.mode = static_cast<mixxx::knobreadout::Mode>(
+            m_pKnobReadoutMode->currentData().toInt());
     settings.style = static_cast<mixxx::knobreadout::Style>(
             m_pKnobReadoutStyle->currentData().toInt());
     return settings;

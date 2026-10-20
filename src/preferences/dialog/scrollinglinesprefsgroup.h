@@ -21,7 +21,8 @@ class QSpinBox;
 // waveform widget factory.
 //
 // While the master switch is on, upstream's beat grid opacity controls (passed
-// in by the page) are disabled, never hidden or edited.
+// in by the page) are disabled, never hidden or edited. The step line rows are
+// disabled while "Show step lines" is off.
 class ScrollingLinesPrefsGroup : public QGroupBox {
     Q_OBJECT
   public:
@@ -39,14 +40,16 @@ class ScrollingLinesPrefsGroup : public QGroupBox {
         QSlider* pSlider = nullptr;
         QSpinBox* pSpinBox = nullptr;
     };
+    using ColorMember = std::optional<QColor> mixxx::scrollinglinelayout::LineSettings::*;
     // A colour button that opens a colour dialog for a custom colour, and a
     // "Skin colour" button that goes back to the skin's beat colour.
     struct ColorControls {
+        // The setting the controls edit.
+        ColorMember member = nullptr;
         QPushButton* pColorButton = nullptr;
         QPushButton* pSkinColorButton = nullptr;
         QColorDialog* pDialog = nullptr;
     };
-    using ColorMember = std::optional<QColor> mixxx::scrollinglinelayout::LineSettings::*;
 
     OpacityControls addOpacityRow(QGridLayout* pGrid,
             int& row,
@@ -69,7 +72,8 @@ class ScrollingLinesPrefsGroup : public QGroupBox {
     void setColor(ColorMember pColor, const std::optional<QColor>& color);
     static void showColor(const ColorControls& controls, const std::optional<QColor>& color);
     void slotControlChanged();
-    void updateUpstreamControls();
+    // Enables or disables the upstream beat grid controls and the step rows.
+    void updateEnabledControls();
 
     QList<QWidget*> m_upstreamBeatGridControls;
     QCheckBox* m_pEnabledCheckBox = nullptr;
@@ -84,5 +88,7 @@ class ScrollingLinesPrefsGroup : public QGroupBox {
     OpacityControls m_stepOpacity;
     QSpinBox* m_pStepWidthSpinBox = nullptr;
     ColorControls m_stepColor;
+    // Every widget on the step rows below "Show step lines", labels included.
+    QList<QWidget*> m_stepRowWidgets;
     mixxx::scrollinglinelayout::LineSettings m_settings;
 };

@@ -7,6 +7,7 @@
 #include <QSlider>
 #include <QSpinBox>
 #include <memory>
+#include <vector>
 
 #include "preferences/dialog/dlgprefwaveform.h"
 #include "test/mixxxtest.h"
@@ -328,4 +329,38 @@ TEST_F(DlgPrefWaveformScrollingLinesTest, ResetToDefaultsResetsStepSettings) {
     EXPECT_FALSE(stored.stepsEnabled);
     EXPECT_EQ(8, stored.stepMinSpacing.px());
     EXPECT_FALSE(stored.stepColor.has_value());
+}
+
+TEST_F(DlgPrefWaveformScrollingLinesTest, StepRowsAreGreyedOutWhileStepLinesAreOff) {
+    auto pDialog = openPage();
+    auto* pSteps = control<QCheckBox>(pDialog.get(), "scrollingStepLinesEnabledCheckBox");
+    const auto stepControls = [&pDialog]() {
+        return std::vector<QWidget*>{
+                control<QSpinBox>(pDialog.get(), "scrollingStepLineMinSpacingSpinBox"),
+                control<QSlider>(pDialog.get(), "scrollingStepLineOpacitySlider"),
+                control<QSpinBox>(pDialog.get(), "scrollingStepLineOpacitySpinBox"),
+                control<QSpinBox>(pDialog.get(), "scrollingStepLineWidthSpinBox"),
+                control<QPushButton>(pDialog.get(), "scrollingStepLineColorButton")};
+    };
+    auto* pSkinColor = control<QPushButton>(pDialog.get(), "scrollingStepLineSkinColorButton");
+    ASSERT_TRUE(pSteps && pSkinColor);
+    // Off by default.
+    for (QWidget* pControl : stepControls()) {
+        EXPECT_FALSE(pControl->isEnabled()) << pControl->objectName().toStdString();
+    }
+    pSteps->setChecked(true);
+    for (QWidget* pControl : stepControls()) {
+        EXPECT_TRUE(pControl->isEnabled()) << pControl->objectName().toStdString();
+    }
+    // "Skin colour" still only with a custom colour.
+    EXPECT_FALSE(pSkinColor->isEnabled());
+    pickColor(pDialog.get(), "scrollingStepLineColorButton", QColor(0x00, 0x80, 0xff));
+    EXPECT_TRUE(pSkinColor->isEnabled());
+    pSteps->setChecked(false);
+    EXPECT_FALSE(pSkinColor->isEnabled());
+    for (QWidget* pControl : stepControls()) {
+        EXPECT_FALSE(pControl->isEnabled()) << pControl->objectName().toStdString();
+    }
+    // The bar and beat rows are not affected.
+    EXPECT_TRUE(control<QSpinBox>(pDialog.get(), "scrollingBeatLineWidthSpinBox")->isEnabled());
 }

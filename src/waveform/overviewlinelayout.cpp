@@ -13,6 +13,10 @@ int positiveMod(int a, int n) {
 
 } // namespace
 
+int beatIndexInCycle(const Beats& beats, Beats::ConstIterator it, int cycleBeats) {
+    return positiveMod(it - beats.cfirstmarker(), cycleBeats);
+}
+
 LinePositions layoutLines(const Beats* pBeats,
         double trackSamples,
         double overviewLength,
@@ -29,20 +33,21 @@ LinePositions layoutLines(const Beats* pBeats,
     // long tracks.
     const int stepBeats = withBars ? kBeatsPerBar : phraseBeats;
 
-    const auto first = pBeats->cfirstmarker();
     const auto end = audio::FramePos::fromEngineSamplePos(trackSamples);
     auto it = pBeats->iteratorFrom(audio::kStartFramePos);
     if (it == pBeats->cend() || it == pBeats->cbegin()) {
         return lines;
     }
     // Align to the first bar/phrase start at or after the current beat.
-    const int index = it - first;
-    it += positiveMod(-index, stepBeats);
+    const int indexInStep = beatIndexInCycle(*pBeats, it, stepBeats);
+    if (indexInStep != 0) {
+        it += stepBeats - indexInStep;
+    }
 
     const double scale = (overviewLength - 2.0) / trackSamples;
     for (; it != pBeats->cend() && *it <= end; it += stepBeats) {
         const double pos = 1.0 + it->toEngineSamplePos() * scale;
-        if (positiveMod(it - first, phraseBeats) == 0) {
+        if (beatIndexInCycle(*pBeats, it, phraseBeats) == 0) {
             lines.phraseLines.push_back(pos);
         } else {
             lines.barLines.push_back(pos);

@@ -192,7 +192,7 @@ DlgPrefWaveform::DlgPrefWaveform(
     // beat grid opacity controls while its master switch is on.
     m_pScrollingLinesGroup = new ScrollingLinesPrefsGroup(
             {beatGridAlphaSlider, beatGridAlphaSpinBox}, this);
-    gridLayout_2->addWidget(m_pScrollingLinesGroup, 19, 0, 1, 4);
+    gridLayout_2->addWidget(m_pScrollingLinesGroup, gridLayout_2->rowCount(), 0, 1, 4);
     connect(m_pScrollingLinesGroup,
             &ScrollingLinesPrefsGroup::settingsChanged,
             this,

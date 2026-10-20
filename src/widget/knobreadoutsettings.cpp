@@ -10,17 +10,29 @@ namespace {
 const QString kDJNoteGroup = QStringLiteral("[DJNote]");
 
 const ConfigKey kEnabledCfgKey(kDJNoteGroup, QStringLiteral("knobReadoutEnabled"));
-// Stored by name ("simple" / "precise"); unknown values read as Simple.
 const ConfigKey kModeCfgKey(kDJNoteGroup, QStringLiteral("knobReadoutMode"));
-
-const QString kSimpleModeName = QStringLiteral("simple");
-const QString kPreciseModeName = QStringLiteral("precise");
-
 const ConfigKey kStyleCfgKey(kDJNoteGroup, QStringLiteral("knobReadoutStyle"));
 
-// Stored as names, so the values stay readable and reorder-safe.
+// Mode and style are stored as names, so the values stay readable and
+// reorder-safe; unknown names read as the default.
+const QString kModeSimple = QStringLiteral("simple");
+const QString kModePrecise = QStringLiteral("precise");
 const QString kStyleUnderKnob = QStringLiteral("underKnob");
 const QString kStyleKnobFace = QStringLiteral("knobFace");
+
+Mode modeFromString(const QString& name, Mode fallback) {
+    if (name == kModeSimple) {
+        return Mode::Simple;
+    }
+    if (name == kModePrecise) {
+        return Mode::Precise;
+    }
+    return fallback;
+}
+
+QString modeToString(Mode mode) {
+    return mode == Mode::Precise ? kModePrecise : kModeSimple;
+}
 
 Style styleFromString(const QString& name, Style fallback) {
     if (name == kStyleUnderKnob) {
@@ -41,17 +53,14 @@ QString styleToString(Style style) {
 Settings loadSettings(const UserSettingsPointer& pConfig) {
     Settings settings;
     settings.enabled = pConfig->getValue(kEnabledCfgKey, settings.enabled);
-    settings.mode = pConfig->getValueString(kModeCfgKey) == kPreciseModeName
-            ? Mode::Precise
-            : Mode::Simple;
+    settings.mode = modeFromString(pConfig->getValueString(kModeCfgKey), settings.mode);
     settings.style = styleFromString(pConfig->getValueString(kStyleCfgKey), settings.style);
     return settings;
 }
 
 void saveSettings(const UserSettingsPointer& pConfig, const Settings& settings) {
     pConfig->setValue(kEnabledCfgKey, settings.enabled);
-    pConfig->setValue(kModeCfgKey,
-            settings.mode == Mode::Precise ? kPreciseModeName : kSimpleModeName);
+    pConfig->setValue(kModeCfgKey, modeToString(settings.mode));
     pConfig->setValue(kStyleCfgKey, styleToString(settings.style));
 }
 
