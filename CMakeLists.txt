@@ -1340,6 +1340,8 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/widget/wkey.cpp
   src/widget/wknob.cpp
   src/widget/wknobcomposed.cpp
+  src/widget/knobreadoutoverlay.cpp
+  src/widget/knobreadouttext.cpp
   src/widget/wlabel.cpp
   src/widget/wlibrary.cpp
   src/widget/wlibrarysidebar.cpp
@@ -2188,6 +2190,7 @@ if(BUILD_TESTING)
     src/test/durationutiltest.cpp
     src/test/overviewlayouttest.cpp
     src/test/overviewlinelayouttest.cpp
+    src/test/knobreadouttexttest.cpp
     src/test/scrollinglinelayouttest.cpp
     src/test/scrollinglinesettingstest.cpp
     src/test/dlgprefwaveformscrollinglinestest.cpp
