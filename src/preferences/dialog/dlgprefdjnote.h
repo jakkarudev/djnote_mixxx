@@ -6,6 +6,7 @@
 
 class QCheckBox;
 class QComboBox;
+class QLabel;
 
 // The DJNote preferences page: settings of DJNote features that have no
 // upstream page to live on. Built in code (no .ui file).
@@ -31,5 +32,7 @@ class DlgPrefDJNote : public DlgPreferencePage {
 
     const UserSettingsPointer m_pConfig;
     QCheckBox* m_pKnobReadoutEnabled;
+    QLabel* m_pKnobReadoutModeLabel;
+    QComboBox* m_pKnobReadoutMode;
     QComboBox* m_pKnobReadoutStyle;
 };

@@ -3,14 +3,17 @@
 #include <QObject>
 #include <QPointer>
 #include <QTimer>
+#include <memory>
 #include <optional>
 
 #include "preferences/usersettings.h"
 #include "widget/knobreadoutsettings.h"
+#include "widget/knobreadouttext.h"
 
 class QLabel;
 class QWidget;
 class ControlProxy;
+class EffectsManager;
 
 namespace mixxx {
 
@@ -31,19 +34,26 @@ class KnobReadoutOverlay : public QObject {
     // The one hook into upstream: the main window calls this each time it
     // finishes loading a skin (first load and every reload). Creates the
     // overlay on first use and watches the knobs found under pSkinRoot.
-    // pConfig holds the readout settings (DJNote preferences page).
+    // pConfig holds the readout settings (DJNote preferences page);
+    // pEffectsManager tells the units of effect parameter knobs.
     static void onSkinLoaded(QWidget* pMainWindow,
             QWidget* pSkinRoot,
-            UserSettingsPointer pConfig);
+            UserSettingsPointer pConfig,
+            std::shared_ptr<EffectsManager> pEffectsManager);
 
     bool eventFilter(QObject* pWatched, QEvent* pEvent) override;
 
   private:
-    KnobReadoutOverlay(QWidget* pMainWindow, UserSettingsPointer pConfig);
+    KnobReadoutOverlay(QWidget* pMainWindow,
+            UserSettingsPointer pConfig,
+            std::shared_ptr<EffectsManager> pEffectsManager);
 
     // The one place the overlay reads its settings: from the config, on every
     // knob change, so changes on the preferences page apply immediately.
     knobreadout::Settings settings() const;
+    // What the readout text needs to know about the knob on control key:
+    // for an effect parameter knob, the loaded effect's units hint.
+    knobreadout::KnobIdentity identify(const ConfigKey& key) const;
     void watchKnobs(QWidget* pSkinRoot);
     void watchKnob(QWidget* pKnob);
     // Whether a change of pKnob's control comes from the user turning it, on
@@ -59,6 +69,8 @@ class KnobReadoutOverlay : public QObject {
 
     QWidget* const m_pMainWindow;
     const UserSettingsPointer m_pConfig;
+    // Weak: the effects manager is shut down with the core services.
+    const std::weak_ptr<EffectsManager> m_pEffectsManager;
     QLabel* const m_pLabel;
     QTimer m_hideTimer;
     // The knob receiving on-screen input in the current event-loop pass.

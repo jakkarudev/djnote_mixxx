@@ -37,6 +37,39 @@ TEST_F(KnobReadoutSettingsTest, StoredUnderADJNoteKey) {
                             QStringLiteral("knobReadoutEnabled"))));
 }
 
+TEST_F(KnobReadoutSettingsTest, ModeDefaultsToSimple) {
+    EXPECT_EQ(Mode::Simple, loadSettings(config()).mode);
+}
+
+TEST_F(KnobReadoutSettingsTest, ModeRoundTrip) {
+    Settings saved;
+    saved.mode = Mode::Precise;
+    saveSettings(config(), saved);
+    EXPECT_EQ(Mode::Precise, loadSettings(config()).mode);
+
+    saved.mode = Mode::Simple;
+    saveSettings(config(), saved);
+    EXPECT_EQ(Mode::Simple, loadSettings(config()).mode);
+}
+
+TEST_F(KnobReadoutSettingsTest, ModeStoredByNameUnderADJNoteKey) {
+    Settings saved;
+    saved.mode = Mode::Precise;
+    saveSettings(config(), saved);
+
+    EXPECT_EQ(QStringLiteral("precise"),
+            config()->getValueString(
+                    ConfigKey(QStringLiteral("[DJNote]"),
+                            QStringLiteral("knobReadoutMode"))));
+}
+
+TEST_F(KnobReadoutSettingsTest, UnknownModeFallsBackToSimple) {
+    config()->setValue(ConfigKey(QStringLiteral("[DJNote]"),
+                               QStringLiteral("knobReadoutMode")),
+            QStringLiteral("bogus"));
+    EXPECT_EQ(Mode::Simple, loadSettings(config()).mode);
+}
+
 // Style (ticket #70): Under the knob (default) or On the knob face.
 TEST_F(KnobReadoutSettingsTest, StyleDefaultsToUnderTheKnob) {
     EXPECT_EQ(Style::UnderKnob, loadSettings(config()).style);

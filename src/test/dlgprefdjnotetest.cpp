@@ -129,3 +129,62 @@ TEST_F(DlgPrefDJNoteTest, ResetRestoresUnderTheKnob) {
     pPage->slotResetToDefaults();
     EXPECT_EQ(QStringLiteral("Under the knob"), styleComboBox(pPage.get())->currentText());
 }
+
+// Mode (ticket #68): a Simple / Precise combo box, default Simple.
+namespace {
+
+QComboBox* modeComboBox(DlgPrefDJNote* pPage) {
+    auto* pComboBox = pPage->findChild<QComboBox*>(
+            QStringLiteral("knobReadoutModeComboBox"));
+    EXPECT_NE(nullptr, pComboBox);
+    return pComboBox;
+}
+
+} // namespace
+
+TEST_F(DlgPrefDJNoteTest, ModeShowsSimpleByDefault) {
+    auto pPage = openPage();
+    auto* pMode = modeComboBox(pPage.get());
+    ASSERT_NE(nullptr, pMode);
+    ASSERT_EQ(2, pMode->count());
+    EXPECT_EQ(QStringLiteral("Simple"), pMode->itemText(0));
+    EXPECT_EQ(QStringLiteral("Precise"), pMode->itemText(1));
+    EXPECT_EQ(QStringLiteral("Simple"), pMode->currentText());
+}
+
+TEST_F(DlgPrefDJNoteTest, ModeShowsTheStoredSetting) {
+    Settings settings;
+    settings.mode = mixxx::knobreadout::Mode::Precise;
+    mixxx::knobreadout::saveSettings(config(), settings);
+    auto pPage = openPage();
+    EXPECT_EQ(QStringLiteral("Precise"), modeComboBox(pPage.get())->currentText());
+}
+
+TEST_F(DlgPrefDJNoteTest, ApplyStoresTheMode) {
+    auto pPage = openPage();
+    modeComboBox(pPage.get())->setCurrentIndex(1);
+    pPage->slotApply();
+    EXPECT_EQ(mixxx::knobreadout::Mode::Precise,
+            mixxx::knobreadout::loadSettings(config()).mode);
+}
+
+TEST_F(DlgPrefDJNoteTest, ResetRestoresSimpleMode) {
+    Settings settings;
+    settings.mode = mixxx::knobreadout::Mode::Precise;
+    mixxx::knobreadout::saveSettings(config(), settings);
+    auto pPage = openPage();
+    pPage->slotResetToDefaults();
+    EXPECT_EQ(QStringLiteral("Simple"), modeComboBox(pPage.get())->currentText());
+    pPage->slotApply();
+    EXPECT_EQ(mixxx::knobreadout::Mode::Simple,
+            mixxx::knobreadout::loadSettings(config()).mode);
+}
+
+TEST_F(DlgPrefDJNoteTest, ModeIsGreyedOutWhileTheReadoutIsOff) {
+    auto pPage = openPage();
+    EXPECT_TRUE(modeComboBox(pPage.get())->isEnabled());
+    enabledCheckBox(pPage.get())->setChecked(false);
+    EXPECT_FALSE(modeComboBox(pPage.get())->isEnabled());
+    enabledCheckBox(pPage.get())->setChecked(true);
+    EXPECT_TRUE(modeComboBox(pPage.get())->isEnabled());
+}

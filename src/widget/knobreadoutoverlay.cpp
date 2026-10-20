@@ -4,11 +4,17 @@
 #include <QEvent>
 #include <QLabel>
 #include <QMouseEvent>
+#include <QRegularExpression>
 #include <QWidget>
 #include <algorithm>
 
+#include "control/controlobject.h"
 #include "control/controlproxy.h"
 #include "controllers/controllerinputscope.h"
+#include "effects/effectchain.h"
+#include "effects/effectparameterslotbase.h"
+#include "effects/effectslot.h"
+#include "effects/effectsmanager.h"
 #include "moc_knobreadoutoverlay.cpp"
 #include "widget/controlwidgetconnection.h"
 #include "widget/knobreadoutface.h"
@@ -89,22 +95,26 @@ namespace mixxx {
 // static
 void KnobReadoutOverlay::onSkinLoaded(QWidget* pMainWindow,
         QWidget* pSkinRoot,
-        UserSettingsPointer pConfig) {
+        UserSettingsPointer pConfig,
+        std::shared_ptr<EffectsManager> pEffectsManager) {
     if (!pMainWindow || !pSkinRoot || !pConfig) {
         return;
     }
     auto* pOverlay = pMainWindow->findChild<KnobReadoutOverlay*>(
             kOverlayObjectName, Qt::FindDirectChildrenOnly);
     if (!pOverlay) {
-        pOverlay = new KnobReadoutOverlay(pMainWindow, pConfig);
+        pOverlay = new KnobReadoutOverlay(pMainWindow, pConfig, pEffectsManager);
     }
     pOverlay->watchKnobs(pSkinRoot);
 }
 
-KnobReadoutOverlay::KnobReadoutOverlay(QWidget* pMainWindow, UserSettingsPointer pConfig)
+KnobReadoutOverlay::KnobReadoutOverlay(QWidget* pMainWindow,
+        UserSettingsPointer pConfig,
+        std::shared_ptr<EffectsManager> pEffectsManager)
         : QObject(pMainWindow),
           m_pMainWindow(pMainWindow),
           m_pConfig(pConfig),
+          m_pEffectsManager(pEffectsManager),
           m_pLabel(new QLabel(pMainWindow)) {
     setObjectName(kOverlayObjectName);
 
@@ -121,6 +131,49 @@ KnobReadoutOverlay::KnobReadoutOverlay(QWidget* pMainWindow, UserSettingsPointer
 
 knobreadout::Settings KnobReadoutOverlay::settings() const {
     return knobreadout::loadSettings(m_pConfig);
+}
+
+knobreadout::KnobIdentity KnobReadoutOverlay::identify(const ConfigKey& key) const {
+    knobreadout::KnobIdentity knob{key};
+    // Effect parameter knobs: [<chain group without "]">_Effect<n>],parameter<m>,
+    // e.g. [EffectRack1_EffectUnit1_Effect2],parameter3.
+    static const QRegularExpression kEffectSlotGroup(
+            QStringLiteral("^(\\[.*)_Effect(\\d+)\\]$"));
+    static const QRegularExpression kKnobParameterItem(
+            QStringLiteral("^parameter(\\d+)$"));
+    const QRegularExpressionMatch groupMatch = kEffectSlotGroup.match(key.group);
+    const QRegularExpressionMatch itemMatch = kKnobParameterItem.match(key.item);
+    if (!groupMatch.hasMatch() || !itemMatch.hasMatch()) {
+        return knob;
+    }
+    const auto pEffectsManager = m_pEffectsManager.lock();
+    if (!pEffectsManager) {
+        return knob;
+    }
+    // A parameter slot exists exactly when its "_loaded" control does; this
+    // avoids the slot lookup's debug assertion on a number out of range.
+    if (!ControlObject::exists(ConfigKey(key.group, key.item + QStringLiteral("_loaded")))) {
+        return knob;
+    }
+    const EffectChainPointer pChain = pEffectsManager->getEffectChain(
+            groupMatch.captured(1) + QStringLiteral("]"));
+    if (!pChain) {
+        return knob;
+    }
+    for (const EffectSlotPointer& pEffectSlot : pChain->getEffectSlots()) {
+        if (!pEffectSlot || pEffectSlot->getGroup() != key.group) {
+            continue;
+        }
+        const EffectParameterSlotBasePointer pParameterSlot =
+                pEffectSlot->getEffectParameterSlot(
+                        EffectManifestParameter::ParameterType::Knob,
+                        itemMatch.captured(1).toUInt() - 1);
+        if (pParameterSlot && pParameterSlot->isLoaded()) {
+            knob.unitsHint = pParameterSlot->getManifest()->unitsHint();
+        }
+        break;
+    }
+    return knob;
 }
 
 void KnobReadoutOverlay::watchKnobs(QWidget* pSkinRoot) {
@@ -207,9 +260,10 @@ void KnobReadoutOverlay::onKnobControlChanged(QWidget* pKnob, ControlProxy* pCon
     if (!isOwnInput(pKnob)) {
         return;
     }
-    const knobreadout::KnobIdentity knob{pControl->getKey()};
+    const knobreadout::KnobIdentity knob = identify(pControl->getKey());
     const knobreadout::KnobValue value{pControl->get(), pControl->getParameter()};
     knobreadout::Options options;
+    options.mode = readoutSettings.mode;
     if (readoutSettings.style == knobreadout::Style::KnobFace) {
         options.compact = true;
         const QString compactText = knobreadout::text(knob, value, options);
