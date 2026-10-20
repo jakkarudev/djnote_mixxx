@@ -100,3 +100,17 @@ _Avoid_: section, block
 **Until Mark**:
 An existing readout at the play marker that counts beats from the play position to the next cue or marker. It is not the hover readout.
 _Avoid_: beat countdown
+
+## Skins
+
+**Skin**:
+A complete look and layout for the DJNote window, chosen in Preferences under Interface. Each skin decides which decks, mixer, waveforms and library parts are shown and how they look.
+_Avoid_: theme, layout
+
+**Nocturne**:
+DJNote's own skin, styled to look as close as possible to Traktor while offering the same layout options as LateNight.
+_Avoid_: Traktor skin, Traktor theme, DJNote skin
+
+**Skin settings**:
+The options a skin offers for showing or hiding parts of its layout (for example the mixer, effect units, samplers or hotcues), set from the skin's own settings panel rather than from Preferences.
+_Avoid_: skin options, layout toggles
