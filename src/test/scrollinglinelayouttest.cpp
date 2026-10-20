@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <functional>
 #include <string>
 #include <vector>
@@ -61,7 +62,7 @@ std::vector<Line> lines(const Beats& beats,
             kSkinColor);
 }
 
-// Checks positions and kinds; 'B' = bar line, 'b' = beat line.
+// Checks positions and kinds; 'B' = bar line, 'b' = beat line, 's' = step line.
 void expectLines(const std::vector<double>& expectedFrames,
         const std::string& expectedKinds,
         const std::vector<Line>& actual) {
@@ -69,9 +70,18 @@ void expectLines(const std::vector<double>& expectedFrames,
     ASSERT_EQ(expectedKinds.size(), actual.size());
     for (size_t i = 0; i < actual.size(); ++i) {
         EXPECT_NEAR(px(expectedFrames[i]), actual[i].x, 1e-6) << "index " << i;
-        const LineKind kind = expectedKinds[i] == 'B' ? LineKind::Bar : LineKind::Beat;
+        const LineKind kind = expectedKinds[i] == 'B'
+                ? LineKind::Bar
+                : (expectedKinds[i] == 's' ? LineKind::Step : LineKind::Beat);
         EXPECT_EQ(kind, actual[i].kind) << "index " << i;
     }
+}
+
+// Default settings with step lines shown.
+LineSettings stepSettings() {
+    LineSettings settings;
+    settings.stepsEnabled = true;
+    return settings;
 }
 
 } // namespace
@@ -288,4 +298,127 @@ TEST(ScrollingLineLayoutTest, MasterSwitchOffIgnoresWidthAndColour) {
         EXPECT_EQ(1, line.widthPx);
         EXPECT_EQ(kSkinColor, line.color);
     }
+}
+
+TEST(ScrollingLineLayoutTest, StepLinesAtQuartersBetweenBeats) {
+    const Beats beats = constBeats(400);
+    // Beats 0 and 1 are 240 px apart, so steps are 60 px apart.
+    const auto result = lines(beats, 0, 400 + kBeatFrames, stepSettings());
+    expectLines({400, 6400, 12400, 18400, 400 + kBeatFrames}, "Bsssb", result);
+}
+
+TEST(ScrollingLineLayoutTest, StepLinesBeforeTheFirstBeatInRange) {
+    const Beats beats = constBeats(400);
+    // The range starts between beats 0 and 1, after the first step.
+    const auto result = lines(beats, 7000, 400 + kBeatFrames, stepSettings());
+    expectLines({12400, 18400, 400 + kBeatFrames}, "ssb", result);
+    // And ends before beat 2, after the first step after beat 1.
+    const auto tail = lines(beats, 400 + kBeatFrames, 400 + 1.3 * kBeatFrames, stepSettings());
+    expectLines({400 + kBeatFrames, 400 + 1.25 * kBeatFrames}, "bs", tail);
+}
+
+TEST(ScrollingLineLayoutTest, StepLinesFollowATempoChange) {
+    // Beat 7 at 120 BPM, beat 8 starts 60 BPM (48000 frames apart).
+    const double tempoChange = 400 + 8 * kBeatFrames;
+    const auto result = lines(kTempoChangeBeats,
+            400 + 7 * kBeatFrames,
+            tempoChange + 48000,
+            stepSettings());
+    expectLines({400 + 7 * kBeatFrames,
+                        400 + 7.25 * kBeatFrames,
+                        400 + 7.5 * kBeatFrames,
+                        400 + 7.75 * kBeatFrames,
+                        tempoChange,
+                        tempoChange + 12000,
+                        tempoChange + 24000,
+                        tempoChange + 36000,
+                        tempoChange + 48000},
+            "bsssBsssb",
+            result);
+}
+
+namespace {
+
+// Lines for one beat from frame 0 of a constant grid at the given tempo, with
+// the beat 'beatPx' wide on screen.
+std::vector<Line> oneBeatAtWidth(double bpm, double beatPx, const LineSettings& settings) {
+    const Beats beats(audio::FramePos(0), Bpm(bpm), kSampleRate, QString());
+    const double beatFrames = kSampleRate.value() * 60.0 / bpm;
+    return layoutLines(&beats,
+            audio::FramePos(0),
+            audio::FramePos(beatFrames),
+            [=](audio::FramePos pos) { return pos.value() * beatPx / beatFrames; },
+            settings,
+            90,
+            kSkinColor);
+}
+
+size_t stepCount(const std::vector<Line>& result) {
+    return std::count_if(result.begin(), result.end(), [](const Line& line) {
+        return line.kind == LineKind::Step;
+    });
+}
+
+} // namespace
+
+TEST(ScrollingLineLayoutTest, StepLinesOnlyWhenAtLeastTheMinimumSpacingApart) {
+    // Default minimum spacing 8 px: a beat must be at least 32 px wide.
+    for (const double bpm : {120.0, 174.0}) {
+        EXPECT_EQ(3u, stepCount(oneBeatAtWidth(bpm, 32.01, stepSettings()))) << bpm;
+        EXPECT_EQ(0u, stepCount(oneBeatAtWidth(bpm, 31.99, stepSettings()))) << bpm;
+        // Beat lines are drawn either way.
+        EXPECT_EQ(2u, oneBeatAtWidth(bpm, 31.99, stepSettings()).size()) << bpm;
+    }
+    LineSettings settings = stepSettings();
+    settings.stepMinSpacing = StepSpacingPx(20);
+    EXPECT_EQ(3u, stepCount(oneBeatAtWidth(120, 80.01, settings)));
+    EXPECT_EQ(0u, stepCount(oneBeatAtWidth(120, 79.99, settings)));
+}
+
+TEST(ScrollingLineLayoutTest, StepSpacingIsClampedTo4To30) {
+    EXPECT_EQ(8, StepSpacingPx().px());
+    EXPECT_EQ(4, StepSpacingPx(1).px());
+    EXPECT_EQ(30, StepSpacingPx(100).px());
+    LineSettings settings = stepSettings();
+    settings.stepMinSpacing = StepSpacingPx(1);
+    EXPECT_EQ(3u, stepCount(oneBeatAtWidth(120, 16.01, settings)));
+    EXPECT_EQ(0u, stepCount(oneBeatAtWidth(120, 15.99, settings)));
+    settings.stepMinSpacing = StepSpacingPx(100);
+    EXPECT_EQ(3u, stepCount(oneBeatAtWidth(120, 120.01, settings)));
+    EXPECT_EQ(0u, stepCount(oneBeatAtWidth(120, 119.99, settings)));
+}
+
+TEST(ScrollingLineLayoutTest, NoStepLinesWithTheSwitchOrMasterOff) {
+    const Beats beats = constBeats(400);
+    EXPECT_EQ(0u, stepCount(lines(beats, 0, 400 + 2 * kBeatFrames)));
+    LineSettings settings = stepSettings();
+    settings.enabled = false;
+    EXPECT_EQ(0u, stepCount(lines(beats, 0, 400 + 2 * kBeatFrames, settings)));
+    settings = stepSettings();
+    settings.stepOpacity = OpacityPercent(0);
+    EXPECT_EQ(0u, stepCount(lines(beats, 0, 400 + 2 * kBeatFrames, settings)));
+}
+
+TEST(ScrollingLineLayoutTest, StepLineOpacityWidthAndColour) {
+    const Beats beats = constBeats(400);
+    LineSettings settings = stepSettings();
+    auto result = lines(beats, 0, 400 + kBeatFrames, settings);
+    ASSERT_EQ(5u, result.size());
+    EXPECT_EQ(45, result[1].opacityPercent);
+    EXPECT_EQ(1, result[1].widthPx);
+    EXPECT_EQ(kSkinColor, result[1].color);
+
+    settings.stepOpacity = OpacityPercent(30);
+    settings.stepWidth = LineWidthPx(3);
+    settings.stepColor = QColor(0, 0, 255);
+    result = lines(beats, 0, 400 + kBeatFrames, settings);
+    ASSERT_EQ(5u, result.size());
+    for (int i = 1; i <= 3; ++i) {
+        EXPECT_EQ(30, result[i].opacityPercent);
+        EXPECT_EQ(3, result[i].widthPx);
+        EXPECT_EQ(QColor(0, 0, 255), result[i].color);
+    }
+    // Bar and beat lines keep their own look.
+    EXPECT_EQ(2, result[0].widthPx);
+    EXPECT_EQ(kSkinColor, result[4].color);
 }

@@ -17,6 +17,12 @@ const ConfigKey kBeatWidthCfgKey(kWaveformGroup, QStringLiteral("scrollingBeatLi
 // "#rrggbb", or empty for the skin's beat colour.
 const ConfigKey kBarColorCfgKey(kWaveformGroup, QStringLiteral("scrollingBarLineColor"));
 const ConfigKey kBeatColorCfgKey(kWaveformGroup, QStringLiteral("scrollingBeatLineColor"));
+const ConfigKey kStepsEnabledCfgKey(kWaveformGroup, QStringLiteral("scrollingStepLinesEnabled"));
+const ConfigKey kStepMinSpacingCfgKey(
+        kWaveformGroup, QStringLiteral("scrollingStepLineMinSpacing"));
+const ConfigKey kStepOpacityCfgKey(kWaveformGroup, QStringLiteral("scrollingStepLineOpacity"));
+const ConfigKey kStepWidthCfgKey(kWaveformGroup, QStringLiteral("scrollingStepLineWidth"));
+const ConfigKey kStepColorCfgKey(kWaveformGroup, QStringLiteral("scrollingStepLineColor"));
 
 std::optional<QColor> loadColor(const UserSettingsPointer& pConfig, const ConfigKey& key) {
     const QColor color(pConfig->getValueString(key));
@@ -45,6 +51,13 @@ LineSettings loadLineSettings(const UserSettingsPointer& pConfig) {
     settings.beatWidth = LineWidthPx(pConfig->getValue(kBeatWidthCfgKey, settings.beatWidth.px()));
     settings.barColor = loadColor(pConfig, kBarColorCfgKey);
     settings.beatColor = loadColor(pConfig, kBeatColorCfgKey);
+    settings.stepsEnabled = pConfig->getValue(kStepsEnabledCfgKey, settings.stepsEnabled);
+    settings.stepMinSpacing = StepSpacingPx(
+            pConfig->getValue(kStepMinSpacingCfgKey, settings.stepMinSpacing.px()));
+    settings.stepOpacity = OpacityPercent(
+            pConfig->getValue(kStepOpacityCfgKey, settings.stepOpacity.percent()));
+    settings.stepWidth = LineWidthPx(pConfig->getValue(kStepWidthCfgKey, settings.stepWidth.px()));
+    settings.stepColor = loadColor(pConfig, kStepColorCfgKey);
     return settings;
 }
 
@@ -56,6 +69,11 @@ void saveLineSettings(const UserSettingsPointer& pConfig, const LineSettings& se
     pConfig->setValue(kBeatWidthCfgKey, settings.beatWidth.px());
     saveColor(pConfig, kBarColorCfgKey, settings.barColor);
     saveColor(pConfig, kBeatColorCfgKey, settings.beatColor);
+    pConfig->setValue(kStepsEnabledCfgKey, settings.stepsEnabled);
+    pConfig->setValue(kStepMinSpacingCfgKey, settings.stepMinSpacing.px());
+    pConfig->setValue(kStepOpacityCfgKey, settings.stepOpacity.percent());
+    pConfig->setValue(kStepWidthCfgKey, settings.stepWidth.px());
+    saveColor(pConfig, kStepColorCfgKey, settings.stepColor);
 }
 
 } // namespace scrollinglinelayout
