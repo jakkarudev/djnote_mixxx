@@ -437,6 +437,7 @@ bool WaveformWidgetFactory::setConfig(UserSettingsPointer config) {
     }
 
     m_overviewLineSettings = mixxx::overviewlayout::loadLineSettings(m_config);
+    m_scrollingLineSettings = mixxx::scrollinglinelayout::loadLineSettings(m_config);
 
     m_playMarkerPosition = m_config->getValue(ConfigKey("[Waveform]","PlayMarkerPosition"),
             WaveformWidgetRenderer::s_defaultPlayMarkerPosition);
@@ -809,6 +810,14 @@ void WaveformWidgetFactory::saveOverviewLineSettings() {
         mixxx::overviewlayout::saveLineSettings(m_config, m_overviewLineSettings);
     }
     emit overviewLinesChanged();
+}
+
+void WaveformWidgetFactory::setScrollingLineSettings(
+        const mixxx::scrollinglinelayout::LineSettings& settings) {
+    m_scrollingLineSettings = settings;
+    if (m_config) {
+        mixxx::scrollinglinelayout::saveLineSettings(m_config, m_scrollingLineSettings);
+    }
 }
 
 void WaveformWidgetFactory::setPlayMarkerPosition(double position) {
