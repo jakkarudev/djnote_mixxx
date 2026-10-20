@@ -10,7 +10,7 @@
 #include "track/beats.h"
 #include "waveform/overviewlinelayout.h"
 
-// Beat and bar lines for the scrolling waveform: which lines to draw, where and
+// Beat, bar and step lines for the scrolling waveform: which lines to draw, where and
 // how strong, wide and in what colour. Pure, like the overview line layout (no widget, painting or GL
 // dependencies): the renderer passes in the visible range and a frame-to-x
 // mapping, and draws the returned lines.
@@ -26,6 +26,9 @@ enum class LineKind {
     Bar,
     // Any other beat line.
     Beat,
+    // A line at a quarter, half or three quarters of the way between two
+    // beats.
+    Step,
 };
 
 // Width of a line in whole pixels. Always within 1..5: out-of-range values are
@@ -46,11 +49,33 @@ class LineWidthPx {
     int m_px;
 };
 
+// The minimum on-screen distance between adjacent step lines for them to be
+// drawn, in pixels. Always within 4..30: out-of-range values are clamped on
+// construction.
+class StepSpacingPx {
+  public:
+    static constexpr int kMin = 4;
+    static constexpr int kMax = 30;
+    static constexpr int kDefault = 8;
+
+    constexpr explicit StepSpacingPx(int px = kDefault)
+            : m_px(std::clamp(px, kMin, kMax)) {
+    }
+    constexpr int px() const {
+        return m_px;
+    }
+
+  private:
+    int m_px;
+};
+
 struct LineSettings {
     static constexpr int kDefaultBarOpacity = 100;
     static constexpr int kDefaultBeatOpacity = 80;
     static constexpr int kDefaultBarWidth = 2;
     static constexpr int kDefaultBeatWidth = 1;
+    static constexpr int kDefaultStepOpacity = 45;
+    static constexpr int kDefaultStepWidth = 1;
 
     // DJNote's master switch. Off: the lines are drawn as upstream Mixxx draws
     // them (every beat alike, at upstream's beat grid opacity).
@@ -62,6 +87,16 @@ struct LineSettings {
     // A custom colour, or none for the skin's beat colour.
     std::optional<QColor> barColor;
     std::optional<QColor> beatColor;
+
+    // Step lines: three per beat, at a quarter, half and three quarters of
+    // the frame gap between two beats of the grid. Between two beats they are
+    // drawn only when adjacent steps are at least stepMinSpacing apart on
+    // screen (no fade below it).
+    bool stepsEnabled = false;
+    StepSpacingPx stepMinSpacing;
+    OpacityPercent stepOpacity = OpacityPercent(kDefaultStepOpacity);
+    LineWidthPx stepWidth = LineWidthPx(kDefaultStepWidth);
+    std::optional<QColor> stepColor;
 };
 
 struct Line {
@@ -76,7 +111,7 @@ struct Line {
     QColor color;
 };
 
-// Lines for the beats in [start, end], ascending in frame order. frameToX maps
+// Lines for the beats (and steps) in [start, end], ascending in frame order. frameToX maps
 // a beat's frame position to its x on screen. upstreamOpacity is upstream's
 // beat grid opacity (0..100, clamped), used for every line when the master
 // switch is off, along with a width of 1 px and skinColor (the skin's beat

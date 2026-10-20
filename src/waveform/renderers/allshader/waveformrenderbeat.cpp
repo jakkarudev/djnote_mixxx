@@ -67,7 +67,7 @@ void WaveformRenderBeat::paintGL() {
     const float rendererBreadth = m_waveformRenderer->getBreadth();
     const float lineBreadth = m_isSlipRenderer ? rendererBreadth / 2 : rendererBreadth;
 
-    // DJNote: the scrolling line layout decides which beat and bar lines to
+    // DJNote: the scrolling line layout decides which beat, bar and step lines to
     // draw and how. With its master switch off it returns upstream's lines.
     const auto lines = mixxx::scrollinglinelayout::layoutLines(trackBeats.get(),
             startPosition,
@@ -98,8 +98,10 @@ void WaveformRenderBeat::paintGL() {
     m_shader.setUniformValue(matrixLocation, matrix);
 
     // One batch per line kind: all lines of a kind look the same (opacity,
-    // width and colour). Wider lines grow both ways from the beat.
-    for (const auto kind : {mixxx::scrollinglinelayout::LineKind::Bar,
+    // width and colour). Wider lines grow both ways from the beat. Step lines
+    // go first, under the beat and bar lines.
+    for (const auto kind : {mixxx::scrollinglinelayout::LineKind::Step,
+                 mixxx::scrollinglinelayout::LineKind::Bar,
                  mixxx::scrollinglinelayout::LineKind::Beat}) {
         m_vertices.clear();
         QColor color;

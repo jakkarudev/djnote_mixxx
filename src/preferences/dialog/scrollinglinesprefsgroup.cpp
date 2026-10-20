@@ -16,6 +16,7 @@
 using mixxx::scrollinglinelayout::LineSettings;
 using mixxx::scrollinglinelayout::LineWidthPx;
 using mixxx::scrollinglinelayout::OpacityPercent;
+using mixxx::scrollinglinelayout::StepSpacingPx;
 
 namespace {
 
@@ -85,19 +86,68 @@ ScrollingLinesPrefsGroup::ScrollingLinesPrefsGroup(
                "of your choice."),
             &LineSettings::beatColor);
 
+    m_pStepsEnabledCheckBox = new QCheckBox(tr("Show step lines"));
+    m_pStepsEnabledCheckBox->setObjectName(QStringLiteral("scrollingStepLinesEnabledCheckBox"));
+    const QString stepsExplanation =
+            tr("Draw three step lines per beat, at a quarter, half and three "
+               "quarters of the way to the next beat, when zoomed in far enough.");
+    m_pStepsEnabledCheckBox->setToolTip(stepsExplanation);
+    pGrid->addWidget(m_pStepsEnabledCheckBox, row++, 0, 1, 3);
+    addExplanation(pGrid, row, stepsExplanation);
+
+    {
+        const QString explanation =
+                tr("Step lines are drawn only when adjacent steps are at least "
+                   "this far apart on screen; below it they are not drawn.");
+        m_pStepMinSpacingSpinBox = new QSpinBox();
+        m_pStepMinSpacingSpinBox->setObjectName(
+                QStringLiteral("scrollingStepLineMinSpacingSpinBox"));
+        m_pStepMinSpacingSpinBox->setRange(StepSpacingPx::kMin, StepSpacingPx::kMax);
+        m_pStepMinSpacingSpinBox->setSuffix(tr(" px"));
+        m_pStepMinSpacingSpinBox->setToolTip(explanation);
+        auto* pLabel = new QLabel(tr("Minimum step spacing"));
+        pLabel->setBuddy(m_pStepMinSpacingSpinBox);
+        pLabel->setToolTip(explanation);
+        pGrid->addWidget(pLabel, row, 0);
+        pGrid->addWidget(m_pStepMinSpacingSpinBox, row, 1, Qt::AlignLeft);
+        ++row;
+    }
+    m_stepOpacity = addOpacityRow(pGrid,
+            row,
+            tr("Step line opacity"),
+            QStringLiteral("scrollingStepLineOpacity"),
+            tr("Opacity of the step lines."));
+    m_pStepWidthSpinBox = addWidthRow(pGrid,
+            row,
+            tr("Step line width"),
+            QStringLiteral("scrollingStepLineWidth"),
+            tr("Width of the step lines, in pixels."));
+    m_stepColor = addColorRow(pGrid,
+            row,
+            tr("Step line colour"),
+            QStringLiteral("scrollingStepLine"),
+            tr("Colour of the step lines: the skin's beat colour, or a colour "
+               "of your choice."),
+            &LineSettings::stepColor);
+
     showSettings(m_settings);
 
     connect(m_pEnabledCheckBox,
             &QCheckBox::toggled,
             this,
             &ScrollingLinesPrefsGroup::slotControlChanged);
-    for (const OpacityControls& controls : {m_barOpacity, m_beatOpacity}) {
+    connect(m_pStepsEnabledCheckBox,
+            &QCheckBox::toggled,
+            this,
+            &ScrollingLinesPrefsGroup::slotControlChanged);
+    for (const OpacityControls& controls : {m_barOpacity, m_beatOpacity, m_stepOpacity}) {
         connect(controls.pSpinBox,
                 QOverload<int>::of(&QSpinBox::valueChanged),
                 this,
                 &ScrollingLinesPrefsGroup::slotControlChanged);
     }
-    for (QSpinBox* pSpinBox : {m_pBarWidthSpinBox, m_pBeatWidthSpinBox}) {
+    for (QSpinBox* pSpinBox :
+            {m_pBarWidthSpinBox, m_pBeatWidthSpinBox, m_pStepWidthSpinBox, m_pStepMinSpacingSpinBox}) {
         connect(pSpinBox,
                 QOverload<int>::of(&QSpinBox::valueChanged),
                 this,
@@ -169,7 +219,13 @@ ScrollingLinesPrefsGroup::ColorControls ScrollingLinesPrefsGroup::addColorRow(
 
 ScrollingLinesPrefsGroup::ColorControls& ScrollingLinesPrefsGroup::colorControls(
         ColorMember pColor) {
-    return pColor == &LineSettings::barColor ? m_barColor : m_beatColor;
+    if (pColor == &LineSettings::barColor) {
+        return m_barColor;
+    }
+    if (pColor == &LineSettings::stepColor) {
+        return m_stepColor;
+    }
+    return m_beatColor;
 }
 
 void ScrollingLinesPrefsGroup::openColorDialog(ColorMember pColor) {
@@ -239,6 +295,10 @@ void ScrollingLinesPrefsGroup::showSettings(const LineSettings& settings) {
         const QSignalBlocker blockEnabled(m_pEnabledCheckBox);
         m_pEnabledCheckBox->setChecked(settings.enabled);
     }
+    {
+        const QSignalBlocker blockStepsEnabled(m_pStepsEnabledCheckBox);
+        m_pStepsEnabledCheckBox->setChecked(settings.stepsEnabled);
+    }
     const auto show = [](const OpacityControls& controls, OpacityPercent opacity) {
         const QSignalBlocker blockSlider(controls.pSlider);
         const QSignalBlocker blockSpinBox(controls.pSpinBox);
@@ -247,13 +307,17 @@ void ScrollingLinesPrefsGroup::showSettings(const LineSettings& settings) {
     };
     show(m_barOpacity, settings.barOpacity);
     show(m_beatOpacity, settings.beatOpacity);
-    for (const auto& [pSpinBox, width] : {std::pair{m_pBarWidthSpinBox, settings.barWidth},
-                 std::pair{m_pBeatWidthSpinBox, settings.beatWidth}}) {
+    show(m_stepOpacity, settings.stepOpacity);
+    for (const auto& [pSpinBox, px] : {std::pair{m_pBarWidthSpinBox, settings.barWidth.px()},
+                 std::pair{m_pBeatWidthSpinBox, settings.beatWidth.px()},
+                 std::pair{m_pStepWidthSpinBox, settings.stepWidth.px()},
+                 std::pair{m_pStepMinSpacingSpinBox, settings.stepMinSpacing.px()}}) {
         const QSignalBlocker blockSpinBox(pSpinBox);
-        pSpinBox->setValue(width.px());
+        pSpinBox->setValue(px);
     }
     showColor(m_barColor, settings.barColor);
     showColor(m_beatColor, settings.beatColor);
+    showColor(m_stepColor, settings.stepColor);
     updateUpstreamControls();
 }
 
@@ -263,6 +327,10 @@ void ScrollingLinesPrefsGroup::slotControlChanged() {
     m_settings.beatOpacity = OpacityPercent(m_beatOpacity.pSpinBox->value());
     m_settings.barWidth = LineWidthPx(m_pBarWidthSpinBox->value());
     m_settings.beatWidth = LineWidthPx(m_pBeatWidthSpinBox->value());
+    m_settings.stepsEnabled = m_pStepsEnabledCheckBox->isChecked();
+    m_settings.stepMinSpacing = StepSpacingPx(m_pStepMinSpacingSpinBox->value());
+    m_settings.stepOpacity = OpacityPercent(m_stepOpacity.pSpinBox->value());
+    m_settings.stepWidth = LineWidthPx(m_pStepWidthSpinBox->value());
     updateUpstreamControls();
     emit settingsChanged(m_settings);
 }

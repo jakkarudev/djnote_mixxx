@@ -13,7 +13,7 @@
 #include "waveform/scrollinglinesettings.h"
 #include "waveform/waveformwidgetfactory.h"
 
-// The "Beat, bar and step lines" group on the Waveforms page (tickets #63, #64).
+// The "Beat, bar and step lines" group on the Waveforms page (tickets #63, #64, #65).
 namespace {
 
 using mixxx::scrollinglinelayout::LineSettings;
@@ -256,4 +256,76 @@ TEST_F(DlgPrefWaveformScrollingLinesTest, ResetToDefaultsResetsWidthsAndColours)
     EXPECT_EQ(2, stored.barWidth.px());
     EXPECT_EQ(1, stored.beatWidth.px());
     EXPECT_FALSE(stored.barColor.has_value());
+}
+
+TEST_F(DlgPrefWaveformScrollingLinesTest, GroupShowsStepDefaults) {
+    auto pDialog = openPage();
+    auto* pSteps = control<QCheckBox>(pDialog.get(), "scrollingStepLinesEnabledCheckBox");
+    auto* pSpacing = control<QSpinBox>(pDialog.get(), "scrollingStepLineMinSpacingSpinBox");
+    auto* pOpacity = control<QSpinBox>(pDialog.get(), "scrollingStepLineOpacitySpinBox");
+    auto* pWidth = control<QSpinBox>(pDialog.get(), "scrollingStepLineWidthSpinBox");
+    auto* pColor = control<QPushButton>(pDialog.get(), "scrollingStepLineColorButton");
+    ASSERT_TRUE(pSteps && pSpacing && pOpacity && pWidth && pColor);
+    EXPECT_FALSE(pSteps->isChecked());
+    EXPECT_EQ(8, pSpacing->value());
+    EXPECT_EQ(4, pSpacing->minimum());
+    EXPECT_EQ(30, pSpacing->maximum());
+    EXPECT_EQ(45, pOpacity->value());
+    EXPECT_EQ(45, control<QSlider>(pDialog.get(), "scrollingStepLineOpacitySlider")->value());
+    EXPECT_EQ(1, pWidth->value());
+    EXPECT_EQ(QStringLiteral("Skin colour"), pColor->text());
+}
+
+TEST_F(DlgPrefWaveformScrollingLinesTest, StepEditsApplyLiveAndPersist) {
+    auto pDialog = openPage();
+    control<QCheckBox>(pDialog.get(), "scrollingStepLinesEnabledCheckBox")->setChecked(true);
+    EXPECT_TRUE(factorySettings().stepsEnabled);
+    control<QSpinBox>(pDialog.get(), "scrollingStepLineMinSpacingSpinBox")->setValue(12);
+    control<QSlider>(pDialog.get(), "scrollingStepLineOpacitySlider")->setValue(60);
+    control<QSpinBox>(pDialog.get(), "scrollingStepLineWidthSpinBox")->setValue(3);
+    pickColor(pDialog.get(), "scrollingStepLineColorButton", QColor(0x00, 0x80, 0xff));
+    EXPECT_EQ(12, factorySettings().stepMinSpacing.px());
+    EXPECT_EQ(60, factorySettings().stepOpacity.percent());
+    EXPECT_EQ(3, factorySettings().stepWidth.px());
+    ASSERT_TRUE(factorySettings().stepColor.has_value());
+    EXPECT_EQ(QColor(0x00, 0x80, 0xff), *factorySettings().stepColor);
+    // The other colours are untouched.
+    EXPECT_FALSE(factorySettings().beatColor.has_value());
+
+    const LineSettings stored = mixxx::scrollinglinelayout::loadLineSettings(config());
+    EXPECT_TRUE(stored.stepsEnabled);
+    EXPECT_EQ(12, stored.stepMinSpacing.px());
+    EXPECT_EQ(60, stored.stepOpacity.percent());
+    EXPECT_EQ(3, stored.stepWidth.px());
+    ASSERT_TRUE(stored.stepColor.has_value());
+    EXPECT_EQ(QColor(0x00, 0x80, 0xff), *stored.stepColor);
+}
+
+TEST_F(DlgPrefWaveformScrollingLinesTest, ResetToDefaultsResetsStepSettings) {
+    LineSettings settings;
+    settings.stepsEnabled = true;
+    settings.stepMinSpacing = mixxx::scrollinglinelayout::StepSpacingPx(20);
+    settings.stepOpacity = OpacityPercent(10);
+    settings.stepWidth = LineWidthPx(5);
+    settings.stepColor = QColor(0x44, 0x55, 0x66);
+    mixxx::scrollinglinelayout::saveLineSettings(config(), settings);
+    WaveformWidgetFactory::instance()->setConfig(config());
+    auto pDialog = openPage();
+    EXPECT_TRUE(control<QCheckBox>(pDialog.get(), "scrollingStepLinesEnabledCheckBox")
+                        ->isChecked());
+    EXPECT_EQ(20, control<QSpinBox>(pDialog.get(), "scrollingStepLineMinSpacingSpinBox")->value());
+
+    pDialog->slotResetToDefaults();
+    EXPECT_FALSE(control<QCheckBox>(pDialog.get(), "scrollingStepLinesEnabledCheckBox")
+                         ->isChecked());
+    EXPECT_EQ(8, control<QSpinBox>(pDialog.get(), "scrollingStepLineMinSpacingSpinBox")->value());
+    EXPECT_EQ(45, control<QSpinBox>(pDialog.get(), "scrollingStepLineOpacitySpinBox")->value());
+    EXPECT_EQ(1, control<QSpinBox>(pDialog.get(), "scrollingStepLineWidthSpinBox")->value());
+    EXPECT_EQ(QStringLiteral("Skin colour"),
+            control<QPushButton>(pDialog.get(), "scrollingStepLineColorButton")->text());
+    EXPECT_FALSE(factorySettings().stepsEnabled);
+    const LineSettings stored = mixxx::scrollinglinelayout::loadLineSettings(config());
+    EXPECT_FALSE(stored.stepsEnabled);
+    EXPECT_EQ(8, stored.stepMinSpacing.px());
+    EXPECT_FALSE(stored.stepColor.has_value());
 }

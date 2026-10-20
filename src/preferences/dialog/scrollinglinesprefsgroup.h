@@ -79,5 +79,10 @@ class ScrollingLinesPrefsGroup : public QGroupBox {
     QSpinBox* m_pBeatWidthSpinBox = nullptr;
     ColorControls m_barColor;
     ColorControls m_beatColor;
+    QCheckBox* m_pStepsEnabledCheckBox = nullptr;
+    QSpinBox* m_pStepMinSpacingSpinBox = nullptr;
+    OpacityControls m_stepOpacity;
+    QSpinBox* m_pStepWidthSpinBox = nullptr;
+    ColorControls m_stepColor;
     mixxx::scrollinglinelayout::LineSettings m_settings;
 };

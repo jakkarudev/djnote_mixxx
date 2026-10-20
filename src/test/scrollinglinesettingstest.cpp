@@ -102,3 +102,48 @@ TEST_F(ScrollingLineSettingsTest, InvalidColourFallsBackToTheSkinColour) {
     EXPECT_FALSE(loaded.barColor.has_value());
     EXPECT_FALSE(loaded.beatColor.has_value());
 }
+
+TEST_F(ScrollingLineSettingsTest, EmptyConfigYieldsStepDefaults) {
+    const LineSettings loaded = loadLineSettings(config());
+    EXPECT_FALSE(loaded.stepsEnabled);
+    EXPECT_EQ(8, loaded.stepMinSpacing.px());
+    EXPECT_EQ(45, loaded.stepOpacity.percent());
+    EXPECT_EQ(1, loaded.stepWidth.px());
+    EXPECT_FALSE(loaded.stepColor.has_value());
+}
+
+TEST_F(ScrollingLineSettingsTest, StepSettingsRoundTrip) {
+    LineSettings saved;
+    saved.stepsEnabled = true;
+    saved.stepMinSpacing = StepSpacingPx(17);
+    saved.stepOpacity = OpacityPercent(70);
+    saved.stepWidth = LineWidthPx(2);
+    saved.stepColor = QColor(0x01, 0x02, 0x03);
+    saveLineSettings(config(), saved);
+
+    LineSettings loaded = loadLineSettings(config());
+    EXPECT_TRUE(loaded.stepsEnabled);
+    EXPECT_EQ(17, loaded.stepMinSpacing.px());
+    EXPECT_EQ(70, loaded.stepOpacity.percent());
+    EXPECT_EQ(2, loaded.stepWidth.px());
+    ASSERT_TRUE(loaded.stepColor.has_value());
+    EXPECT_EQ(QColor(0x01, 0x02, 0x03), *loaded.stepColor);
+
+    saved.stepColor.reset();
+    saveLineSettings(config(), saved);
+    loaded = loadLineSettings(config());
+    EXPECT_FALSE(loaded.stepColor.has_value());
+}
+
+TEST_F(ScrollingLineSettingsTest, OutOfRangeStepValuesAreClamped) {
+    setInt(QStringLiteral("scrollingStepLineMinSpacing"), 2);
+    setInt(QStringLiteral("scrollingStepLineOpacity"), 150);
+    setInt(QStringLiteral("scrollingStepLineWidth"), 9);
+    LineSettings loaded = loadLineSettings(config());
+    EXPECT_EQ(4, loaded.stepMinSpacing.px());
+    EXPECT_EQ(100, loaded.stepOpacity.percent());
+    EXPECT_EQ(5, loaded.stepWidth.px());
+    setInt(QStringLiteral("scrollingStepLineMinSpacing"), 99);
+    loaded = loadLineSettings(config());
+    EXPECT_EQ(30, loaded.stepMinSpacing.px());
+}
