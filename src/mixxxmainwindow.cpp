@@ -57,6 +57,7 @@
 #include "waveform/sharedglcontext.h"
 #include "waveform/visualsmanager.h"
 #include "waveform/waveformwidgetfactory.h"
+#include "widget/knobreadoutoverlay.h"
 #include "widget/wglwidget.h"
 #include "widget/wmainmenubar.h"
 
@@ -1305,6 +1306,8 @@ bool MixxxMainWindow::loadConfiguredSkin() {
     if (centralWidget() == m_pLaunchImage) {
         initializationProgressUpdate(100, "");
     }
+    mixxx::KnobReadoutOverlay::onSkinLoaded( // DJNote
+            this, m_pCentralWidget, m_pCoreServices->getSettings());
     emit skinLoaded();
     return m_pCentralWidget != nullptr;
 }

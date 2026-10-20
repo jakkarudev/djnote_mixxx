@@ -1112,6 +1112,7 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/preferences/dialog/dlgprefsounditem.cpp
   src/preferences/dialog/dlgprefsounditem.ui
   src/preferences/dialog/dlgprefvinyldlg.ui
+  src/preferences/dialog/dlgprefdjnote.cpp
   src/preferences/dialog/dlgprefwaveform.cpp
   src/preferences/dialog/dlgprefwaveformdlg.ui
   src/preferences/dialog/scrollinglinesprefsgroup.cpp
@@ -1340,6 +1341,9 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/widget/wkey.cpp
   src/widget/wknob.cpp
   src/widget/wknobcomposed.cpp
+  src/widget/knobreadoutoverlay.cpp
+  src/widget/knobreadoutsettings.cpp
+  src/widget/knobreadouttext.cpp
   src/widget/wlabel.cpp
   src/widget/wlibrary.cpp
   src/widget/wlibrarysidebar.cpp
@@ -2188,6 +2192,9 @@ if(BUILD_TESTING)
     src/test/durationutiltest.cpp
     src/test/overviewlayouttest.cpp
     src/test/overviewlinelayouttest.cpp
+    src/test/knobreadouttexttest.cpp
+    src/test/knobreadoutsettingstest.cpp
+    src/test/dlgprefdjnotetest.cpp
     src/test/scrollinglinelayouttest.cpp
     src/test/scrollinglinesettingstest.cpp
     src/test/dlgprefwaveformscrollinglinestest.cpp
