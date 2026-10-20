@@ -762,6 +762,7 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/control/controlpushbutton.cpp
   src/control/controlttrotary.cpp
   src/controllers/controller.cpp
+  src/controllers/controllerinputscope.cpp
   src/controllers/controllerenumerator.cpp
   src/controllers/controllerinputmappingtablemodel.cpp
   src/controllers/controllerlearningeventfilter.cpp
@@ -2192,6 +2193,7 @@ if(BUILD_TESTING)
     src/test/durationutiltest.cpp
     src/test/overviewlayouttest.cpp
     src/test/overviewlinelayouttest.cpp
+    src/test/controllerinputscopetest.cpp
     src/test/knobreadouttexttest.cpp
     src/test/knobreadoutsettingstest.cpp
     src/test/dlgprefdjnotetest.cpp
