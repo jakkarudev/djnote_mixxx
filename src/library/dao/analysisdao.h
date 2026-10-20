@@ -16,7 +16,8 @@ class AnalysisDao : public DAO {
     enum AnalysisType {
         TYPE_UNKNOWN = 0,
         TYPE_WAVEFORM,
-        TYPE_WAVESUMMARY
+        TYPE_WAVESUMMARY,
+        TYPE_PHOSPHOR_OVERVIEW
     };
 
     struct AnalysisInfo {

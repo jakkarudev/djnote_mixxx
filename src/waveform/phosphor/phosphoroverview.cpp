@@ -148,4 +148,53 @@ OverviewColumnsView PhosphorOverviewData::view() const {
     return v;
 }
 
+namespace {
+constexpr int kHeaderBytes = 4 + 8;
+constexpr int kLevelBytes = kOverviewColumns * 3;
+constexpr int kDensityBytes = kOverviewColumns * kOverviewRows;
+} // namespace
+
+QByteArray PhosphorOverviewData::toByteArray() const {
+    QByteArray bytes;
+    bytes.reserve(kHeaderBytes + kLevelBytes + kDensityBytes);
+    for (int i = 0; i < 4; ++i) {
+        bytes.append(static_cast<char>((static_cast<uint32_t>(m_sampleRate) >> (8 * i)) & 0xFF));
+    }
+    for (int i = 0; i < 8; ++i) {
+        bytes.append(static_cast<char>((static_cast<uint64_t>(m_totalFrames) >> (8 * i)) & 0xFF));
+    }
+    bytes.append(reinterpret_cast<const char*>(m_levels.data()), kLevelBytes);
+    bytes.append(reinterpret_cast<const char*>(m_density.data()), kDensityBytes);
+    return bytes;
+}
+
+// static
+std::shared_ptr<PhosphorOverviewData> PhosphorOverviewData::fromByteArray(
+        const QByteArray& bytes) {
+    if (bytes.size() != kHeaderBytes + kLevelBytes + kDensityBytes) {
+        return nullptr;
+    }
+    uint32_t rate = 0;
+    uint64_t frames = 0;
+    for (int i = 0; i < 4; ++i) {
+        rate |= static_cast<uint32_t>(static_cast<uint8_t>(bytes[i])) << (8 * i);
+    }
+    for (int i = 0; i < 8; ++i) {
+        frames |= static_cast<uint64_t>(static_cast<uint8_t>(bytes[4 + i])) << (8 * i);
+    }
+    if (rate == 0 || rate > 1000000 || frames == 0 || frames > (uint64_t(1) << 40)) {
+        return nullptr;
+    }
+    auto pData = std::make_shared<PhosphorOverviewData>(
+            static_cast<int>(rate), static_cast<SINT>(frames));
+    std::copy_n(bytes.constData() + kHeaderBytes,
+            kLevelBytes,
+            reinterpret_cast<char*>(pData->writableLevels(0)));
+    std::copy_n(bytes.constData() + kHeaderBytes + kLevelBytes,
+            kDensityBytes,
+            reinterpret_cast<char*>(pData->writableDensity(0)));
+    pData->setCompletedColumns(kOverviewColumns);
+    return pData;
+}
+
 } // namespace mixxx::phosphor

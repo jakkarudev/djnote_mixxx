@@ -1,10 +1,12 @@
 #pragma once
 
+#include <QSqlDatabase>
 #include <array>
 #include <memory>
 #include <vector>
 
 #include "analyzer/analyzer.h"
+#include "library/dao/analysisdao.h"
 #include "preferences/usersettings.h"
 #include "track/track_decl.h"
 #include "waveform/phosphor/phosphorcolortrack.h"
@@ -20,7 +22,10 @@
 /// initialize(); its completion is published as columns become final.
 class AnalyzerPhosphorOverview : public Analyzer {
   public:
-    explicit AnalyzerPhosphorOverview(UserSettingsPointer pConfig);
+    /// `dbConnection` is the analysis store; without one (default) nothing is
+    /// loaded or saved and the data lives on the track only.
+    explicit AnalyzerPhosphorOverview(UserSettingsPointer pConfig,
+            const QSqlDatabase& dbConnection = QSqlDatabase());
 
     /// True if the overview type setting is Phosphor.
     static bool isSelected(const UserSettingsPointer& pConfig);
@@ -42,10 +47,14 @@ class AnalyzerPhosphorOverview : public Analyzer {
     void cleanup() override;
 
   private:
+    /// Stored data of the track, if current; deletes stale rows. Null if none.
+    mixxx::phosphor::PhosphorOverviewPointer loadStored(
+            TrackId trackId, int sampleRate, SINT frameLength);
     void finishColumn();
     void writeReadyColumns(bool finished);
 
     UserSettingsPointer m_pConfig;
+    AnalysisDao m_analysisDao;
     TrackPointer m_pTrack;
     std::shared_ptr<mixxx::phosphor::PhosphorOverviewData> m_pData;
     std::unique_ptr<mixxx::phosphor::ColorTrackBuilder> m_pColor;

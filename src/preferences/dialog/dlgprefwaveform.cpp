@@ -845,6 +845,7 @@ void DlgPrefWaveform::slotClearCachedWaveforms() {
     QSqlDatabase dbConnection = mixxx::DbConnectionPooled(m_pLibrary->dbConnectionPool());
     analysisDao.deleteAnalysesByType(dbConnection, AnalysisDao::TYPE_WAVEFORM);
     analysisDao.deleteAnalysesByType(dbConnection, AnalysisDao::TYPE_WAVESUMMARY);
+    analysisDao.deleteAnalysesByType(dbConnection, AnalysisDao::TYPE_PHOSPHOR_OVERVIEW);
     calculateCachedWaveformDiskUsage();
 }
 
@@ -890,7 +891,8 @@ void DlgPrefWaveform::calculateCachedWaveformDiskUsage() {
     AnalysisDao analysisDao(m_pConfig);
     QSqlDatabase dbConnection = mixxx::DbConnectionPooled(m_pLibrary->dbConnectionPool());
     size_t numBytes = analysisDao.getDiskUsageInBytes(dbConnection, AnalysisDao::TYPE_WAVEFORM) +
-            analysisDao.getDiskUsageInBytes(dbConnection, AnalysisDao::TYPE_WAVESUMMARY);
+            analysisDao.getDiskUsageInBytes(dbConnection, AnalysisDao::TYPE_WAVESUMMARY) +
+            analysisDao.getDiskUsageInBytes(dbConnection, AnalysisDao::TYPE_PHOSPHOR_OVERVIEW);
 
     // Display total cached waveform size in mebibytes with 2 decimals.
     QString sizeMebibytes = QString::number(

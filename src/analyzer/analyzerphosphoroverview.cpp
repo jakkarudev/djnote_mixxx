@@ -4,6 +4,7 @@
 #include <cmath>
 
 #include "analyzer/constants.h"
+#include "preferences/waveformsettings.h"
 #include "track/track.h"
 #include "util/logger.h"
 #include "widget/woverview.h"
@@ -29,8 +30,10 @@ inline uint8_t roundU8(double v) {
 
 } // namespace
 
-AnalyzerPhosphorOverview::AnalyzerPhosphorOverview(UserSettingsPointer pConfig)
-        : m_pConfig(std::move(pConfig)),
+AnalyzerPhosphorOverview::AnalyzerPhosphorOverview(
+        UserSettingsPointer pConfig, const QSqlDatabase& dbConnection)
+        : m_pConfig(pConfig),
+          m_analysisDao(pConfig),
           m_histogram{},
           m_colorBlockFrames(1),
           m_columnFill(0),
@@ -38,6 +41,7 @@ AnalyzerPhosphorOverview::AnalyzerPhosphorOverview(UserSettingsPointer pConfig)
           m_writtenColumns(0),
           m_framesSeen(0),
           m_stored(false) {
+    m_analysisDao.initialize(dbConnection);
 }
 
 // static
@@ -60,6 +64,29 @@ bool AnalyzerPhosphorOverview::needsBuild(bool selected,
             existing->totalFrames() != frameLength;
 }
 
+PhosphorOverviewPointer AnalyzerPhosphorOverview::loadStored(
+        TrackId trackId, int sampleRate, SINT frameLength) {
+    if (!trackId.isValid() || !WaveformSettings(m_pConfig).waveformCachingEnabled()) {
+        return nullptr;
+    }
+    PhosphorOverviewPointer pLoaded;
+    const auto rows = m_analysisDao.getAnalysesForTrackByType(
+            trackId, AnalysisDao::TYPE_PHOSPHOR_OVERVIEW);
+    for (const auto& row : rows) {
+        std::shared_ptr<PhosphorOverviewData> pData;
+        if (row.version == kOverviewVersion) {
+            pData = PhosphorOverviewData::fromByteArray(row.data);
+        }
+        if (!pLoaded && pData && !needsBuild(true, pData, sampleRate, frameLength)) {
+            pLoaded = pData;
+        } else {
+            // Older version, other length, unreadable, or a duplicate: rebuild.
+            m_analysisDao.deleteAnalysis(row.analysisId);
+        }
+    }
+    return pLoaded;
+}
+
 bool AnalyzerPhosphorOverview::initialize(const AnalyzerTrack& track,
         mixxx::audio::SampleRate sampleRate,
         SINT frameLength) {
@@ -73,12 +100,23 @@ bool AnalyzerPhosphorOverview::initialize(const AnalyzerTrack& track,
     }
     const TrackPointer pTrack = track.getTrack();
     std::shared_ptr<PhosphorOverviewData> pData;
+    bool triedStore = false;
     for (;;) {
         // Built or being built for another deck: share it. Otherwise replace
         // it, unless another thread replaced it first (then look again).
         const auto pExisting = pTrack->getPhosphorOverview();
         if (!needsBuild(true, pExisting, sampleRate.value(), frameLength)) {
             return false;
+        }
+        if (!pExisting && !triedStore) {
+            // First look in the analysis store: current data is simply shown.
+            triedStore = true;
+            if (const auto pStored = loadStored(pTrack->getId(), sampleRate.value(), frameLength)) {
+                if (pTrack->replacePhosphorOverview(pExisting, pStored)) {
+                    return false;
+                }
+                continue; // lost the race, look again
+            }
         }
         if (!pData) {
             pData = std::make_shared<PhosphorOverviewData>(sampleRate.value(), frameLength);
@@ -177,6 +215,18 @@ void AnalyzerPhosphorOverview::storeResults(TrackPointer pTrack) {
     // Columns past the end of the track stay empty.
     m_pData->setCompletedColumns(kOverviewColumns);
     m_stored = true;
+    const TrackId trackId = m_pTrack ? m_pTrack->getId() : TrackId();
+    if (trackId.isValid() && WaveformSettings(m_pConfig).waveformCachingEnabled()) {
+        AnalysisDao::AnalysisInfo info;
+        info.trackId = trackId;
+        info.type = AnalysisDao::TYPE_PHOSPHOR_OVERVIEW;
+        info.description = kOverviewDescription;
+        info.version = kOverviewVersion;
+        info.data = m_pData->toByteArray();
+        if (!m_analysisDao.saveAnalysis(&info)) {
+            kLogger.warning() << "Failed to save the Phosphor overview of track" << trackId;
+        }
+    }
 }
 
 void AnalyzerPhosphorOverview::cleanup() {

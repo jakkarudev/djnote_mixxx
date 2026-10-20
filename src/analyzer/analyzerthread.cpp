@@ -124,7 +124,8 @@ void AnalyzerThread::doRun() {
     // sampler and preview loads, library analysis), only while Phosphor is the
     // selected overview type.
     if (m_modeFlags & AnalyzerModeFlags::WithWaveform) {
-        m_analyzers.push_back(AnalyzerWithState(std::make_unique<AnalyzerPhosphorOverview>(m_pConfig)));
+        m_analyzers.push_back(AnalyzerWithState(std::make_unique<AnalyzerPhosphorOverview>(
+                m_pConfig, mixxx::DbConnectionPooled(m_dbConnectionPool))));
     }
     DEBUG_ASSERT(!m_analyzers.empty());
     kLogger.debug() << "Activated" << m_analyzers.size() << "analyzers";

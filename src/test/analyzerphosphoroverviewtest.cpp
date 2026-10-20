@@ -7,6 +7,10 @@
 
 #include "analyzer/analyzerphosphoroverview.h"
 #include "analyzer/analyzertrack.h"
+#include "database/mixxxdb.h"
+#include "database/schemamanager.h"
+#include "library/dao/analysisdao.h"
+#include "test/mixxxdbtest.h"
 #include "test/mixxxtest.h"
 #include "test/phosphoroverviewfixture.h"
 #include "track/track.h"
@@ -19,7 +23,7 @@ using namespace mixxx::phosphor;
 namespace pf = phosphoroverviewfixture;
 
 class AnalyzerPhosphorOverviewTest : public MixxxTest {
-  protected:
+  public:
     void selectOverviewType(WOverview::Type type) {
         config()->setValue(ConfigKey("[Waveform]", "WaveformOverviewType"), type);
     }
@@ -163,6 +167,113 @@ TEST_F(AnalyzerPhosphorOverviewTest, AbortedBuildLeavesNothingAndALengthChangeRe
     EXPECT_TRUE(again.initialize(
             AnalyzerTrack(pTrack), mixxx::audio::SampleRate(f.rate), f.frames + 5000));
     again.cleanup();
+}
+
+// Storage seam: the analysis store (a real database).
+class AnalyzerPhosphorOverviewStoreTest : public MixxxDbTest {
+  protected:
+    void SetUp() override {
+        ASSERT_EQ(SchemaManager::Result::UpgradeSucceeded,
+                SchemaManager(dbConnection())
+                        .upgradeToSchemaVersion(MixxxDb::kRequiredSchemaVersion,
+                                MixxxDb::kDefaultSchemaFile));
+        config()->setValue(ConfigKey("[Waveform]", "WaveformOverviewType"),
+                WOverview::Type::Phosphor);
+        m_f = pf::load(getTestDir().filePath("phosphor/q4_sine_vs_square.phov"));
+        ASSERT_TRUE(m_f.ok);
+        m_stereo = AnalyzerPhosphorOverviewTest::toStereoFloats(m_f);
+    }
+
+    TrackPointer newTrack() const {
+        return Track::newDummy(QStringLiteral("/tmp/overview.mp3"), TrackId(QVariant(1)));
+    }
+
+    // Runs a complete analysis of the fixture, as if the file had `frames`.
+    bool analyze(const TrackPointer& pTrack, SINT frames) {
+        AnalyzerPhosphorOverview analyzer(config(), dbConnection());
+        if (!analyzer.initialize(AnalyzerTrack(pTrack), mixxx::audio::SampleRate(m_f.rate), frames)) {
+            analyzer.cleanup();
+            return false;
+        }
+        for (SINT pos = 0; pos < static_cast<SINT>(m_stereo.size()); pos += 2 * 4096) {
+            const SINT n = std::min<SINT>(2 * 4096, m_stereo.size() - pos);
+            EXPECT_TRUE(analyzer.processSamples(m_stereo.data() + pos, n));
+        }
+        analyzer.storeResults(pTrack);
+        analyzer.cleanup();
+        return true;
+    }
+
+    int storedCount() {
+        AnalysisDao dao(config());
+        dao.initialize(dbConnection());
+        return dao.getAnalysesForTrackByType(TrackId(QVariant(1)), AnalysisDao::TYPE_PHOSPHOR_OVERVIEW).size();
+    }
+
+    static bool sameColumns(const PhosphorOverviewPointer& a, const PhosphorOverviewPointer& b) {
+        const auto va = a->view();
+        const auto vb = b->view();
+        return a->samplesPerColumn() == b->samplesPerColumn() &&
+                std::equal(va.levels, va.levels + kOverviewColumns * 3, vb.levels) &&
+                std::equal(va.density, va.density + kOverviewColumns * kOverviewRows, vb.density);
+    }
+
+    pf::Fixture m_f;
+    std::vector<CSAMPLE> m_stereo;
+};
+
+TEST_F(AnalyzerPhosphorOverviewStoreTest, StoredColumnsLoadIdenticallyAndAreSkipped) {
+    const TrackPointer pFirst = newTrack();
+    ASSERT_TRUE(analyze(pFirst, m_f.frames));
+    EXPECT_EQ(1, storedCount());
+
+    const TrackPointer pSecond = newTrack(); // a fresh load of the same track
+    EXPECT_FALSE(analyze(pSecond, m_f.frames)); // current data: nothing to build
+    ASSERT_TRUE(pSecond->getPhosphorOverview());
+    EXPECT_TRUE(pSecond->getPhosphorOverview()->isComplete());
+    EXPECT_TRUE(sameColumns(pFirst->getPhosphorOverview(), pSecond->getPhosphorOverview()));
+    EXPECT_EQ(1, storedCount());
+}
+
+TEST_F(AnalyzerPhosphorOverviewStoreTest, ChangedLengthRebuildsAndReplacesTheStoredData) {
+    ASSERT_TRUE(analyze(newTrack(), m_f.frames));
+    const TrackPointer pTrack = newTrack();
+    EXPECT_TRUE(analyze(pTrack, m_f.frames + 5000));
+    ASSERT_TRUE(pTrack->getPhosphorOverview());
+    EXPECT_EQ(m_f.frames + 5000, pTrack->getPhosphorOverview()->totalFrames());
+    EXPECT_EQ(1, storedCount());
+}
+
+TEST_F(AnalyzerPhosphorOverviewStoreTest, OlderVersionRebuilds) {
+    ASSERT_TRUE(analyze(newTrack(), m_f.frames));
+    AnalysisDao dao(config());
+    dao.initialize(dbConnection());
+    auto rows = dao.getAnalysesForTrackByType(TrackId(QVariant(1)), AnalysisDao::TYPE_PHOSPHOR_OVERVIEW);
+    ASSERT_EQ(1, rows.size());
+    rows[0].version = "PhosphorOverview-0.1";
+    ASSERT_TRUE(dao.saveAnalysis(&rows[0]));
+    EXPECT_TRUE(analyze(newTrack(), m_f.frames));
+    EXPECT_EQ(1, storedCount());
+}
+
+TEST_F(AnalyzerPhosphorOverviewStoreTest, ClearingAnalysesRemovesIt) {
+    ASSERT_TRUE(analyze(newTrack(), m_f.frames));
+    AnalysisDao dao(config());
+    dao.initialize(dbConnection());
+    dao.deleteAnalysesForTrack(TrackId(QVariant(1)));
+    EXPECT_EQ(0, storedCount());
+    EXPECT_TRUE(analyze(newTrack(), m_f.frames));
+}
+
+TEST_F(AnalyzerPhosphorOverviewStoreTest, NothingIsStoredWithoutPhosphorOrWithCachingOff) {
+    config()->setValue(ConfigKey("[Waveform]", "WaveformOverviewType"), WOverview::Type::RGB);
+    EXPECT_FALSE(analyze(newTrack(), m_f.frames));
+    EXPECT_EQ(0, storedCount());
+
+    config()->setValue(ConfigKey("[Waveform]", "WaveformOverviewType"), WOverview::Type::Phosphor);
+    config()->setValue(ConfigKey("[Library]", "EnableWaveformCaching"), false);
+    EXPECT_TRUE(analyze(newTrack(), m_f.frames)); // still built in memory
+    EXPECT_EQ(0, storedCount());
 }
 
 } // namespace
