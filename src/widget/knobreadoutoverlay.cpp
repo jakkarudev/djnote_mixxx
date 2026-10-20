@@ -8,6 +8,7 @@
 #include <algorithm>
 
 #include "control/controlproxy.h"
+#include "controllers/controllerinputscope.h"
 #include "moc_knobreadoutoverlay.cpp"
 #include "widget/controlwidgetconnection.h"
 #include "widget/knobreadouttext.h"
@@ -135,6 +136,22 @@ void KnobReadoutOverlay::watchKnob(QWidget* pKnob) {
             onKnobControlChanged(pKnobGuard, pControl);
         }
     });
+    // Controller input: the watch samples the controller's input scope in the
+    // controller thread; the connection is queued to this (GUI) thread and
+    // dies with pControl, i.e. with the knob.
+    if (auto* pWatch = ControllerInputWatch::forKey(pConnection->getKey())) {
+        connect(pWatch,
+                &ControllerInputWatch::changedByController,
+                pControl,
+                [this, pKnobGuard, pControl](double) {
+                    if (!pKnobGuard) {
+                        return;
+                    }
+                    m_pControllerInputKnob = pKnobGuard;
+                    onKnobControlChanged(pKnobGuard, pControl);
+                    m_pControllerInputKnob.clear();
+                });
+    }
     pKnob->installEventFilter(this);
 }
 
@@ -151,7 +168,7 @@ bool KnobReadoutOverlay::eventFilter(QObject* pWatched, QEvent* pEvent) {
 }
 
 bool KnobReadoutOverlay::isOwnInput(QWidget* pKnob) const {
-    return m_pScreenInputKnob == pKnob;
+    return m_pScreenInputKnob == pKnob || m_pControllerInputKnob == pKnob;
 }
 
 void KnobReadoutOverlay::onKnobControlChanged(QWidget* pKnob, ControlProxy* pControl) {
