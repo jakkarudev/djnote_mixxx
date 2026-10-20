@@ -24,6 +24,10 @@ inline int16_t monoSample(CSAMPLE left, CSAMPLE right) {
     return static_cast<int16_t>(std::clamp(mono, -32768.0, 32767.0));
 }
 
+/// Colour tails (research 9): the stored low and high levels release across
+/// columns with these time constants in seconds; mid has none (0).
+constexpr double kHoldSeconds[3] = {0.7, 0.0, 0.1};
+
 inline uint8_t roundU8(double v) {
     return static_cast<uint8_t>(std::clamp(std::floor(v + 0.5), 0.0, 255.0));
 }
@@ -163,8 +167,15 @@ void AnalyzerPhosphorOverview::writeReadyColumns(bool finished) {
             }
         }
         uint8_t* pLevels = m_pData->writableLevels(m_writtenColumns);
+        const double columnSeconds = static_cast<double>(n) / m_pData->sampleRate();
         for (int c = 0; c < 3; ++c) {
-            pLevels[c] = roundU8(peak[c] * 255.0 / 65535.0);
+            double held = roundU8(peak[c] * 255.0 / 65535.0);
+            if (m_writtenColumns > 0 && kHoldSeconds[c] > 0.0) {
+                held = std::max(held,
+                        m_held[c] * std::exp(-columnSeconds / kHoldSeconds[c]));
+            }
+            m_held[c] = held;
+            pLevels[c] = roundU8(held);
         }
         ++m_writtenColumns;
     }
@@ -245,6 +256,7 @@ void AnalyzerPhosphorOverview::cleanup() {
     m_columnFill = 0;
     m_densityColumns = 0;
     m_writtenColumns = 0;
+    m_held = {};
     m_framesSeen = 0;
     m_stored = false;
 }

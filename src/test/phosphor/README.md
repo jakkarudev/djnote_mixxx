@@ -124,7 +124,8 @@ All numbers are little-endian, except the `qCompress` length prefix.
 
 - **Input to the analyzer:** feed the samples (mono sum `(L+R)/2`, int16 scaled by 1/32768 for Mixxx floats)
   at `rate`. The analyzer must produce `COLS` : `n` = samples per column, `levels` = `round(255 * peak hold of
-  the 1 ms colour track)` (colour track fixed at the calibrated constants), `density` = `round(255 * (d / 0.8)^0.25)`
+  the 1 ms colour track)` (colour track fixed at the calibrated constants), then released across columns
+  (`level[k] = max(level[k], held[k-1] * exp(-n / rate / tau))`, tau 0.7 s low, none mid, 0.1 s high, built columns only), `density` = `round(255 * (d / 0.8)^0.25)`
   clipped, `d` the share of the column's samples in the row; rows are `clip(floor(31 v + 31), 0, 61)`, positive
   downward. Zero outside the extent and in columns past the end. Tolerances: levels within 1, density within 1.
 - **Images:** `pixels` is `height` rows of 1920 pixels, bytes B, G, R, A (Qt `Format_ARGB32` on little-endian),

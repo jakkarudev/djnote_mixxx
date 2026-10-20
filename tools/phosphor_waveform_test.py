@@ -288,10 +288,29 @@ class OverviewColumns(unittest.TestCase):
         levels = np.zeros((1920 * 100 + 2, 3))
         levels[10] = (0.2, 0.9, 0.4)
         mono = np.full(1920 * 4410, 0.1)  # N = 4410 -> 100 colour blocks per column
-        c = pw.overview_columns(mono, 44100, pw.default_args(), levels=levels)
+        c = pw.overview_columns(mono, 44100, pw.default_args(), levels=levels, hold=())
         self.assertEqual(c.n, 4410)
         self.assertEqual(c.levels[0].tolist(), [51, 230, 102])
         self.assertEqual(c.levels[1].tolist(), [0, 0, 0])
+
+    def test_low_and_high_levels_release_across_columns_mid_does_not(self):
+        levels = np.zeros((1920 * 100 + 2, 3))
+        levels[10] = (0.4, 0.9, 0.4)
+        mono = np.full(1920 * 4410, 0.1)  # one column = 0.1 s
+        c = pw.overview_columns(mono, 44100, pw.default_args(), levels=levels)
+        self.assertEqual(c.levels[0].tolist(), [102, 230, 102])
+        low, mid, high = c.levels[1].tolist()
+        self.assertEqual(low, round(102 * np.exp(-0.1 / 0.7)))
+        self.assertEqual(mid, 0)
+        self.assertEqual(high, round(102 * np.exp(-0.1 / 0.1)))
+        self.assertEqual(c.levels[2].tolist()[2], round(102 * np.exp(-0.2 / 0.1)))
+
+    def test_levels_do_not_release_into_columns_past_the_end(self):
+        levels = np.zeros((100, 3))
+        levels[0] = (1.0, 1.0, 1.0)
+        c = pw.overview_columns(np.full(1000 * 441, 0.1), 44100, pw.default_args(), levels=levels)
+        built = -(-len(np.full(1000 * 441, 0.1)) // c.n)
+        self.assertTrue(c.levels[built:].sum() == 0)
 
     def test_digital_silence_is_a_one_row_line_at_row_31(self):
         c = self.columns(np.zeros(1920 * 2))

@@ -66,6 +66,7 @@ class AnalyzerPhosphorOverview : public Analyzer {
     int m_columnFill;     // samples in the column being counted
     int m_densityColumns; // columns whose density is final
     int m_writtenColumns; // columns whose levels are final too
+    std::array<double, 3> m_held{}; // last column's held levels (colour tails)
     SINT m_framesSeen;
     bool m_stored;
 };
