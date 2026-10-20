@@ -78,7 +78,8 @@ void WaveformRenderBeat::paintGL() {
                 return qRound(x * devicePixelRatio) / static_cast<double>(devicePixelRatio);
             },
             WaveformWidgetFactory::instance()->getScrollingLineSettings(),
-            m_waveformRenderer->getBeatGridAlpha());
+            m_waveformRenderer->getBeatGridAlpha(),
+            m_color);
     if (lines.empty()) {
         return;
     }
@@ -96,25 +97,26 @@ void WaveformRenderBeat::paintGL() {
     const QMatrix4x4 matrix = matrixForWidgetGeometry(m_waveformRenderer, false);
     m_shader.setUniformValue(matrixLocation, matrix);
 
-    // One batch per line kind: all lines of a kind look the same.
+    // One batch per line kind: all lines of a kind look the same (opacity,
+    // width and colour). Wider lines grow both ways from the beat.
     for (const auto kind : {mixxx::scrollinglinelayout::LineKind::Bar,
                  mixxx::scrollinglinelayout::LineKind::Beat}) {
         m_vertices.clear();
-        int opacityPercent = 0;
+        QColor color;
         for (const auto& line : lines) {
             if (line.kind == kind) {
-                opacityPercent = line.opacityPercent;
-                const float x1 = static_cast<float>(line.x);
-                m_vertices.addRectangle(x1, 0.f, x1 + 1.f, lineBreadth);
+                color = line.color;
+                color.setAlphaF(line.opacityPercent / 100.0f);
+                const float x1 = static_cast<float>(line.x) - (line.widthPx - 1) / 2;
+                m_vertices.addRectangle(x1, 0.f, x1 + line.widthPx, lineBreadth);
             }
         }
         if (m_vertices.size() == 0) {
             continue;
         }
-        m_color.setAlphaF(opacityPercent / 100.0f);
         m_shader.setAttributeArray(
                 positionLocation, GL_FLOAT, m_vertices.constData(), 2);
-        m_shader.setUniformValue(colorLocation, m_color);
+        m_shader.setUniformValue(colorLocation, color);
         glDrawArrays(GL_TRIANGLES, 0, m_vertices.size());
     }
 

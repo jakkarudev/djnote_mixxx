@@ -2,11 +2,15 @@
 
 #include <QGroupBox>
 #include <QList>
+#include <optional>
 
 #include "waveform/scrollinglinelayout.h"
 
 class QCheckBox;
+class QColor;
+class QColorDialog;
 class QGridLayout;
+class QPushButton;
 class QSlider;
 class QSpinBox;
 
@@ -35,12 +39,35 @@ class ScrollingLinesPrefsGroup : public QGroupBox {
         QSlider* pSlider = nullptr;
         QSpinBox* pSpinBox = nullptr;
     };
+    // A colour button that opens a colour dialog for a custom colour, and a
+    // "Skin colour" button that goes back to the skin's beat colour.
+    struct ColorControls {
+        QPushButton* pColorButton = nullptr;
+        QPushButton* pSkinColorButton = nullptr;
+        QColorDialog* pDialog = nullptr;
+    };
+    using ColorMember = std::optional<QColor> mixxx::scrollinglinelayout::LineSettings::*;
 
     OpacityControls addOpacityRow(QGridLayout* pGrid,
             int& row,
             const QString& name,
             const QString& objectNamePrefix,
             const QString& explanation);
+    QSpinBox* addWidthRow(QGridLayout* pGrid,
+            int& row,
+            const QString& name,
+            const QString& objectNamePrefix,
+            const QString& explanation);
+    ColorControls addColorRow(QGridLayout* pGrid,
+            int& row,
+            const QString& name,
+            const QString& objectNamePrefix,
+            const QString& explanation,
+            ColorMember pColor);
+    ColorControls& colorControls(ColorMember pColor);
+    void openColorDialog(ColorMember pColor);
+    void setColor(ColorMember pColor, const std::optional<QColor>& color);
+    static void showColor(const ColorControls& controls, const std::optional<QColor>& color);
     void slotControlChanged();
     void updateUpstreamControls();
 
@@ -48,5 +75,9 @@ class ScrollingLinesPrefsGroup : public QGroupBox {
     QCheckBox* m_pEnabledCheckBox = nullptr;
     OpacityControls m_barOpacity;
     OpacityControls m_beatOpacity;
+    QSpinBox* m_pBarWidthSpinBox = nullptr;
+    QSpinBox* m_pBeatWidthSpinBox = nullptr;
+    ColorControls m_barColor;
+    ColorControls m_beatColor;
     mixxx::scrollinglinelayout::LineSettings m_settings;
 };
