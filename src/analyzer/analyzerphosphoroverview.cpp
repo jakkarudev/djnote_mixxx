@@ -24,13 +24,9 @@ inline int16_t monoSample(CSAMPLE left, CSAMPLE right) {
     return static_cast<int16_t>(std::clamp(mono, -32768.0, 32767.0));
 }
 
-/// Colour tails (research 9): the stored low and high levels release across
+/// Color tails (research 9): the stored low and high levels release across
 /// columns with these time constants in seconds; mid has none (0).
 constexpr double kHoldSeconds[3] = {0.7, 0.0, 0.1};
-
-inline uint8_t roundU8(double v) {
-    return static_cast<uint8_t>(std::clamp(std::floor(v + 0.5), 0.0, 255.0));
-}
 
 } // namespace
 
@@ -163,7 +159,9 @@ void AnalyzerPhosphorOverview::writeReadyDensity(bool finished) {
         }
         uint8_t* pDensity = m_pData->writableDensity(k);
         for (int r = 0; r < kOverviewRows; ++r) {
-            pDensity[r] = roundU8(255.0 * std::pow(static_cast<double>(window[r]) / std::max(1, count) / 0.8, 0.25));
+            pDensity[r] = roundU8(255.0 *
+                    std::pow(static_cast<double>(window[r]) / std::max(1, count) / kDensityFull,
+                            kDensityStorePower));
         }
         ++m_densityColumns;
     }
@@ -213,10 +211,7 @@ bool AnalyzerPhosphorOverview::processSamples(const CSAMPLE* pIn, SINT count) {
         const SINT frame = m_framesSeen + i;
         const SINT column = frame / n;
         if (column < kOverviewColumns) {
-            const int row = std::clamp(
-                    static_cast<int>(std::floor(mono / 32768.0 * 31 + 31)),
-                    0,
-                    kOverviewRows - 1);
+            const int row = overviewRowOf(mono);
             const SINT start = column * n;
             ++m_own[column][row];
             if (mono != 0) {

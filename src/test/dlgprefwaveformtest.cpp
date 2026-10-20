@@ -43,6 +43,29 @@ TEST_F(DlgPrefWaveformTest, PhosphorIsListedAfterTheOtherOverviewTypes) {
     }
 }
 
+// Only a switch to Phosphor asks for the loaded tracks to be analyzed again.
+TEST_F(DlgPrefWaveformTest, OnlySwitchingToPhosphorSignalsTheOverviewSelection) {
+    config()->setValue(ConfigKey("[Waveform]", "WaveformOverviewType"), WOverview::Type::RGB);
+    WaveformWidgetFactory::instance()->setConfig(config());
+    auto pDialog = std::make_unique<DlgPrefWaveform>(nullptr, config(), nullptr);
+    pDialog->slotUpdate();
+    QSignalSpy spy(WaveformWidgetFactory::instance(),
+            &WaveformWidgetFactory::phosphorOverviewSelected);
+    auto* pCombo = pDialog->waveformOverviewComboBox;
+    const auto select = [&](WOverview::Type type) {
+        pCombo->setCurrentIndex(pCombo->findData(QVariant::fromValue(type)));
+    };
+    select(WOverview::Type::Filtered);
+    select(WOverview::Type::HSV);
+    EXPECT_EQ(0, spy.count());
+    select(WOverview::Type::Phosphor);
+    EXPECT_EQ(1, spy.count());
+    select(WOverview::Type::RGB);
+    EXPECT_EQ(1, spy.count());
+    select(WOverview::Type::Phosphor);
+    EXPECT_EQ(2, spy.count());
+}
+
 namespace {
 using mixxx::phosphor::PhosphorOverviewSettings;
 

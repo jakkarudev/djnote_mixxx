@@ -788,10 +788,14 @@ def overview_image(levels, density, n, settings=None, height=OVERVIEW_ROWS, colu
     bottom = OVERVIEW_ROWS - 1 - nz[:, ::-1].argmax(1)
     rows = np.arange(OVERVIEW_ROWS)[None, :]
     inside = has[:, None] & (rows >= top[:, None]) & (rows <= bottom[:, None])
+    # The floor for a row no sample hit is 0.5 / N. Density is now a share of
+    # a ~2N-sample window, so this is about one sample of it. Tried at half a
+    # sample of the window (0.25 / N): the four tracks move by 0.01 at most,
+    # Q4 gets worse (24.4 to 28.1) and Q2a slightly (35.9 to 36.4), so it is
+    # kept as a calibrated floor (research 9).
     d = np.where(inside, np.maximum(DENSITY_FULL * (dens / 255.0) ** 4, 0.5 / n), 0.0)
     norm = np.linalg.norm(lv, axis=1)
-    live = norm > 0
-    unit = lv / np.where(live, norm, 1.0)[:, None]
+    unit = lv / np.where(norm > 0, norm, 1.0)[:, None]
     blue4 = unit[:, 2] ** STRIPE_BLUE_POWER
     mag = ((unit @ STRIPE_W[:3] + blue4 * STRIPE_W[3]) * norm ** s.level_exponent * s.brightness)
     rgb = unit[:, None, :] * (mag[:, None] * d ** s.density_exponent)[:, :, None]  # (cols, rows, 3)
@@ -799,13 +803,14 @@ def overview_image(levels, density, n, settings=None, height=OVERVIEW_ROWS, colu
     px[..., 0], px[..., 1], px[..., 2] = rgb[..., 2], rgb[..., 1], rgb[..., 0]
     px[..., 3] = ALPHA_PER_G * rgb[..., 1]
     px = np.clip(px, 0, 255)
-    px[inside & ~live[:, None]] = (0, 0, 0, 255)  # silence: an opaque black line
     px[~inside] = 0
-    # Traktor draws that line one row above the row map's centre (row 30, research 9),
-    # while the map itself stays: shift silent columns up by a row.
-    sil = has & ~live
-    px[sil, :-1] = px[sil, 1:].copy()
-    px[sil, -1] = 0
+    # Silence is judged from the audio, not from the gained levels: stored
+    # levels all zero and the extent a single row at the centre. Gains of 0
+    # only darken a column. Traktor draws the silence line one row above the
+    # row map's centre (row 30, research 9), while the map itself stays.
+    sil = has & (top == bottom) & (top == OVERVIEW_ROWS // 2) & ~np.asarray(levels[:done]).any(1)
+    px[sil] = 0
+    px[sil, OVERVIEW_ROWS // 2 - 1] = (0, 0, 0, 255)
     out[:, :done] = px.transpose(1, 0, 2)
     if height != OVERVIEW_ROWS:
         out = np.einsum("yr,rcb->ycb", _height_weights(height), out)

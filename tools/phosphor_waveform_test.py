@@ -404,6 +404,7 @@ class OverviewImage(unittest.TestCase):
     def test_gaps_inside_the_extent_get_half_a_sample(self):
         c = self.cols(self.square(0.5))
         img = self.image(c)
+        # A calibrated floor of 0.5 / N (about one sample of the two-column window).
         u, mag = self.magnitude(c.levels[0].astype(float), 0.5 / c.n)
         self.assertEqual(img[30, 0, 1], int(np.floor(u[1] * mag + 0.5)))
 
@@ -433,13 +434,14 @@ class OverviewImage(unittest.TestCase):
         self.assertLess(np.abs(a * 2 - b).max(), 2)
         self.assertEqual(self.image(c, brightness=4.0)[15, 0, :3].max(), 255)
 
-    def test_gains_change_the_hue_and_zero_gains_leave_a_black_line(self):
+    def test_gains_change_the_hue_and_zero_gains_leave_the_columns_dark(self):
         c = self.cols(self.square(0.5))
         base = self.image(c)[15, 0]
         red = self.image(c, gain_low=4.0)[15, 0]
         self.assertGreater(int(red[2]) / max(1, int(red[1])), 2 * int(base[2]) / int(base[1]))
         off = self.image(c, gain_low=0, gain_mid=0, gain_high=0)
-        self.assertEqual(off[15, 0].tolist(), [0, 0, 0, 255])
+        # Not silence (the audio is loud): dark and transparent, no black block.
+        self.assertEqual(off[:, 0].tolist(), [[0, 0, 0, 0]] * 62)
 
     def test_density_exponent_one_makes_the_pixel_proportional_to_density(self):
         rng = np.random.default_rng(3)

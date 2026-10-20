@@ -334,11 +334,7 @@ void WOverview::slotPhosphorOverviewUpdated() {
     if (pOverview != m_pPhosphorOverview) {
         // Replaced (rebuilt) or cleared: start over with what is there.
         m_pPhosphorOverview = pOverview;
-        m_waveformSourceImage = QImage();
-        m_waveformImageScaled = QImage();
-        m_actualCompletion = 0;
-        m_waveformPeak = -1.0;
-        m_pixmapDone = false;
+        resetOverviewImage();
         m_analyzerProgress = kAnalyzerProgressUnknown;
     }
     if (m_pPhosphorOverview) {
@@ -515,12 +511,16 @@ void WOverview::slotTypeControlChanged(double v) {
     m_type = type;
     m_pWaveform.clear();
     m_pPhosphorOverview.reset();
+    resetOverviewImage();
+    slotWaveformSummaryUpdated();
+}
+
+void WOverview::resetOverviewImage() {
     m_waveformSourceImage = QImage();
     m_waveformImageScaled = QImage();
     m_actualCompletion = 0;
     m_waveformPeak = -1.0;
     m_pixmapDone = false;
-    slotWaveformSummaryUpdated();
 }
 
 void WOverview::slotPhosphorOverviewSettingsChanged() {
@@ -1574,7 +1574,7 @@ void WOverview::drawPassthroughOverlay(QPainter* pPainter) {
     }
 }
 
-mixxx::phosphor::OverviewDrawSettings WOverview::phosphorDrawSettings() const {
+mixxx::phosphor::PhosphorOverviewSettings WOverview::phosphorDrawSettings() const {
     return WaveformWidgetFactory::instance()->phosphorOverviewSettings();
 }
 

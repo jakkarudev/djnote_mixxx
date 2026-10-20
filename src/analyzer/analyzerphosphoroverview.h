@@ -74,7 +74,7 @@ class AnalyzerPhosphorOverview : public Analyzer {
     int m_colorBlockFrames;
     int m_densityColumns; // columns whose density is final
     int m_writtenColumns; // columns whose levels are final too
-    std::array<double, 3> m_held{}; // last column's held levels (colour tails)
+    std::array<double, 3> m_held{}; // last column's held levels (color tails)
     SINT m_framesSeen;
     bool m_stored;
 };

@@ -775,6 +775,12 @@ void WaveformWidgetFactory::setPhosphorOverviewSettings(
     emit phosphorOverviewSettingsChanged();
 }
 
+void WaveformWidgetFactory::setOverviewType(WOverview::Type type) {
+    if (type == WOverview::Type::Phosphor) {
+        emit phosphorOverviewSelected();
+    }
+}
+
 void WaveformWidgetFactory::setOverviewNormalized(bool normalize) {
     m_overviewNormalized = normalize;
     if (m_config) {

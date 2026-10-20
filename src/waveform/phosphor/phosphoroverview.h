@@ -2,7 +2,9 @@
 
 #include <QByteArray>
 #include <QImage>
+#include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -15,7 +17,26 @@ namespace mixxx::phosphor {
 /// The Phosphor overview model (research 9, ADR-0005, spec #50).
 constexpr int kOverviewColumns = 1920;
 constexpr int kOverviewRows = 62;
-constexpr int kOverviewColumnBytes = 3 + kOverviewRows; // levels + density
+/// The row of a sample of 0, and so the center line of the row map.
+constexpr int kOverviewCenterRow = kOverviewRows / 2;
+/// A share of the window of this size stores as 255 (density byte =
+/// round(255 * (share / kDensityFull)^kDensityStorePower)).
+constexpr double kDensityFull = 0.8;
+constexpr double kDensityStorePower = 0.25;
+/// round half up, clipped to a byte.
+inline uint8_t roundU8(double v) {
+    return static_cast<uint8_t>(std::clamp(std::floor(v + 0.5), 0.0, 255.0));
+}
+
+/// The row of an int16 mono sample: floor(v / 32768 * 31 + 31), 0..61,
+/// positive downward.
+inline int overviewRowOf(int16_t sample) {
+    constexpr double kInt16Scale = 32768.0;
+    return std::clamp(static_cast<int>(std::floor(
+                              sample / kInt16Scale * kOverviewCenterRow + kOverviewCenterRow)),
+            0,
+            kOverviewRows - 1);
+}
 
 /// Version of the stored columns: bump when the row map, the column count, the
 /// encoding, the column window or the color track constants change (1.2:
@@ -24,12 +45,9 @@ constexpr const char* kOverviewVersion = "PhosphorOverview-1.2";
 constexpr const char* kOverviewDescription =
         "Phosphor overview: 1920 columns of 3 band levels and 62 density rows";
 
-/// How the stored columns are drawn (the settings group of the same name).
-using OverviewDrawSettings = PhosphorOverviewSettings;
-
 /// A read-only view on stored columns: kOverviewColumns x 3 level bytes
 /// (low, mid, high; round(255 * level)) and kOverviewColumns x kOverviewRows
-/// density bytes (round(255 * (d / 0.8)^0.25), zero outside the extent).
+/// density bytes (round(255 * (d / kDensityFull)^kDensityStorePower), zero outside the extent).
 struct OverviewColumnsView {
     const uint8_t* levels = nullptr;
     const uint8_t* density = nullptr;
@@ -41,11 +59,11 @@ struct OverviewColumnsView {
 /// The overview source image: kOverviewColumns wide, `height` rows covering
 /// -1.0 (top) to +1.0, Format_ARGB32 (straight alpha). Pure.
 QImage overviewImage(const OverviewColumnsView& columns,
-        const OverviewDrawSettings& settings,
+        const PhosphorOverviewSettings& settings,
         int height = kOverviewRows);
 
 /// The outermost non-empty row of the built columns, as a distance from the
-/// centre line in rows (0..31): 31 is a track that reaches 0 dBFS. Normalize
+/// center line in rows (0..31): 31 is a track that reaches 0 dBFS. Normalize
 /// crops to this once the data is complete.
 int overviewExtentRows(const OverviewColumnsView& columns);
 

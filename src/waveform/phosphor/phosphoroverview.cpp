@@ -15,8 +15,6 @@ constexpr double kWeightG = 242.0;
 constexpr double kWeightB = -37.4;
 constexpr double kWeightB4 = 606.1;
 constexpr double kAlphaPerGreen = 2.0;
-// A density share of this stores as 255.
-constexpr double kDensityFull = 0.8;
 
 inline double clamp255(double v) {
     return std::clamp(v, 0.0, 255.0);
@@ -25,12 +23,13 @@ inline double clamp255(double v) {
 } // namespace
 
 QImage overviewImage(const OverviewColumnsView& columns,
-        const OverviewDrawSettings& settings,
+        const PhosphorOverviewSettings& settings,
         int height) {
     DEBUG_ASSERT(height > 0);
     // 62 rows, per channel B, G, R, A, as floats.
     std::vector<double> src(static_cast<size_t>(kOverviewRows) * kOverviewColumns * 4, 0.0);
     const int done = std::clamp(columns.columnsDone, 0, kOverviewColumns);
+    // A calibrated floor (research 9): about one sample of the two-column window.
     const double halfSample = 0.5 / std::max(1, columns.samplesPerColumn);
     for (int c = 0; c < done; ++c) {
         const uint8_t* density = columns.density + static_cast<size_t>(c) * kOverviewRows;
@@ -48,32 +47,32 @@ QImage overviewImage(const OverviewColumnsView& columns,
             continue;
         }
         const uint8_t* lv8 = columns.levels + static_cast<size_t>(c) * 3;
+        if (top == bottom && top == kOverviewCenterRow && lv8[0] == 0 && lv8[1] == 0 &&
+                lv8[2] == 0) {
+            // Digital silence (judged from the audio, not the gained levels): an
+            // opaque black pixel one row above the row map's center, as Traktor
+            // draws it (row 30, research 9).
+            src[(static_cast<size_t>(kOverviewCenterRow - 1) * kOverviewColumns + c) * 4 + 3] = 255.0;
+            continue;
+        }
         const double lr = lv8[0] / 255.0 * settings.gainLow;
         const double lg = lv8[1] / 255.0 * settings.gainMid;
         const double lb = lv8[2] / 255.0 * settings.gainHigh;
         const double norm = std::sqrt(lr * lr + lg * lg + lb * lb);
-        double ur = 0, ug = 0, ub = 0, mag = 0;
-        const bool live = norm > 0;
-        if (live) {
-            ur = lr / norm;
-            ug = lg / norm;
-            ub = lb / norm;
-            mag = (kWeightR * ur + kWeightG * ug + kWeightB * ub +
-                          kWeightB4 * std::pow(ub, 4)) *
-                    std::pow(norm, settings.levelExponent) * settings.brightness;
+        if (norm <= 0) {
+            continue; // all gains at 0: the column is dark
         }
+        const double ur = lr / norm;
+        const double ug = lg / norm;
+        const double ub = lb / norm;
+        const double mag = (kWeightR * ur + kWeightG * ug + kWeightB * ub +
+                                   kWeightB4 * std::pow(ub, 4)) *
+                std::pow(norm, settings.levelExponent) * settings.brightness;
         for (int r = top; r <= bottom; ++r) {
-            if (!live) {
-                // Silence: an opaque black line, drawn one row above the row map
-                // as Traktor does (row 30 for digital silence, research 9).
-                if (r > 0) {
-                    src[(static_cast<size_t>(r - 1) * kOverviewColumns + c) * 4 + 3] = 255.0;
-                }
-                continue;
-            }
             double* px = &src[(static_cast<size_t>(r) * kOverviewColumns + c) * 4];
-            const double d = std::max(
-                    kDensityFull * std::pow(density[r] / 255.0, 4), halfSample);
+            const double d = std::max(kDensityFull *
+                                    std::pow(density[r] / 255.0, 1.0 / kDensityStorePower),
+                    halfSample);
             const double k = mag * std::pow(d, settings.densityExponent);
             px[0] = clamp255(ub * k);
             px[1] = clamp255(ug * k);
@@ -83,9 +82,6 @@ QImage overviewImage(const OverviewColumnsView& columns,
     }
 
     QImage image(kOverviewColumns, height, QImage::Format_ARGB32);
-    const auto roundU8 = [](double v) {
-        return static_cast<uint8_t>(std::clamp(std::floor(v + 0.5), 0.0, 255.0));
-    };
     std::vector<double> acc(static_cast<size_t>(kOverviewColumns) * 4);
     for (int y = 0; y < height; ++y) {
         // Area average of the source rows covered by output row y.
@@ -118,14 +114,14 @@ int overviewExtentRows(const OverviewColumnsView& columns) {
         const uint8_t* density = columns.density + static_cast<size_t>(c) * kOverviewRows;
         for (int r = 0; r < kOverviewRows; ++r) {
             if (density[r] != 0) {
-                // Row r above the centre is 31 - r rows from it, below it r - 30.
-                extent = std::max(extent, kOverviewRows / 2 - r);
+                // Row r above the center is 31 - r rows from it, below it r - 30.
+                extent = std::max(extent, kOverviewCenterRow - r);
                 break;
             }
         }
         for (int r = kOverviewRows - 1; r >= 0; --r) {
             if (density[r] != 0) {
-                extent = std::max(extent, r - (kOverviewRows / 2 - 1));
+                extent = std::max(extent, r - (kOverviewCenterRow - 1));
                 break;
             }
         }
@@ -153,6 +149,9 @@ OverviewColumnsView PhosphorOverviewData::view() const {
 }
 
 namespace {
+// Sanity bounds of stored data.
+constexpr uint32_t kMaxStoredSampleRate = 1000000;
+constexpr uint64_t kMaxStoredFrames = uint64_t(1) << 40;
 constexpr int kHeaderBytes = 4 + 8;
 constexpr int kLevelBytes = kOverviewColumns * 3;
 constexpr int kDensityBytes = kOverviewColumns * kOverviewRows;
@@ -186,7 +185,7 @@ std::shared_ptr<PhosphorOverviewData> PhosphorOverviewData::fromByteArray(
     for (int i = 0; i < 8; ++i) {
         frames |= static_cast<uint64_t>(static_cast<uint8_t>(bytes[4 + i])) << (8 * i);
     }
-    if (rate == 0 || rate > 1000000 || frames == 0 || frames > (uint64_t(1) << 40)) {
+    if (rate == 0 || rate > kMaxStoredSampleRate || frames == 0 || frames > kMaxStoredFrames) {
         return nullptr;
     }
     auto pData = std::make_shared<PhosphorOverviewData>(

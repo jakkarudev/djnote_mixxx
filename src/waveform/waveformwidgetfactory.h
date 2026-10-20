@@ -12,6 +12,7 @@
 #include "waveform/overviewsettings.h"
 #include "waveform/phosphor/phosphorsettings.h"
 #include "waveform/widgets/waveformwidgettype.h"
+#include "widget/woverview.h"
 
 class WVuMeterLegacy;
 class WVuMeterBase;
@@ -170,6 +171,9 @@ class WaveformWidgetFactory : public QObject, public Singleton<WaveformWidgetFac
     }
     void setPhosphorOverviewSettings(const mixxx::phosphor::PhosphorOverviewSettings& settings);
 
+    /// The overview type was changed in Preferences: only a switch to Phosphor
+    /// needs the loaded tracks analyzed again.
+    void setOverviewType(WOverview::Type type);
     void setOverviewNormalized(bool normalize);
     int isOverviewNormalized() const { return m_overviewNormalized;}
 
@@ -218,8 +222,9 @@ class WaveformWidgetFactory : public QObject, public Singleton<WaveformWidgetFac
 
     void overviewNormalizeChanged();
     void phosphorOverviewSettingsChanged();
-    /// The overview type was changed in Preferences.
-    void overviewTypeChanged();
+    /// The overview type was switched to Phosphor in Preferences (the config
+    /// is written first: the analyzers read it on their own thread).
+    void phosphorOverviewSelected();
     void overviewLinesChanged();
     void overallVisualGainChanged();
 

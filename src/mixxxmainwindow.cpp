@@ -282,7 +282,7 @@ void MixxxMainWindow::initialize() {
 
     // Switching the overview type rebuilds the decks' loaded tracks.
     connect(WaveformWidgetFactory::instance(),
-            &WaveformWidgetFactory::overviewTypeChanged,
+            &WaveformWidgetFactory::phosphorOverviewSelected,
             m_pCoreServices->getPlayerManager().get(),
             &PlayerManager::slotAnalyzeLoadedDeckTracks);
 

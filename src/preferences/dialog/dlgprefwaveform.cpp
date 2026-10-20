@@ -25,6 +25,45 @@
 namespace {
 const ConfigKey kOverviewTypeCfgKey(QStringLiteral("[Waveform]"),
         QStringLiteral("WaveformOverviewType"));
+
+/// One setting row of a grid: a name with its control(s), and the explanation
+/// below, which is also the tooltip of everything on the row. Advances `row`.
+void addSettingRow(QGridLayout* pGrid,
+        int& row,
+        const QString& name,
+        const QList<QWidget*>& controls,
+        const QString& explanation) {
+    auto* pLabel = new QLabel(name);
+    auto* pControls = new QHBoxLayout();
+    pControls->setContentsMargins(0, 0, 0, 0);
+    for (QWidget* pControl : controls) {
+        pControl->setToolTip(explanation);
+        pControls->addWidget(pControl);
+    }
+    pControls->addStretch(1);
+    pLabel->setToolTip(explanation);
+    pGrid->addWidget(pLabel, row, 0);
+    pGrid->addLayout(pControls, row, 1);
+    auto* pExplanation = new QLabel(explanation);
+    pExplanation->setWordWrap(true);
+    pExplanation->setToolTip(explanation);
+    QFont font = pExplanation->font();
+    font.setItalic(true);
+    pExplanation->setFont(font);
+    pGrid->addWidget(pExplanation, row + 1, 0, 1, 2);
+    row += 2;
+}
+
+/// A small name in front of a box, for rows with three boxes.
+QWidget* labelledBox(const QString& text, QDoubleSpinBox* pBox) {
+    auto* pWidget = new QWidget();
+    auto* pLayout = new QHBoxLayout(pWidget);
+    pLayout->setContentsMargins(0, 0, 0, 0);
+    pLayout->addWidget(new QLabel(text));
+    pLayout->addWidget(pBox);
+    return pWidget;
+}
+
 } // namespace
 
 DlgPrefWaveform::DlgPrefWaveform(
@@ -551,7 +590,7 @@ void DlgPrefWaveform::slotSetWaveformOverviewType() {
     m_pConfig->setValue(kOverviewTypeCfgKey, type);
     m_pTypeControl->forceSet(static_cast<double>(type));
     // Config is written first: the analyzers read it on their own thread.
-    emit WaveformWidgetFactory::instance()->overviewTypeChanged();
+    WaveformWidgetFactory::instance()->setOverviewType(type);
 }
 
 void DlgPrefWaveform::slotSetDefaultZoom(int index) {
@@ -623,30 +662,10 @@ void DlgPrefWaveform::buildPhosphorAdvanced() {
             &QWidget::setVisible);
 
     int row = 0;
-    // One setting: a name with its control(s), and the explanation below,
-    // which is also the tooltip of everything on the row.
     const auto addSetting = [&](const QString& name,
                                     const QList<QWidget*>& controls,
                                     const QString& explanation) {
-        auto* pLabel = new QLabel(name);
-        auto* pControls = new QHBoxLayout();
-        pControls->setContentsMargins(0, 0, 0, 0);
-        for (QWidget* pControl : controls) {
-            pControl->setToolTip(explanation);
-            pControls->addWidget(pControl);
-        }
-        pControls->addStretch(1);
-        pLabel->setToolTip(explanation);
-        pGrid->addWidget(pLabel, row, 0);
-        pGrid->addLayout(pControls, row, 1);
-        auto* pExplanation = new QLabel(explanation);
-        pExplanation->setWordWrap(true);
-        pExplanation->setToolTip(explanation);
-        QFont font = pExplanation->font();
-        font.setItalic(true);
-        pExplanation->setFont(font);
-        pGrid->addWidget(pExplanation, row + 1, 0, 1, 2);
-        row += 2;
+        addSettingRow(pGrid, row, name, controls, explanation);
     };
     const auto changed = [this](QDoubleSpinBox* pBox) {
         connect(pBox,
@@ -654,15 +673,6 @@ void DlgPrefWaveform::buildPhosphorAdvanced() {
                 this,
                 &DlgPrefWaveform::slotPhosphorAdvancedChanged);
         return pBox;
-    };
-    // A small name in front of a box, for rows with three boxes.
-    const auto labelled = [](const QString& text, QDoubleSpinBox* pBox) {
-        auto* pWidget = new QWidget();
-        auto* pLayout = new QHBoxLayout(pWidget);
-        pLayout->setContentsMargins(0, 0, 0, 0);
-        pLayout->addWidget(new QLabel(text));
-        pLayout->addWidget(pBox);
-        return pWidget;
     };
 
     m_pPhosphorSaturation = changed(makeSpinBox(kMinSaturation, kMaxSaturation, 0.1, 1, QString()));
@@ -679,7 +689,7 @@ void DlgPrefWaveform::buildPhosphorAdvanced() {
     for (int c = 0; c < 3; ++c) {
         m_pPhosphorGain[c] = changed(makeSpinBox(0.0, kMaxChannelGain, 0.05, 2, QString()));
         m_pPhosphorGain[c]->setToolTip(gainText);
-        gainWidgets.append(labelled(gainNames[c], m_pPhosphorGain[c]));
+        gainWidgets.append(labelledBox(gainNames[c], m_pPhosphorGain[c]));
     }
     addSetting(tr("Color strength"), gainWidgets, gainText);
 
@@ -742,7 +752,7 @@ void DlgPrefWaveform::buildPhosphorAdvanced() {
     for (int c = 0; c < 3; ++c) {
         m_pPhosphorRelease[c] = changed(makeSpinBox(0.0, kMaxReleaseMs, 10.0, 0, tr(" ms")));
         m_pPhosphorRelease[c]->setToolTip(releaseText);
-        releaseWidgets.append(labelled(releaseNames[c], m_pPhosphorRelease[c]));
+        releaseWidgets.append(labelledBox(releaseNames[c], m_pPhosphorRelease[c]));
     }
     addSetting(tr("Color release"), releaseWidgets, releaseText);
 
@@ -851,25 +861,7 @@ void DlgPrefWaveform::buildPhosphorOverviewAdvanced() {
     const auto addSetting = [&](const QString& name,
                                     const QList<QWidget*>& controls,
                                     const QString& explanation) {
-        auto* pLabel = new QLabel(name);
-        auto* pControls = new QHBoxLayout();
-        pControls->setContentsMargins(0, 0, 0, 0);
-        for (QWidget* pControl : controls) {
-            pControl->setToolTip(explanation);
-            pControls->addWidget(pControl);
-        }
-        pControls->addStretch(1);
-        pLabel->setToolTip(explanation);
-        pGrid->addWidget(pLabel, row, 0);
-        pGrid->addLayout(pControls, row, 1);
-        auto* pExplanation = new QLabel(explanation);
-        pExplanation->setWordWrap(true);
-        pExplanation->setToolTip(explanation);
-        QFont font = pExplanation->font();
-        font.setItalic(true);
-        pExplanation->setFont(font);
-        pGrid->addWidget(pExplanation, row + 1, 0, 1, 2);
-        row += 2;
+        addSettingRow(pGrid, row, name, controls, explanation);
     };
     const auto make = [this](const QString& objectName, double min, double max, double step) {
         auto* pBox = makeSpinBox(min, max, step, 2, QString());
@@ -919,12 +911,7 @@ void DlgPrefWaveform::buildPhosphorOverviewAdvanced() {
     for (int c = 0; c < 3; ++c) {
         m_pOverviewGain[c] = make(QString::fromLatin1(gainObjects[c]), 0.0, kMaxOverviewGain, 0.05);
         m_pOverviewGain[c]->setToolTip(gainText);
-        auto* pWidget = new QWidget();
-        auto* pLayout = new QHBoxLayout(pWidget);
-        pLayout->setContentsMargins(0, 0, 0, 0);
-        pLayout->addWidget(new QLabel(gainNames[c]));
-        pLayout->addWidget(m_pOverviewGain[c]);
-        gainWidgets.append(pWidget);
+        gainWidgets.append(labelledBox(gainNames[c], m_pOverviewGain[c]));
     }
     addSetting(tr("Color strength"), gainWidgets, gainText);
 

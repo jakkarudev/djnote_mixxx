@@ -206,15 +206,14 @@ class PlayerManager : public PlayerManagerInterface {
     void slotChangeNumMicrophones(double v);
     void slotChangeNumAuxiliaries(double v);
 
-  protected slots:
-    FRIEND_TEST(PlayerManagerTest, UnEjectInvalidTrackIdTest);
-    void slotSaveEjectedTrack(TrackPointer track);
-
-  public slots:
     /// Queues the tracks loaded in decks for analysis again, without
     /// reloading them (switching the overview type to Phosphor). Samplers and
     /// preview decks pick the change up on their next load.
     void slotAnalyzeLoadedDeckTracks();
+
+  protected slots:
+    FRIEND_TEST(PlayerManagerTest, UnEjectInvalidTrackIdTest);
+    void slotSaveEjectedTrack(TrackPointer track);
 
   private slots:
     void slotAnalyzeTrack(TrackPointer track);

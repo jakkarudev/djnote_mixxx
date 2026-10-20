@@ -23,8 +23,8 @@ class PhosphorOverviewTest : public MixxxTest {
     }
 };
 
-OverviewDrawSettings toDrawSettings(const pf::Settings& s) {
-    OverviewDrawSettings d;
+PhosphorOverviewSettings toDrawSettings(const pf::Settings& s) {
+    PhosphorOverviewSettings d;
     d.brightness = s.brightness;
     d.levelExponent = s.levelExponent;
     d.densityExponent = s.densityExponent;
@@ -67,6 +67,44 @@ TEST_F(PhosphorOverviewTest, ImageMatchesFixtures) {
     EXPECT_GT(compared, 50);
 }
 
+// Silence is judged from the stored audio, not from the gained levels.
+TEST_F(PhosphorOverviewTest, SilenceIsAudioNotGain) {
+    std::vector<uint8_t> levels(kOverviewColumns * 3, 0);
+    std::vector<uint8_t> density(static_cast<size_t>(kOverviewColumns) * kOverviewRows, 0);
+    // Column 0: digital silence (levels 0, one row at the center).
+    density[kOverviewCenterRow] = 255;
+    // Column 1: a loud column (rows 15..46) with levels.
+    for (int r = 15; r <= 46; ++r) {
+        density[kOverviewRows + r] = 200;
+    }
+    levels[3] = 100;
+    levels[4] = 200;
+    levels[5] = 50;
+    OverviewColumnsView view;
+    view.levels = levels.data();
+    view.density = density.data();
+    view.samplesPerColumn = 100;
+    view.columnsDone = 2;
+    const auto pixelAt = [](const QImage& img, int column, int row) {
+        return img.pixel(column, row);
+    };
+
+    PhosphorOverviewSettings settings;
+    QImage img = overviewImage(view, settings);
+    EXPECT_EQ(qRgba(0, 0, 0, 255), pixelAt(img, 0, kOverviewCenterRow - 1));
+    EXPECT_EQ(0u, pixelAt(img, 0, kOverviewCenterRow));
+    EXPECT_NE(0u, pixelAt(img, 1, 30));
+
+    // All gains at 0: the silent column is still the line; the loud column is
+    // dark and transparent, not a black block.
+    settings.gainLow = settings.gainMid = settings.gainHigh = 0.0;
+    img = overviewImage(view, settings);
+    EXPECT_EQ(qRgba(0, 0, 0, 255), pixelAt(img, 0, kOverviewCenterRow - 1));
+    for (int r = 0; r < kOverviewRows; ++r) {
+        EXPECT_EQ(0u, pixelAt(img, 1, r)) << r;
+    }
+}
+
 TEST_F(PhosphorOverviewTest, ExtentIsTheOutermostNonEmptyRow) {
     std::vector<uint8_t> levels(kOverviewColumns * 3, 0);
     std::vector<uint8_t> density(static_cast<size_t>(kOverviewColumns) * kOverviewRows, 0);
@@ -76,7 +114,7 @@ TEST_F(PhosphorOverviewTest, ExtentIsTheOutermostNonEmptyRow) {
     view.samplesPerColumn = 100;
     view.columnsDone = kOverviewColumns;
     EXPECT_EQ(0, overviewExtentRows(view));
-    density[5 * kOverviewRows + 21] = 9; // 10 rows above the centre
+    density[5 * kOverviewRows + 21] = 9; // 10 rows above the center
     density[5 * kOverviewRows + 40] = 9; // 10 rows below
     EXPECT_EQ(10, overviewExtentRows(view));
     density[7 * kOverviewRows + 0] = 1; // the top row: full scale

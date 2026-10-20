@@ -99,9 +99,10 @@ class WOverview : public WWidget, public TrackDropTarget {
     // The Phosphor type: renders the stored columns built so far into the
     // source image through the pure image function.
     bool drawNextPhosphorPart();
-    // How the Phosphor columns are drawn. The calibrated defaults; the settings
-    // group (#55) loads them from the config.
-    mixxx::phosphor::OverviewDrawSettings phosphorDrawSettings() const;
+    // Forget the rendered overview image so the next draw starts over.
+    void resetOverviewImage();
+    // How the Phosphor columns are drawn: the factory's current settings.
+    mixxx::phosphor::PhosphorOverviewSettings phosphorDrawSettings() const;
     void drawNextPixmapPartHSV(QPainter* pPainter,
             ConstWaveformPointer pWaveform,
             const int nextCompletion);
