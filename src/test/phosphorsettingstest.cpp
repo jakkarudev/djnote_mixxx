@@ -219,3 +219,90 @@ TEST_F(PhosphorSettingsTest, ResetRestoresEveryAdvancedValue) {
     EXPECT_EQ(d.shapeWindow, l.shapeWindow);
     EXPECT_EQ(d.color.releaseMs[1], l.color.releaseMs[1]);
 }
+
+// The overview group (spec #50, ticket #55).
+TEST(PhosphorSettingsPlainTest, OverviewDefaultsAreTheCalibratedValues) {
+    const PhosphorOverviewSettings s;
+    EXPECT_EQ(1.0, s.brightness);
+    EXPECT_EQ(0.7, s.levelExponent);
+    EXPECT_EQ(0.25, s.densityExponent);
+    EXPECT_EQ(1.0, s.gainLow);
+    EXPECT_EQ(1.0, s.gainMid);
+    EXPECT_EQ(1.0, s.gainHigh);
+}
+
+TEST(PhosphorSettingsPlainTest, OverviewOutOfRangeValuesAreClamped) {
+    PhosphorOverviewSettings s;
+    s.brightness = 99;
+    s.levelExponent = 0;
+    s.densityExponent = 5;
+    s.gainLow = -1;
+    s.gainMid = 40;
+    s.gainHigh = 2;
+    const PhosphorOverviewSettings c = clampOverviewSettings(s);
+    EXPECT_EQ(4.0, c.brightness);
+    EXPECT_EQ(0.1, c.levelExponent);
+    EXPECT_EQ(1.0, c.densityExponent);
+    EXPECT_EQ(0.0, c.gainLow);
+    EXPECT_EQ(4.0, c.gainMid);
+    EXPECT_EQ(2.0, c.gainHigh);
+    s.brightness = -5;
+    s.levelExponent = 9;
+    s.densityExponent = 0;
+    EXPECT_EQ(0.1, clampOverviewSettings(s).brightness);
+    EXPECT_EQ(1.5, clampOverviewSettings(s).levelExponent);
+    EXPECT_EQ(0.05, clampOverviewSettings(s).densityExponent);
+    // Not a number: the default.
+    s.brightness = std::nan("");
+    EXPECT_EQ(1.0, clampOverviewSettings(s).brightness);
+}
+
+TEST_F(PhosphorSettingsTest, OverviewEmptyConfigGivesDefaults) {
+    EXPECT_EQ(PhosphorOverviewSettings(), loadOverviewSettings(config()));
+}
+
+TEST_F(PhosphorSettingsTest, OverviewRoundTrip) {
+    PhosphorOverviewSettings s;
+    s.brightness = 1.7;
+    s.levelExponent = 0.5;
+    s.densityExponent = 0.4;
+    s.gainLow = 1.5;
+    s.gainMid = 0.8;
+    s.gainHigh = 2.0;
+    saveOverviewSettings(config(), s);
+    EXPECT_EQ(s, loadOverviewSettings(config()));
+}
+
+TEST_F(PhosphorSettingsTest, OverviewInvalidConfigValuesAreClampedOrDefaulted) {
+    const ConfigKey brightness(
+            QStringLiteral("[Waveform]"), QStringLiteral("PhosphorOverviewBrightness"));
+    const ConfigKey gainMid(
+            QStringLiteral("[Waveform]"), QStringLiteral("PhosphorOverviewGainMid"));
+    config()->setValue(brightness, 42.0);
+    config()->setValue(gainMid, -3.0);
+    const PhosphorOverviewSettings s = loadOverviewSettings(config());
+    EXPECT_EQ(4.0, s.brightness);
+    EXPECT_EQ(0.0, s.gainMid);
+    config()->setValue(brightness, QStringLiteral("not a number"));
+    EXPECT_EQ(1.0, loadOverviewSettings(config()).brightness);
+}
+
+TEST_F(PhosphorSettingsTest, OverviewAndScrollingGroupsShareNoValues) {
+    PhosphorOverviewSettings o;
+    o.brightness = 2.5;
+    o.gainHigh = 0.3;
+    saveOverviewSettings(config(), o);
+    // The scrolling group is untouched by the overview group...
+    EXPECT_EQ(PhosphorSettings().densityBrightness, loadSettings(config()).densityBrightness);
+    EXPECT_EQ(PhosphorSettings().channelGains[2], loadSettings(config()).channelGains[2]);
+    // ...and the other way round.
+    PhosphorSettings s;
+    s.densityBrightness = 2.0;
+    s.channelGains[2] = 3.0;
+    s.brightnessExponent = 1.2;
+    saveSettings(config(), s);
+    EXPECT_EQ(o, loadOverviewSettings(config()));
+    // Resetting the scrolling group does not reset the overview's.
+    saveSettings(config(), PhosphorSettings());
+    EXPECT_EQ(o, loadOverviewSettings(config()));
+}

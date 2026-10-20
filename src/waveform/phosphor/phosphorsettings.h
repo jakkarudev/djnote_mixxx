@@ -108,6 +108,34 @@ struct PhosphorSettings {
     ColorTrackParams color;
 };
 
+/// Ranges of the Phosphor overview's settings (also the clamping limits).
+constexpr double kMinOverviewBrightness = 0.1;
+constexpr double kMaxOverviewBrightness = 4.0;
+constexpr double kMinOverviewLevelExponent = 0.1;
+constexpr double kMaxOverviewLevelExponent = 1.5;
+constexpr double kMinOverviewDensityExponent = 0.05;
+constexpr double kMaxOverviewDensityExponent = 1.0;
+constexpr double kMaxOverviewGain = 4.0;
+
+/// The Phosphor overview's own settings group. All of them apply live: the
+/// overview image is drawn again from the stored columns. They share no values
+/// with PhosphorSettings (the scrolling waveform).
+struct PhosphorOverviewSettings {
+    double brightness = 1.0;
+    double levelExponent = 0.7;
+    double densityExponent = 0.25;
+    double gainLow = 1.0;
+    double gainMid = 1.0;
+    double gainHigh = 1.0;
+
+    bool operator==(const PhosphorOverviewSettings&) const = default;
+};
+
+PhosphorOverviewSettings clampOverviewSettings(const PhosphorOverviewSettings& settings);
+PhosphorOverviewSettings loadOverviewSettings(const UserSettingsPointer& pConfig);
+void saveOverviewSettings(
+        const UserSettingsPointer& pConfig, const PhosphorOverviewSettings& settings);
+
 /// The settings with every value pulled into its range.
 PhosphorSettings clampSettings(const PhosphorSettings& settings);
 

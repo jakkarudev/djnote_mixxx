@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "util/types.h"
+#include "waveform/phosphor/phosphorsettings.h"
 
 namespace mixxx::phosphor {
 
@@ -22,16 +23,8 @@ constexpr const char* kOverviewVersion = "PhosphorOverview-1.0";
 constexpr const char* kOverviewDescription =
         "Phosphor overview: 1920 columns of 3 band levels and 62 density rows";
 
-/// How the stored columns are drawn. Plain values at the calibrated defaults;
-/// the settings group loads these from the config.
-struct OverviewDrawSettings {
-    double brightness = 1.0;
-    double levelExponent = 0.7;
-    double densityExponent = 0.25;
-    double gainLow = 1.0;
-    double gainMid = 1.0;
-    double gainHigh = 1.0;
-};
+/// How the stored columns are drawn (the settings group of the same name).
+using OverviewDrawSettings = PhosphorOverviewSettings;
 
 /// A read-only view on stored columns: kOverviewColumns x 3 level bytes
 /// (low, mid, high; round(255 * level)) and kOverviewColumns x kOverviewRows

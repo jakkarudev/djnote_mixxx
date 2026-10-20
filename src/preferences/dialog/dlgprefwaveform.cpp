@@ -146,6 +146,7 @@ DlgPrefWaveform::DlgPrefWaveform(
     phosphorDetailComboBox->addItem(
             tr("Low"), static_cast<int>(mixxx::phosphor::WaveformDetail::Low));
     buildPhosphorAdvanced();
+    buildPhosphorOverviewAdvanced();
 
     // The GUI is not fully setup so connecting signals before calling
     // slotUpdate can generate rebootMixxxView calls.
@@ -360,6 +361,7 @@ void DlgPrefWaveform::slotUpdate() {
     followsGainCheckBox->setChecked(factory->followsGain());
     followsEqCheckBox->setChecked(factory->followsEq());
     showPhosphorSettings(factory->phosphorSettings());
+    showPhosphorOverviewSettings(factory->phosphorOverviewSettings());
     normalizeOverviewCheckBox->setChecked(factory->isOverviewNormalized());
     overviewLinesComboBox->setCurrentIndex(overviewLinesComboBox->findData(
             static_cast<int>(factory->getOverviewLineSettings().mode)));
@@ -440,6 +442,10 @@ void DlgPrefWaveform::slotResetToDefaults() {
     // Phosphor: the defaults of PhosphorSettings.
     WaveformWidgetFactory::instance()->setPhosphorSettings(mixxx::phosphor::PhosphorSettings());
     showPhosphorSettings(mixxx::phosphor::PhosphorSettings());
+    // The Phosphor overview: the defaults of PhosphorOverviewSettings.
+    WaveformWidgetFactory::instance()->setPhosphorOverviewSettings(
+            mixxx::phosphor::PhosphorOverviewSettings());
+    showPhosphorOverviewSettings(mixxx::phosphor::PhosphorOverviewSettings());
 
     // Don't normalize overview.
     normalizeOverviewCheckBox->setChecked(false);
@@ -815,6 +821,154 @@ void DlgPrefWaveform::slotResetPhosphorAdvanced() {
     settings.detail = pFactory->phosphorSettings().detail;
     pFactory->setPhosphorSettings(settings);
     showPhosphorSettings(settings);
+}
+
+void DlgPrefWaveform::buildPhosphorOverviewAdvanced() {
+    using namespace mixxx::phosphor;
+    // Behind the same "Show advanced settings" toggle as the scrolling group,
+    // under its own heading.
+    m_pPhosphorOverviewWidget = new QWidget();
+    auto* pGrid = new QGridLayout(m_pPhosphorOverviewWidget);
+    pGrid->setContentsMargins(0, 0, 0, 0);
+    pGrid->setColumnStretch(1, 1);
+    phosphorGridLayout->addWidget(m_pPhosphorOverviewWidget, 3, 0, 1, 2);
+    m_pPhosphorOverviewWidget->setVisible(false);
+    connect(m_pPhosphorAdvancedCheckBox,
+            &QCheckBox::toggled,
+            m_pPhosphorOverviewWidget,
+            &QWidget::setVisible);
+
+    int row = 0;
+    auto* pHeading = new QLabel(tr("Phosphor overview"));
+    QFont headingFont = pHeading->font();
+    headingFont.setBold(true);
+    pHeading->setFont(headingFont);
+    pHeading->setToolTip(
+            tr("Settings of the Phosphor overview. They apply at once and never need "
+               "a track to be analyzed again."));
+    pGrid->addWidget(pHeading, row++, 0, 1, 2);
+
+    const auto addSetting = [&](const QString& name,
+                                    const QList<QWidget*>& controls,
+                                    const QString& explanation) {
+        auto* pLabel = new QLabel(name);
+        auto* pControls = new QHBoxLayout();
+        pControls->setContentsMargins(0, 0, 0, 0);
+        for (QWidget* pControl : controls) {
+            pControl->setToolTip(explanation);
+            pControls->addWidget(pControl);
+        }
+        pControls->addStretch(1);
+        pLabel->setToolTip(explanation);
+        pGrid->addWidget(pLabel, row, 0);
+        pGrid->addLayout(pControls, row, 1);
+        auto* pExplanation = new QLabel(explanation);
+        pExplanation->setWordWrap(true);
+        pExplanation->setToolTip(explanation);
+        QFont font = pExplanation->font();
+        font.setItalic(true);
+        pExplanation->setFont(font);
+        pGrid->addWidget(pExplanation, row + 1, 0, 1, 2);
+        row += 2;
+    };
+    const auto make = [this](const QString& objectName, double min, double max, double step) {
+        auto* pBox = makeSpinBox(min, max, step, 2, QString());
+        pBox->setObjectName(objectName);
+        connect(pBox,
+                QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+                this,
+                &DlgPrefWaveform::slotPhosphorOverviewChanged);
+        return pBox;
+    };
+
+    m_pOverviewBrightness = make(QStringLiteral("phosphorOverviewBrightness"),
+            kMinOverviewBrightness,
+            kMaxOverviewBrightness,
+            0.05);
+    addSetting(tr("Brightness"),
+            {m_pOverviewBrightness},
+            tr("How bright the whole overview is. Raise it for a bolder overview; lower it "
+               "for a subtler one."));
+
+    m_pOverviewLevelExponent = make(QStringLiteral("phosphorOverviewLevelExponent"),
+            kMinOverviewLevelExponent,
+            kMaxOverviewLevelExponent,
+            0.01);
+    addSetting(tr("Level exponent"),
+            {m_pOverviewLevelExponent},
+            tr("How much louder passages brighten. Lower values make quiet passages look "
+               "brighter; higher values keep only the loudest passages bright."));
+
+    m_pOverviewDensityExponent = make(QStringLiteral("phosphorOverviewDensityExponent"),
+            kMinOverviewDensityExponent,
+            kMaxOverviewDensityExponent,
+            0.01);
+    addSetting(tr("Density exponent"),
+            {m_pOverviewDensityExponent},
+            tr("How strongly the density inside a column shows. Lower values look smoother; "
+               "higher values look grainier, with a brighter center."));
+
+    const QString gainText = tr(
+            "How strong each color is: red is the bass, green the mids, blue the highs. "
+            "Turn one up to make that part of the music stand out, or down to calm it.");
+    const QString gainNames[3] = {tr("Low"), tr("Mid"), tr("High")};
+    const char* gainObjects[3] = {"phosphorOverviewGainLow",
+            "phosphorOverviewGainMid",
+            "phosphorOverviewGainHigh"};
+    QList<QWidget*> gainWidgets;
+    for (int c = 0; c < 3; ++c) {
+        m_pOverviewGain[c] = make(QString::fromLatin1(gainObjects[c]), 0.0, kMaxOverviewGain, 0.05);
+        m_pOverviewGain[c]->setToolTip(gainText);
+        auto* pWidget = new QWidget();
+        auto* pLayout = new QHBoxLayout(pWidget);
+        pLayout->setContentsMargins(0, 0, 0, 0);
+        pLayout->addWidget(new QLabel(gainNames[c]));
+        pLayout->addWidget(m_pOverviewGain[c]);
+        gainWidgets.append(pWidget);
+    }
+    addSetting(tr("Color strength"), gainWidgets, gainText);
+
+    m_pOverviewResetButton = new QPushButton(tr("Reset to calibrated defaults"));
+    m_pOverviewResetButton->setObjectName(QStringLiteral("phosphorOverviewResetButton"));
+    m_pOverviewResetButton->setToolTip(
+            tr("Put every Phosphor overview setting back to its calibrated value."));
+    connect(m_pOverviewResetButton,
+            &QPushButton::clicked,
+            this,
+            &DlgPrefWaveform::slotResetPhosphorOverview);
+    pGrid->addWidget(m_pOverviewResetButton, row, 0, 1, 2, Qt::AlignLeft);
+}
+
+void DlgPrefWaveform::showPhosphorOverviewSettings(
+        const mixxx::phosphor::PhosphorOverviewSettings& settings) {
+    // Showing a value must not save it (or apply it) again.
+    const auto set = [](QDoubleSpinBox* pBox, double value) {
+        const QSignalBlocker blocker(pBox);
+        pBox->setValue(value);
+    };
+    set(m_pOverviewBrightness, settings.brightness);
+    set(m_pOverviewLevelExponent, settings.levelExponent);
+    set(m_pOverviewDensityExponent, settings.densityExponent);
+    set(m_pOverviewGain[0], settings.gainLow);
+    set(m_pOverviewGain[1], settings.gainMid);
+    set(m_pOverviewGain[2], settings.gainHigh);
+}
+
+void DlgPrefWaveform::slotPhosphorOverviewChanged() {
+    mixxx::phosphor::PhosphorOverviewSettings settings;
+    settings.brightness = m_pOverviewBrightness->value();
+    settings.levelExponent = m_pOverviewLevelExponent->value();
+    settings.densityExponent = m_pOverviewDensityExponent->value();
+    settings.gainLow = m_pOverviewGain[0]->value();
+    settings.gainMid = m_pOverviewGain[1]->value();
+    settings.gainHigh = m_pOverviewGain[2]->value();
+    WaveformWidgetFactory::instance()->setPhosphorOverviewSettings(settings);
+}
+
+void DlgPrefWaveform::slotResetPhosphorOverview() {
+    const mixxx::phosphor::PhosphorOverviewSettings settings;
+    WaveformWidgetFactory::instance()->setPhosphorOverviewSettings(settings);
+    showPhosphorOverviewSettings(settings);
 }
 
 void DlgPrefWaveform::slotSetNormalizeOverview(bool normalize) {

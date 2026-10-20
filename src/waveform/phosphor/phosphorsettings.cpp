@@ -134,4 +134,63 @@ void saveSettings(const UserSettingsPointer& pConfig, const PhosphorSettings& se
     }
 }
 
+namespace {
+
+struct OverviewField {
+    const char* key;
+    double min;
+    double max;
+    double PhosphorOverviewSettings::*member;
+};
+
+const OverviewField kOverviewFields[] = {
+    {"PhosphorOverviewBrightness", kMinOverviewBrightness, kMaxOverviewBrightness,
+            &PhosphorOverviewSettings::brightness},
+    {"PhosphorOverviewLevelExponent", kMinOverviewLevelExponent, kMaxOverviewLevelExponent,
+            &PhosphorOverviewSettings::levelExponent},
+    {"PhosphorOverviewDensityExponent", kMinOverviewDensityExponent, kMaxOverviewDensityExponent,
+            &PhosphorOverviewSettings::densityExponent},
+    {"PhosphorOverviewGainLow", 0.0, kMaxOverviewGain, &PhosphorOverviewSettings::gainLow},
+    {"PhosphorOverviewGainMid", 0.0, kMaxOverviewGain, &PhosphorOverviewSettings::gainMid},
+    {"PhosphorOverviewGainHigh", 0.0, kMaxOverviewGain, &PhosphorOverviewSettings::gainHigh},
+};
+
+double clampedOverview(double value, const OverviewField& field, double fallback) {
+    return std::isfinite(value) ? std::clamp(value, field.min, field.max) : fallback;
+}
+
+ConfigKey overviewKeyOf(const OverviewField& field) {
+    return ConfigKey(kGroup, QString::fromLatin1(field.key));
+}
+
+} // namespace
+
+PhosphorOverviewSettings clampOverviewSettings(const PhosphorOverviewSettings& in) {
+    const PhosphorOverviewSettings defaults;
+    PhosphorOverviewSettings s = in;
+    for (const OverviewField& field : kOverviewFields) {
+        s.*field.member = clampedOverview(in.*field.member, field, defaults.*field.member);
+    }
+    return s;
+}
+
+PhosphorOverviewSettings loadOverviewSettings(const UserSettingsPointer& pConfig) {
+    const PhosphorOverviewSettings defaults;
+    PhosphorOverviewSettings s;
+    for (const OverviewField& field : kOverviewFields) {
+        const double fallback = defaults.*field.member;
+        s.*field.member = clampedOverview(
+                pConfig->getValue(overviewKeyOf(field), fallback), field, fallback);
+    }
+    return s;
+}
+
+void saveOverviewSettings(
+        const UserSettingsPointer& pConfig, const PhosphorOverviewSettings& settings) {
+    const PhosphorOverviewSettings s = clampOverviewSettings(settings);
+    for (const OverviewField& field : kOverviewFields) {
+        pConfig->setValue(overviewKeyOf(field), s.*field.member);
+    }
+}
+
 } // namespace mixxx::phosphor
