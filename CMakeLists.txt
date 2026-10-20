@@ -1114,6 +1114,7 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/preferences/dialog/dlgprefvinyldlg.ui
   src/preferences/dialog/dlgprefwaveform.cpp
   src/preferences/dialog/dlgprefwaveformdlg.ui
+  src/preferences/dialog/scrollinglinesprefsgroup.cpp
   src/preferences/effectchainpresetlistmodel.cpp
   src/preferences/effectmanifesttablemodel.cpp
   src/preferences/replaygainsettings.cpp
@@ -2189,6 +2190,7 @@ if(BUILD_TESTING)
     src/test/overviewlinelayouttest.cpp
     src/test/scrollinglinelayouttest.cpp
     src/test/scrollinglinesettingstest.cpp
+    src/test/dlgprefwaveformscrollinglinestest.cpp
     src/test/dlgprefwaveformtest.cpp
   src/test/overviewsettingstest.cpp
     src/test/phosphorheighttest.cpp

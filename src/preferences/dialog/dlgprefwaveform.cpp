@@ -14,6 +14,7 @@
 #include "library/dao/analysisdao.h"
 #include "library/library.h"
 #include "moc_dlgprefwaveform.cpp"
+#include "preferences/dialog/scrollinglinesprefsgroup.h"
 #include "preferences/waveformsettings.h"
 #include "util/db/dbconnectionpooled.h"
 #include "waveform/overviewlinelayout.h"
@@ -186,6 +187,18 @@ DlgPrefWaveform::DlgPrefWaveform(
             tr("Low"), static_cast<int>(mixxx::phosphor::WaveformDetail::Low));
     buildPhosphorAdvanced();
     buildPhosphorOverviewAdvanced();
+
+    // DJNote: the "Beat, bar and step lines" group. It greys out upstream's
+    // beat grid opacity controls while its master switch is on.
+    m_pScrollingLinesGroup = new ScrollingLinesPrefsGroup(
+            {beatGridAlphaSlider, beatGridAlphaSpinBox}, this);
+    gridLayout_2->addWidget(m_pScrollingLinesGroup, 19, 0, 1, 4);
+    connect(m_pScrollingLinesGroup,
+            &ScrollingLinesPrefsGroup::settingsChanged,
+            this,
+            [](const mixxx::scrollinglinelayout::LineSettings& settings) {
+                WaveformWidgetFactory::instance()->setScrollingLineSettings(settings);
+            });
 
     // The GUI is not fully setup so connecting signals before calling
     // slotUpdate can generate rebootMixxxView calls.
@@ -425,6 +438,7 @@ void DlgPrefWaveform::slotUpdate() {
                     factory->getUntilMarkTextHeightLimit()));
 
     showHoverReadoutControls(factory->getOverviewHoverReadoutSettings());
+    m_pScrollingLinesGroup->showSettings(factory->getScrollingLineSettings());
 
     WOverview::Type cfgOverviewType =
             m_pConfig->getValue<WOverview::Type>(kOverviewTypeCfgKey, WOverview::Type::RGB);
@@ -515,6 +529,10 @@ void DlgPrefWaveform::slotResetToDefaults() {
 
     // Hover readout: the defaults of HoverReadoutSettings.
     showHoverReadoutControls(mixxx::overviewlayout::HoverReadoutSettings());
+
+    // DJNote beat, bar and step lines: the defaults of LineSettings.
+    factory->setScrollingLineSettings(mixxx::scrollinglinelayout::LineSettings());
+    m_pScrollingLinesGroup->showSettings(mixxx::scrollinglinelayout::LineSettings());
 }
 
 void DlgPrefWaveform::showHoverReadoutControls(
