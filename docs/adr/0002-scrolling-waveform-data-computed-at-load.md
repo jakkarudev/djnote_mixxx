@@ -11,4 +11,4 @@ The Phosphor scrolling waveform draws signed min..max and sample density from sa
 
 - Every deck load costs one background decode of the whole file (roughly 1–3 s for an 8-minute track), and the view fills in progressively, as Mixxx already does for unanalysed tracks.
 - Memory per loaded track is about 42 MB for an 8-minute track, plus the color track.
-- This ADR covers the scrolling waveform only. The Phosphor overview's data *is* stored, as a new analysis type written by the load pass and by library analysis: it is small (about 2000 columns per track) and has to show the whole track the moment a track loads. Its format is fixed after the overview is calibrated against Traktor's stored stripes.
+- This ADR covers the scrolling waveform only. The Phosphor overview's data *is* stored, as a new analysis type: it is small (1920 columns per track) and has to show the whole track the moment a track loads. Its format, and the separate analyzer that writes it, are in ADR-0005.
