@@ -4,6 +4,9 @@
 #include <QPointer>
 #include <QTimer>
 
+#include "preferences/usersettings.h"
+#include "widget/knobreadoutsettings.h"
+
 class QLabel;
 class QWidget;
 class ControlProxy;
@@ -27,13 +30,19 @@ class KnobReadoutOverlay : public QObject {
     // The one hook into upstream: the main window calls this each time it
     // finishes loading a skin (first load and every reload). Creates the
     // overlay on first use and watches the knobs found under pSkinRoot.
-    static void onSkinLoaded(QWidget* pMainWindow, QWidget* pSkinRoot);
+    // pConfig holds the readout settings (DJNote preferences page).
+    static void onSkinLoaded(QWidget* pMainWindow,
+            QWidget* pSkinRoot,
+            UserSettingsPointer pConfig);
 
     bool eventFilter(QObject* pWatched, QEvent* pEvent) override;
 
   private:
-    explicit KnobReadoutOverlay(QWidget* pMainWindow);
+    KnobReadoutOverlay(QWidget* pMainWindow, UserSettingsPointer pConfig);
 
+    // The one place the overlay reads its settings: from the config, on every
+    // knob change, so changes on the preferences page apply immediately.
+    knobreadout::Settings settings() const;
     void watchKnobs(QWidget* pSkinRoot);
     void watchKnob(QWidget* pKnob);
     // Whether a change of pKnob's control comes from the user turning it, on
@@ -43,6 +52,7 @@ class KnobReadoutOverlay : public QObject {
     void showReadout(QWidget* pKnob, const QString& text);
 
     QWidget* const m_pMainWindow;
+    const UserSettingsPointer m_pConfig;
     QLabel* const m_pLabel;
     QTimer m_hideTimer;
     // The knob receiving on-screen input in the current event-loop pass.

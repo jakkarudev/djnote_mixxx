@@ -1306,7 +1306,8 @@ bool MixxxMainWindow::loadConfiguredSkin() {
     if (centralWidget() == m_pLaunchImage) {
         initializationProgressUpdate(100, "");
     }
-    mixxx::KnobReadoutOverlay::onSkinLoaded(this, m_pCentralWidget); // DJNote
+    mixxx::KnobReadoutOverlay::onSkinLoaded( // DJNote
+            this, m_pCentralWidget, m_pCoreServices->getSettings());
     emit skinLoaded();
     return m_pCentralWidget != nullptr;
 }

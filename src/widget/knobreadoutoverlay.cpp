@@ -60,21 +60,24 @@ bool isScreenInputEvent(const QEvent* pEvent) {
 namespace mixxx {
 
 // static
-void KnobReadoutOverlay::onSkinLoaded(QWidget* pMainWindow, QWidget* pSkinRoot) {
-    if (!pMainWindow || !pSkinRoot) {
+void KnobReadoutOverlay::onSkinLoaded(QWidget* pMainWindow,
+        QWidget* pSkinRoot,
+        UserSettingsPointer pConfig) {
+    if (!pMainWindow || !pSkinRoot || !pConfig) {
         return;
     }
     auto* pOverlay = pMainWindow->findChild<KnobReadoutOverlay*>(
             kOverlayObjectName, Qt::FindDirectChildrenOnly);
     if (!pOverlay) {
-        pOverlay = new KnobReadoutOverlay(pMainWindow);
+        pOverlay = new KnobReadoutOverlay(pMainWindow, pConfig);
     }
     pOverlay->watchKnobs(pSkinRoot);
 }
 
-KnobReadoutOverlay::KnobReadoutOverlay(QWidget* pMainWindow)
+KnobReadoutOverlay::KnobReadoutOverlay(QWidget* pMainWindow, UserSettingsPointer pConfig)
         : QObject(pMainWindow),
           m_pMainWindow(pMainWindow),
+          m_pConfig(pConfig),
           m_pLabel(new QLabel(pMainWindow)) {
     setObjectName(kOverlayObjectName);
 
@@ -96,6 +99,10 @@ KnobReadoutOverlay::KnobReadoutOverlay(QWidget* pMainWindow)
     m_hideTimer.setSingleShot(true);
     m_hideTimer.setInterval(kHideDelayMs);
     connect(&m_hideTimer, &QTimer::timeout, m_pLabel, &QWidget::hide);
+}
+
+knobreadout::Settings KnobReadoutOverlay::settings() const {
+    return knobreadout::loadSettings(m_pConfig);
 }
 
 void KnobReadoutOverlay::watchKnobs(QWidget* pSkinRoot) {
@@ -172,6 +179,13 @@ bool KnobReadoutOverlay::isOwnInput(QWidget* pKnob) const {
 }
 
 void KnobReadoutOverlay::onKnobControlChanged(QWidget* pKnob, ControlProxy* pControl) {
+    const knobreadout::Settings readoutSettings = settings();
+    if (!readoutSettings.enabled) {
+        // Turned off while a readout was showing: take it down now.
+        m_hideTimer.stop();
+        m_pLabel->hide();
+        return;
+    }
     if (!isOwnInput(pKnob)) {
         return;
     }

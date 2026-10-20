@@ -12,6 +12,25 @@ const QString kWaveformGroup = QStringLiteral("[Waveform]");
 const ConfigKey kEnabledCfgKey(kWaveformGroup, QStringLiteral("scrollingLinesEnabled"));
 const ConfigKey kBarOpacityCfgKey(kWaveformGroup, QStringLiteral("scrollingBarLineOpacity"));
 const ConfigKey kBeatOpacityCfgKey(kWaveformGroup, QStringLiteral("scrollingBeatLineOpacity"));
+const ConfigKey kBarWidthCfgKey(kWaveformGroup, QStringLiteral("scrollingBarLineWidth"));
+const ConfigKey kBeatWidthCfgKey(kWaveformGroup, QStringLiteral("scrollingBeatLineWidth"));
+// "#rrggbb", or empty for the skin's beat colour.
+const ConfigKey kBarColorCfgKey(kWaveformGroup, QStringLiteral("scrollingBarLineColor"));
+const ConfigKey kBeatColorCfgKey(kWaveformGroup, QStringLiteral("scrollingBeatLineColor"));
+
+std::optional<QColor> loadColor(const UserSettingsPointer& pConfig, const ConfigKey& key) {
+    const QColor color(pConfig->getValueString(key));
+    if (!color.isValid()) {
+        return std::nullopt;
+    }
+    return color;
+}
+
+void saveColor(const UserSettingsPointer& pConfig,
+        const ConfigKey& key,
+        const std::optional<QColor>& color) {
+    pConfig->setValue(key, color ? color->name(QColor::HexRgb) : QString());
+}
 
 } // namespace
 
@@ -22,6 +41,10 @@ LineSettings loadLineSettings(const UserSettingsPointer& pConfig) {
             pConfig->getValue(kBarOpacityCfgKey, settings.barOpacity.percent()));
     settings.beatOpacity = OpacityPercent(
             pConfig->getValue(kBeatOpacityCfgKey, settings.beatOpacity.percent()));
+    settings.barWidth = LineWidthPx(pConfig->getValue(kBarWidthCfgKey, settings.barWidth.px()));
+    settings.beatWidth = LineWidthPx(pConfig->getValue(kBeatWidthCfgKey, settings.beatWidth.px()));
+    settings.barColor = loadColor(pConfig, kBarColorCfgKey);
+    settings.beatColor = loadColor(pConfig, kBeatColorCfgKey);
     return settings;
 }
 
@@ -29,6 +52,10 @@ void saveLineSettings(const UserSettingsPointer& pConfig, const LineSettings& se
     pConfig->setValue(kEnabledCfgKey, settings.enabled);
     pConfig->setValue(kBarOpacityCfgKey, settings.barOpacity.percent());
     pConfig->setValue(kBeatOpacityCfgKey, settings.beatOpacity.percent());
+    pConfig->setValue(kBarWidthCfgKey, settings.barWidth.px());
+    pConfig->setValue(kBeatWidthCfgKey, settings.beatWidth.px());
+    saveColor(pConfig, kBarColorCfgKey, settings.barColor);
+    saveColor(pConfig, kBeatColorCfgKey, settings.beatColor);
 }
 
 } // namespace scrollinglinelayout
