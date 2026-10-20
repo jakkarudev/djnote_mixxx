@@ -211,6 +211,8 @@ class WaveformWidgetFactory : public QObject, public Singleton<WaveformWidgetFac
     void swapVuMeters();
 
     void overviewNormalizeChanged();
+    /// The overview type was changed in Preferences.
+    void overviewTypeChanged();
     void overviewLinesChanged();
     void overallVisualGainChanged();
 
