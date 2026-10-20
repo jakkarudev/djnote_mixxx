@@ -1,3 +1,11 @@
+## Upstream-merge friendly
+
+DJNote must stay easy to update to the next stable Mixxx (`upstream` remote). Wherever possible:
+
+- Put DJNote logic in new files; touch upstream files only at small hook points.
+- Never rename or repurpose upstream config keys, UI elements, skin attributes or controls; add new ones under DJNote-specific names.
+- Prefer wrapping or observing upstream classes over editing them.
+
 ## Agent skills
 
 ### Issue tracker

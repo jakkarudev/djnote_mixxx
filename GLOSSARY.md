@@ -28,6 +28,10 @@ _Avoid_: seek preview, drag ruler
 The label next to the hover line that shows the beat distance, in beats or in bars.
 _Avoid_: tooltip, beat counter
 
+**Knob adjustment readout**:
+The label shown just under a knob while it is being turned, from the screen or a controller, giving the knob's value in its own unit (for example dB or percent). It disappears shortly after the knob stops changing.
+_Avoid_: knob tooltip, value popup, knob label
+
 **Cue times**:
 The position and time-distance labels shown next to a cue while the pointer is over the cue's line or label. They come from Mixxx and are neither the time ruler nor the hover readout.
 _Avoid_: cue tooltip, cue hover time
@@ -64,6 +68,9 @@ _Avoid_: Traktor mode, Mixxx mode
 A vertical line drawn on a waveform at the start of a beat, bar or phrase. They are drawn from the beat grid but are not the beat grid.
 _Avoid_: bar grid, phrase grid, grid lines
 
+**Step line**:
+A vertical line on a scrolling waveform at each quarter of a beat, between two beat lines: three per beat, sixteen steps per bar. Shown only when zoomed in far enough for the steps to be told apart.
+_Avoid_: sixteenth line, subdivision line, in-between line
 ## Beats
 
 **Beat grid**:
