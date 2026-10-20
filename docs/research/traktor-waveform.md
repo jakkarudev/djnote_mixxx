@@ -515,35 +515,31 @@ That is 65 bytes per column, **66 560 bytes (65 KB) per track at 1024 columns**,
 
 ## 10. On-screen colours of the overview (2026-10-20, ticket #60)
 
-Traktor does not draw the stored stripe as is. On screen its overview is vivid (mean max(R,G,B) over lit pixels 170-220, hot pink and red for music, saturated hues for tones); the stored stripe is dim and desaturated (mean about 50-85), so our overview looked like it sat behind a grey overlay. `--fit-screen --signals-dir <waveform-tests> --screen-sheet docs/research/phosphor-overview-screen.png` compares them (Traktor on screen / ours before / ours after for Q2a, Dilema and Gigando).
+Traktor does not draw the stored stripe as is. On screen its overview is vivid (hot pink and red for music, saturated hues for tones) and each column fades from full colour at the centre to almost the background at its edges; the stored stripe is dim and desaturated. `--fit-screen --signals-dir <waveform-tests>` compares them per pixel over the whole widget (Q2a, Dilema, Gigando).
 
-**Evidence (screenshots, widget x 42..713 for the 1024 columns, strip 27 rows).**
-- Every pixel's colour, not just the hue, changes: the on-screen pixel of a tone has its largest channel at about 255 and a small floor in the smallest channel, at all amplitudes (Q3a-c keep a vivid colour down to -40 dB); the stored pixel's brightness falls with level.
-- **The hue is kept when a pixel passes full value.** In Q2a's blue steps B is 255 while G stays constant (131) across rows whose density differs two-fold; a per-channel clip would let G vary. So the pixel is divided by its largest channel when that passes 255 (per-channel clipping: mean error 29 against 13.6 over all columns).
-- A steep power fits the tones: out = K (p/255)^s with s = 2.4-2.5 over Q2a/Q2b/Q3/Q4/Q6/Q7/Q9 (median error 3-9 of 255 per channel, per-column centre rows against the stored stripe), where 0.25 x 2.5 = 0.6 is the profile exponent seen in Q2a's red steps (the stored density^0.25 profile raised to s).
-- Music columns are pinker than a power law of the stored colour gives (screen (217, 101, 132) against stored (71, 56, 61) for Gigando): removing 33 % of the smallest channel before the power (a saturation boost) lowers the music error and leaves the tones as they were.
-- **The on-screen column is much flatter than the stored profile.** With the profile unchanged the extent-wide mean brightness of Gigando is 104 against Traktor's 169 (edge rows are dim). Pulling each pixel toward its column's brightest pixel, `p (peak / |p|)^0.8`, with the hue kept, fixes it: flatten 0 / 0.5 / 0.8 / 1 gives Dilema 129 / 159 / 185 / 207 against 189.
+**Geometry (measured from the background colour, not guessed).** The deck overview is 672 px wide (x0 = 42, or 41 in the older Gigando shot) and 33 rows tall (Q2a's shots: 51 rows), 33-grey between 24-grey borders. Stored columns map to screen x by area (1024 -> 672), the 64 stored rows to the widget rows by area average; the alignment is exact at shift 0 (error doubles at +-2 px).
 
-**Mapping** (per pixel p = stripe colour R, G, B, 0..255; `screen_colour`, `screen_image` in the script; `overviewDisplayImage` in C++):
+**First attempt (7ae4adbadd) and why it failed.** It was fitted on each column's centre row only and flattened the column toward its brightest pixel (`p (peak / |p|)^0.8`), which removed the profile: edge / centre 0.85 against Traktor's 0.45 (B 255 at the centre, about 30 at the edges at Dilema's x = 500), so loud sections were slabs filling the height.
 
-1. `p = p * (peak / |p|)^0.8`, `peak` = the largest `|p|` in the column.
-2. `p = p - 0.33 min(p)`.
-3. `pre = 23.9 * (p / 255)^2.17 * 255` per channel.
-4. `out = pre / max(1, max(pre) / 255)`; alpha 255 for every pixel with colour or alpha, as before.
+**Mapping** (per pixel p = stripe colour R, G, B, 0..255; `screen_colour`, `screen_cover`, `overview_display` in the script; `overviewDisplayImage` in C++):
 
-Fitted on the per-column centre rows of Q2a, Q2b, Q3a-c, Q4, Q6, Q7, Q9, Gigando and Dilema (robust least squares; Gigando and Dilema weighted 2; Q5 left out, its centre line is a marker), 3 parameters for the colour (gain 23.9, exponent 2.17, desaturation 0.33) and one for the profile (0.8, chosen on mean brightness over the extents). Six free parameters (gain and exponent per channel) gave a median error 1-2 lower on some signals and were not kept. The stored data and `kOverviewVersion` are unchanged; the Brightness, exponent and gain settings still act (they shape the stored-colour pixel the mapping starts from).
+1. colour: `q = p - 0.32 min(p)`; `pre = 114 * (1, 0.79, 1.07) * (q / 255)^2.5 * 255` per channel; `colour = pre / max(1, max(pre) / 255)` (hue kept past full value).
+2. coverage (alpha): `(3.6 max(p) / 255)^2.18`, clipped to 1. The faint rows at a column's edge blend into the background; the density profile of the stored data is the profile on screen.
+3. A pixel with alpha but no colour (the silence line) stays opaque black; an empty pixel stays empty.
 
-**Result** (mean max(R,G,B) over the pixels inside the columns' extents, left of the playhead excluded; mean absolute difference between the column-mean colours, 0-255):
+Fitted by robust least squares per pixel over the whole widget on Q2a, Dilema and Gigando (ours as stored, background 33). Physical reading: the on-screen column = boosted colour over the background, weighted by how much of the stored pixel is there. Fitting on Traktor's real stored stripes instead gives the same structure with lower error (Dilema 10.8, Gigando 5.9, Q2a 6.1 with alpha from the stored alpha), so the remaining error on ours is the stored model's hue and level, not the mapping. Alpha from the brightest channel (not the stored 2 x green) is kept because a red-only or blue-only pixel (low-only or high-only audio) has stored alpha 0 and must still show. The stored data and `kOverviewVersion` are unchanged; Brightness, exponents and gain still shape the pixel the mapping starts from.
 
-| | Traktor | ours before | ours after | colour diff before / after |
-|---|---|---|---|---|
-| Q2a | 218 | 85 | 253 | 61 / 25 |
-| Dilema | 189 | 56 | 185 | 83 / 22 |
-| Gigando | 169 | 49 | 173 | 68 / 25 |
+**Result** (per-pixel mean absolute error 0-255 over the widget, max(R,G,B) at the centre rows and 2 rows inside Traktor's drawn extent, loud columns right of the playhead):
 
-Q2a is over-bright (clamped tones, centre rows of the test tone are at full value). Gigando's pink-red is still a little orange. Dilema in the user's own Mixxx screenshot (Normalize on, visual gain 2) read 56 with 0 % of pixels above 200; Traktor's own screenshot of Dilema reads 184-189 with 37 % above 200.
+| | Traktor centre / edge / ratio | 7ae4adbadd: error, centre / edge / ratio | now: error, centre / edge / ratio |
+|---|---|---|---|
+| Dilema | 240 / 110 / 0.46 | 34.7, 204 / 176 / 0.86 | 10.9, 239 / 115 / 0.48 |
+| Gigando | 234 / 106 / 0.45 | 32.3, 198 / 168 / 0.85 | 9.2, 224 / 98 / 0.44 |
+| Q2a | 215 / 239 / 1.11 | 10.7, 246 / 246 / 1.00 | 9.8, 190 / 218 / 1.15 |
 
-**Not done / open.** Gigando's hue (screen G 101 against our higher G); the playhead-side darkening of played audio on Traktor's screen; the amplitude scaling of the widget (Q2a's -6 dBFS tone fills the strip, so Traktor's strip is normalised or gained, which Mixxx handles with Normalize).
+In the app (Normalize on, visual gain 1, resampled to Traktor's geometry) edge / centre is 0.46 / 0.45 against Traktor's 0.45 and centre 224 / 223 against 225 / 234 (Dilema / Gigando). Still off: Dilema's magenta reads (225, 82, 202) in Mixxx against Traktor's (175, 126, 255) (the stored model's blue is low there) and Gigando is a little orange; these are stored-colour differences.
+
+**Not done / open.** The stored model's hue on magenta and warm sections; the playhead-side darkening of played audio on Traktor's screen.
 
 ## Implications for a Traktor-style renderer in Mixxx
 
