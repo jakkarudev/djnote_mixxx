@@ -10,6 +10,7 @@
 #include "control/controlproxy.h"
 #include "moc_knobreadoutoverlay.cpp"
 #include "widget/controlwidgetconnection.h"
+#include "widget/knobreadoutface.h"
 #include "widget/knobreadouttext.h"
 #include "widget/wbasewidget.h"
 #include "widget/wknob.h"
@@ -54,6 +55,32 @@ bool isScreenInputEvent(const QEvent* pEvent) {
     }
 }
 
+// The label's look: under the knob, or on the knob face (no border, so the
+// padding matches the one knobreadoutface.h fits with).
+QString labelStyleSheet(int pixelSize, bool onFace) {
+    const QString border = onFace
+            ? QStringLiteral("none")
+            : QStringLiteral("1px solid rgba(255, 255, 255, 60)");
+    const QString padding = onFace
+            ? QStringLiteral("%1px %2px")
+                      .arg(mixxx::knobreadout::kFaceVerticalPaddingPx)
+                      .arg(mixxx::knobreadout::kFaceHorizontalPaddingPx)
+            : QStringLiteral("1px 4px");
+    return QStringLiteral(
+            "QLabel#%1 {"
+            " color: #f0f0f0;"
+            " background-color: rgba(16, 16, 16, 220);"
+            " border: %2;"
+            " border-radius: 3px;"
+            " padding: %3;"
+            " font-size: %4px;"
+            "}")
+            .arg(kLabelObjectName, border, padding, QString::number(pixelSize));
+}
+
+// Under the knob, the label uses the full-size font.
+constexpr int kUnderKnobPixelSize = 11;
+
 } // namespace
 
 namespace mixxx {
@@ -83,16 +110,7 @@ KnobReadoutOverlay::KnobReadoutOverlay(QWidget* pMainWindow, UserSettingsPointer
     m_pLabel->setObjectName(kLabelObjectName);
     m_pLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
     m_pLabel->setAlignment(Qt::AlignCenter);
-    m_pLabel->setStyleSheet(QStringLiteral(
-            "QLabel#%1 {"
-            " color: #f0f0f0;"
-            " background-color: rgba(16, 16, 16, 220);"
-            " border: 1px solid rgba(255, 255, 255, 60);"
-            " border-radius: 3px;"
-            " padding: 1px 4px;"
-            " font-size: 11px;"
-            "}")
-                                    .arg(kLabelObjectName));
+    setLabelStyleSheet(labelStyleSheet(kUnderKnobPixelSize, false));
     m_pLabel->hide();
 
     m_hideTimer.setSingleShot(true);
@@ -174,23 +192,50 @@ void KnobReadoutOverlay::onKnobControlChanged(QWidget* pKnob, ControlProxy* pCon
     }
     const knobreadout::KnobIdentity knob{pControl->getKey()};
     const knobreadout::KnobValue value{pControl->get(), pControl->getParameter()};
-    showReadout(pKnob, knobreadout::text(knob, value));
+    knobreadout::Options options;
+    if (readoutSettings.style == knobreadout::Style::KnobFace) {
+        options.compact = true;
+        const QString compactText = knobreadout::text(knob, value, options);
+        const std::optional<int> pixelSize = knobreadout::faceFontPixelSize(
+                compactText, m_pLabel->font(), pKnob->size());
+        if (pixelSize) {
+            showReadout(pKnob, compactText, *pixelSize);
+            return;
+        }
+        // Even the compact text doesn't fit: full text under the knob.
+        options.compact = false;
+    }
+    showReadout(pKnob, knobreadout::text(knob, value, options));
 }
 
-void KnobReadoutOverlay::showReadout(QWidget* pKnob, const QString& text) {
+void KnobReadoutOverlay::setLabelStyleSheet(const QString& styleSheet) {
+    // Re-polishing on every change would be wasted work while a knob turns.
+    if (m_pLabel->styleSheet() != styleSheet) {
+        m_pLabel->setStyleSheet(styleSheet);
+    }
+}
+
+void KnobReadoutOverlay::showReadout(
+        QWidget* pKnob, const QString& text, std::optional<int> facePixelSize) {
     if (!pKnob->isVisible()) {
         return;
     }
+    setLabelStyleSheet(facePixelSize
+                    ? labelStyleSheet(*facePixelSize, true)
+                    : labelStyleSheet(kUnderKnobPixelSize, false));
     m_pLabel->setText(text);
     m_pLabel->adjustSize();
 
-    // Centred just under the knob, kept inside the main window.
-    const QPoint knobBottomCentre = m_pMainWindow->mapFromGlobal(
-            pKnob->mapToGlobal(QPoint(pKnob->width() / 2, pKnob->height())));
+    // Centred on the knob face, or centred just under the knob; kept inside
+    // the main window.
+    const QPoint anchor = m_pMainWindow->mapFromGlobal(pKnob->mapToGlobal(
+            facePixelSize ? pKnob->rect().center()
+                          : QPoint(pKnob->width() / 2, pKnob->height())));
     const int maxX = std::max(0, m_pMainWindow->width() - m_pLabel->width());
     const int maxY = std::max(0, m_pMainWindow->height() - m_pLabel->height());
-    const int x = std::clamp(knobBottomCentre.x() - m_pLabel->width() / 2, 0, maxX);
-    const int y = std::clamp(knobBottomCentre.y() + kGapPx, 0, maxY);
+    const int x = std::clamp(anchor.x() - m_pLabel->width() / 2, 0, maxX);
+    const int top = facePixelSize ? anchor.y() - m_pLabel->height() / 2 : anchor.y() + kGapPx;
+    const int y = std::clamp(top, 0, maxY);
     m_pLabel->move(x, y);
     m_pLabel->show();
     m_pLabel->raise();

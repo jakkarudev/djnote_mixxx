@@ -1,5 +1,6 @@
 #include "widget/knobreadouttext.h"
 
+#include <QRegularExpression>
 #include <algorithm>
 #include <cmath>
 
@@ -52,11 +53,22 @@ QString knobPositionText(double parameter) {
 QString text(const KnobIdentity& knob,
         const KnobValue& value,
         const Options& options) {
-    Q_UNUSED(options);
-    if (isAudioTaperGain(knob.key)) {
-        return decibelText(value.value);
+    const QString fullText = isAudioTaperGain(knob.key)
+            ? decibelText(value.value)
+            : knobPositionText(value.parameter);
+    return options.compact ? compactForm(fullText) : fullText;
+}
+
+QString compactForm(const QString& fullText) {
+    // [label ][sign]number-or-infinity[ unit]
+    static const QRegularExpression kPattern(QStringLiteral(
+            "^(?:(\\p{L}+)\\s+)?([+\\x{2212}-]?)(\\d+(?:\\.\\d+)?|\\x{221E})\\s*\\D*$"));
+    const QRegularExpressionMatch match = kPattern.match(fullText);
+    if (!match.hasMatch()) {
+        return fullText;
     }
-    return knobPositionText(value.parameter);
+    const QString sign = match.captured(2) == QStringLiteral("+") ? QString() : match.captured(2);
+    return match.captured(1) + sign + match.captured(3);
 }
 
 } // namespace knobreadout
