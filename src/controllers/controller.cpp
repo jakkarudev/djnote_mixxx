@@ -3,6 +3,7 @@
 #include <QJSEngine>
 #include <algorithm>
 
+#include "controllers/controllerinputscope.h"
 #include "controllers/scripting/legacy/controllerscriptenginelegacy.h"
 #include "moc_controller.cpp"
 #include "util/cmdlineargs.h"
@@ -124,6 +125,7 @@ void Controller::receive(const QByteArray& data, mixxx::Duration timestamp) {
         //  queued signals flush out
         return;
     }
+    const mixxx::ControllerInputScope inputScope; // DJNote: knob readout
     triggerActivity();
 
     int length = data.size();

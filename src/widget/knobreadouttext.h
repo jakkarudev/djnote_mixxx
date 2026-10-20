@@ -25,9 +25,11 @@ struct KnobValue {
     double parameter = 0.0;
 };
 
-// How the text is written. Simple/Precise mode and the compact (knob-face)
-// form join here.
-struct Options {};
+// How the text is written. Simple/Precise mode joins here.
+struct Options {
+    // The compact form for the knob-face style: see compactForm().
+    bool compact = false;
+};
 
 // Audio-taper gain controls (deck, sampler, microphone and auxiliary pregain;
 // main, headphone and booth gain) read in dB with one decimal place, "minus infinity
@@ -36,6 +38,12 @@ struct Options {};
 QString text(const KnobIdentity& knob,
         const KnobValue& value,
         const Options& options = Options{});
+
+// The compact form of a readout text, for the knob-face style: the unit is
+// dropped, and so are a "+" sign and the space after a leading label
+// ("+12.0 dB" -> "12.0", "40%" -> "40", "L 30%" -> "L30"). Generic, so it
+// applies to every unit family; text without a number is returned unchanged.
+QString compactForm(const QString& fullText);
 
 } // namespace knobreadout
 } // namespace mixxx

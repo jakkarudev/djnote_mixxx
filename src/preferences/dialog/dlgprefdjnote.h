@@ -5,6 +5,7 @@
 #include "widget/knobreadoutsettings.h"
 
 class QCheckBox;
+class QComboBox;
 
 // The DJNote preferences page: settings of DJNote features that have no
 // upstream page to live on. Built in code (no .ui file).
@@ -30,4 +31,5 @@ class DlgPrefDJNote : public DlgPreferencePage {
 
     const UserSettingsPointer m_pConfig;
     QCheckBox* m_pKnobReadoutEnabled;
+    QComboBox* m_pKnobReadoutStyle;
 };
