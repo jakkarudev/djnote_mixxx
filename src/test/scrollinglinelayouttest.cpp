@@ -44,6 +44,9 @@ const Beats kTempoChangeBeats(
         kSampleRate,
         QString());
 
+// The skin's beat colour passed in by the renderer.
+const QColor kSkinColor(10, 20, 30);
+
 std::vector<Line> lines(const Beats& beats,
         double startFrame,
         double endFrame,
@@ -54,7 +57,8 @@ std::vector<Line> lines(const Beats& beats,
             audio::FramePos(endFrame),
             kFrameToX,
             settings,
-            upstreamOpacity);
+            upstreamOpacity,
+            kSkinColor);
 }
 
 // Checks positions and kinds; 'B' = bar line, 'b' = beat line.
@@ -195,7 +199,8 @@ TEST(ScrollingLineLayoutTest, EmptyAndEdgeRanges) {
             audio::FramePos(100000),
             kFrameToX,
             LineSettings(),
-            90)
+            90,
+            kSkinColor)
                         .empty());
     // Invalid or reversed range.
     EXPECT_TRUE(layoutLines(&beats,
@@ -203,7 +208,8 @@ TEST(ScrollingLineLayoutTest, EmptyAndEdgeRanges) {
             audio::FramePos(100000),
             kFrameToX,
             LineSettings(),
-            90)
+            90,
+            kSkinColor)
                         .empty());
     EXPECT_TRUE(lines(beats, 100000, 0).empty());
     // A range between two beats.
@@ -213,4 +219,73 @@ TEST(ScrollingLineLayoutTest, EmptyAndEdgeRanges) {
     expectLines({400 + kBeatFrames, 400 + 2 * kBeatFrames},
             "bb",
             lines(beats, 400 + kBeatFrames, 400 + 2 * kBeatFrames));
+}
+
+TEST(ScrollingLineLayoutTest, DefaultWidthsAreBar2Beat1) {
+    const Beats beats = constBeats(400);
+    const auto result = lines(beats, 0, 400 + 1 * kBeatFrames);
+    ASSERT_EQ(2u, result.size());
+    EXPECT_EQ(2, result[0].widthPx);
+    EXPECT_EQ(1, result[1].widthPx);
+}
+
+TEST(ScrollingLineLayoutTest, WidthsAreClampedTo1To5) {
+    const Beats beats = constBeats(400);
+    LineSettings settings;
+    settings.barWidth = LineWidthPx(9);
+    settings.beatWidth = LineWidthPx(0);
+    auto result = lines(beats, 0, 400 + 1 * kBeatFrames, settings);
+    ASSERT_EQ(2u, result.size());
+    EXPECT_EQ(5, result[0].widthPx);
+    EXPECT_EQ(1, result[1].widthPx);
+
+    settings.barWidth = LineWidthPx(3);
+    settings.beatWidth = LineWidthPx(4);
+    result = lines(beats, 0, 400 + 1 * kBeatFrames, settings);
+    ASSERT_EQ(2u, result.size());
+    EXPECT_EQ(3, result[0].widthPx);
+    EXPECT_EQ(4, result[1].widthPx);
+}
+
+TEST(ScrollingLineLayoutTest, LinesUseTheSkinColourByDefault) {
+    const Beats beats = constBeats(400);
+    const auto result = lines(beats, 0, 400 + 1 * kBeatFrames);
+    ASSERT_EQ(2u, result.size());
+    EXPECT_EQ(kSkinColor, result[0].color);
+    EXPECT_EQ(kSkinColor, result[1].color);
+}
+
+TEST(ScrollingLineLayoutTest, CustomColourOverridesTheSkinColourPerKind) {
+    const Beats beats = constBeats(400);
+    LineSettings settings;
+    settings.barColor = QColor(255, 0, 0);
+    auto result = lines(beats, 0, 400 + 1 * kBeatFrames, settings);
+    ASSERT_EQ(2u, result.size());
+    EXPECT_EQ(QColor(255, 0, 0), result[0].color);
+    EXPECT_EQ(kSkinColor, result[1].color);
+
+    settings.barColor.reset();
+    settings.beatColor = QColor(0, 255, 0);
+    result = lines(beats, 0, 400 + 1 * kBeatFrames, settings);
+    ASSERT_EQ(2u, result.size());
+    EXPECT_EQ(kSkinColor, result[0].color);
+    EXPECT_EQ(QColor(0, 255, 0), result[1].color);
+}
+
+TEST(ScrollingLineLayoutTest, MasterSwitchOffIgnoresWidthAndColour) {
+    // Upstream draws 1 px lines in the skin's beat colour.
+    const Beats beats = constBeats(400);
+    LineSettings settings;
+    settings.enabled = false;
+    settings.barWidth = LineWidthPx(4);
+    settings.beatWidth = LineWidthPx(3);
+    settings.barColor = QColor(255, 0, 0);
+    settings.beatColor = QColor(0, 255, 0);
+    const auto result = lines(beats, 0, 400 + 5 * kBeatFrames, settings);
+    ASSERT_EQ(6u, result.size());
+    for (const auto& line : result) {
+        EXPECT_EQ(LineKind::Beat, line.kind);
+        EXPECT_EQ(1, line.widthPx);
+        EXPECT_EQ(kSkinColor, line.color);
+    }
 }
