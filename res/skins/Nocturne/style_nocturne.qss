@@ -3264,6 +3264,71 @@ WSearchLineEdit::indicator:unchecked:selected {
 *************** QSpinBox, QMenu, QToolTip *************************************/
 
 
+/* === Nocturne: mixer === */
+/* Channel columns, captions, status dots and the clip light (templates mixer/nocturne_*.xml) */
+#NocturneMixCol {
+  background-color: #181818;
+  border-right: 1px solid #000000;
+  padding: 0px 1px;
+}
+#NocturneMixCell {
+  background-color: transparent;
+}
+WLabel#NocturneMixLabel {
+  color: #afafaf;
+  font-family: "Barlow Semi Condensed";
+  font-size: 12px;
+  padding: 0px;
+  margin: 0px;
+  qproperty-alignment: AlignCenter;
+}
+WLabel#NocturneMixLabelFx {
+  color: #fefefe;
+  font-family: "Barlow Semi Condensed SemiBold", "Barlow Semi Condensed";
+  font-size: 14px;
+  padding: 0px;
+  margin: 0px;
+  qproperty-alignment: AlignCenter;
+}
+#NocturneMixCell WPushButton#NocturneBtn {
+  font-family: "Barlow Semi Condensed SemiBold", "Barlow Semi Condensed";
+  font-size: 15px;
+  padding: 0px;
+  background-color: #262626;
+  border: 1px solid #262626;
+}
+#NocturneMixCell WPushButton#NocturneBtn:hover {
+  background-color: #323232;
+}
+#NocturneMixCell WPushButton#NocturneBtn[displayValue="1"] {
+  background-color: #448bf6;
+  border-color: #448bf6;
+}
+WPushButton#NocturneDot {
+  background-color: #323232;
+  border: none;
+  border-radius: 4px;
+  margin: 0px;
+  padding: 0px;
+}
+WPushButton#NocturneDot:hover {
+  background-color: #6d6d6d;
+}
+WPushButton#NocturneDot[displayValue="1"] {
+  background-color: #448bf6;
+}
+#NocturneClipLight {
+  background-color: #323232;
+  border-radius: 4px;
+}
+#NocturneClipLight[highlight="1"] {
+  background-color: #fa7242;
+}
+#NocturneVuBox {
+  background-color: transparent;
+}
+/* === /Nocturne: mixer === */
+
 /**********************************************************************
 ***************** Nocturne base look (Traktor dark) *******************
 Shared by every region. QSS cannot read skin variables, so the palette

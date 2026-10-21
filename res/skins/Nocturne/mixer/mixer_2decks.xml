@@ -14,68 +14,13 @@
         <Layout>horizontal</Layout>
         <Children>
 
-          <Template src="skins:Nocturne/mixer/channel_left.xml">
-            <SetVariable name="ChanNum">1</SetVariable>
-            <SetVariable name="xfaderLeft">default</SetVariable>
-            <SetVariable name="xfaderRight">warning</SetVariable>
-          </Template>
-
-          <WidgetGroup><!-- Pfl + VU -->
-            <Layout>vertical</Layout>
-            <SizePolicy>max,max</SizePolicy>
-            <Children>
-
-              <WidgetGroup>
-                <ObjectName></ObjectName>
-                <Layout>horizontal</Layout>
-                <Size>0min,26f</Size>
-                <Children>
-                  <Template src="skins:Nocturne/controls/button_2state.xml">
-                    <SetVariable name="TooltipId">pfl</SetVariable>
-                    <SetVariable name="ObjectName">PflButton</SetVariable>
-                    <SetVariable name="Size">26f,26f</SetVariable>
-                    <SetVariable name="BtnSize">square</SetVariable>
-                    <SetVariable name="ConfigKey">[Channel1],pfl</SetVariable>
-                  </Template>
-                  <WidgetGroup><Size>3f,0min</Size></WidgetGroup>
-                  <Template src="skins:Nocturne/controls/button_2state.xml">
-                    <SetVariable name="TooltipId">pfl</SetVariable>
-                    <SetVariable name="ObjectName">PflButton</SetVariable>
-                    <SetVariable name="Size">26f,26f</SetVariable>
-                    <SetVariable name="BtnSize">square</SetVariable>
-                    <SetVariable name="ConfigKey">[Channel2],pfl</SetVariable>
-                  </Template>
-                </Children>
-              </WidgetGroup>
-
-              <WidgetGroup><Size>1min,13f</Size></WidgetGroup>
-
-              <WidgetGroup>
-                <ObjectName>VuMeterBoxFull</ObjectName>
-                <Layout>horizontal</Layout>
-                <SizePolicy>min,min</SizePolicy>
-                <Children>
-                  <SingletonContainer>
-                    <ObjectName>VuMeterChannel1</ObjectName>
-                  </SingletonContainer>
-                  <WidgetGroup><Size>7f,0min</Size></WidgetGroup>
-                  <SingletonContainer>
-                    <ObjectName>VuMeterMain_Dark</ObjectName>
-                  </SingletonContainer>
-                  <WidgetGroup><Size>7f,0min</Size></WidgetGroup>
-                  <SingletonContainer>
-                    <ObjectName>VuMeterChannel2</ObjectName>
-                  </SingletonContainer>
-                </Children>
-              </WidgetGroup>
-            </Children>
-          </WidgetGroup><!-- Pfl + VU -->
-
-          <Template src="skins:Nocturne/mixer/channel_right.xml">
-            <SetVariable name="ChanNum">2</SetVariable>
-            <SetVariable name="xfaderLeft">warning</SetVariable>
-            <SetVariable name="xfaderRight">default</SetVariable>
-          </Template>
+          <!-- Nocturne: mixer. Channel 1 = gain column | VU+PFL | EQ+fader; channel 2 mirrors it. -->
+          <Template src="skins:Nocturne/mixer/nocturne_channel_gain_col.xml"><SetVariable name="ChanNum">1</SetVariable></Template>
+          <Template src="skins:Nocturne/mixer/nocturne_channel_vu.xml"><SetVariable name="ChanNum">1</SetVariable></Template>
+          <Template src="skins:Nocturne/mixer/nocturne_channel_eq_col.xml"><SetVariable name="ChanNum">1</SetVariable></Template>
+          <Template src="skins:Nocturne/mixer/nocturne_channel_eq_col.xml"><SetVariable name="ChanNum">2</SetVariable></Template>
+          <Template src="skins:Nocturne/mixer/nocturne_channel_vu.xml"><SetVariable name="ChanNum">2</SetVariable></Template>
+          <Template src="skins:Nocturne/mixer/nocturne_channel_gain_col.xml"><SetVariable name="ChanNum">2</SetVariable></Template>
 
         </Children>
       </WidgetGroup><!-- /Channel controls -->

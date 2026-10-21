@@ -1,0 +1,49 @@
+<!DOCTYPE template>
+<!-- Nocturne: mixer. Channel level meter with the headphone-cue (PFL) button under it. Variable: ChanNum -->
+<Template>
+  <SetVariable name="Group">[Channel<Variable name="ChanNum"/>]</SetVariable>
+  <WidgetGroup>
+    <Layout>vertical</Layout>
+    <SizePolicy>min,min</SizePolicy>
+    <Children>
+      <WidgetGroup><Size>0min,6f</Size></WidgetGroup>
+      <WidgetGroup>
+        <ObjectName>NocturneVuBox</ObjectName>
+        <Layout>horizontal</Layout>
+        <SizePolicy>min,min</SizePolicy>
+        <Children>
+          <WidgetGroup><Size>3f,0min</Size></WidgetGroup>
+          <VuMeter>
+            <TooltipId>channel_VuMeter</TooltipId>
+            <PathBack>skins:Nocturne/<Variable name="StyleScheme"/>/style/vu_deck_level_bg_dark.png</PathBack>
+            <PathVu>skins:Nocturne/<Variable name="StyleScheme"/>/style/vu_deck_level_active.png</PathVu>
+            <Horizontal>false</Horizontal>
+            <PeakHoldSize>4</PeakHoldSize>
+            <PeakHoldTime>500</PeakHoldTime>
+            <PeakFallTime>10</PeakFallTime>
+            <PeakFallStep>2</PeakFallStep>
+            <Connection>
+              <ConfigKey><Variable name="Group"/>,vu_meter</ConfigKey>
+            </Connection>
+          </VuMeter>
+          <WidgetGroup><Size>3f,0min</Size></WidgetGroup>
+        </Children>
+      </WidgetGroup>
+      <WidgetGroup><Size>0min,0me</Size></WidgetGroup>
+      <WidgetGroup>
+        <Layout>horizontal</Layout>
+        <Size>0min,22f</Size>
+        <Children>
+          <Template src="skins:Nocturne/controls/button_2state.xml">
+            <SetVariable name="TooltipId">pfl</SetVariable>
+            <SetVariable name="ObjectName">PflButton</SetVariable>
+            <SetVariable name="Size">20f,20f</SetVariable>
+            <SetVariable name="BtnSize">square</SetVariable>
+            <SetVariable name="ConfigKey"><Variable name="Group"/>,pfl</SetVariable>
+          </Template>
+        </Children>
+      </WidgetGroup>
+      <WidgetGroup><Size>0min,3f</Size></WidgetGroup>
+    </Children>
+  </WidgetGroup>
+</Template>
