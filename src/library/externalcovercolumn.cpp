@@ -170,8 +170,10 @@ bool ExternalCoverColumn::sortRequested(int column, Qt::SortOrder order) {
                 &ExternalCoverColumn::slotReadyToSort);
     }
     if (m_rowsOfPreviousTable) {
-        // Another playlist: its rows, in the view's order, while its covers
-        // are read.
+        // Another playlist: its rows, in its default order, while its covers
+        // are read. Not in the order of the previous playlist's view, which
+        // the new view can't be ordered by.
+        m_pModel->setSort(m_pModel->defaultSortColumn(), m_pModel->defaultSortOrder());
         m_pModel->select();
     }
     const QStringList locations = rowLocations();

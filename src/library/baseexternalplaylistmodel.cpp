@@ -1,7 +1,7 @@
 #include "library/baseexternalplaylistmodel.h"
 
 #include "library/dao/trackschema.h"
-#include "library/externalcovercolumn.h"
+#include "library/externalcovercolumn.h" // DJNote
 #include "library/queryutil.h"
 #include "library/trackcollection.h"
 #include "library/trackcollectionmanager.h"
@@ -28,16 +28,18 @@ BaseExternalPlaylistModel::BaseExternalPlaylistModel(QObject* parent,
           m_playlistTracksTable(playlistTracksTable),
           m_trackSource(trackSource),
           m_currentPlaylistId(kInvalidPlaylistId),
-          m_pCoverColumn(new ExternalCoverColumn(this, m_database)) {
+          m_pCoverColumn(new ExternalCoverColumn(this, m_database)) { // DJNote
 }
 
 BaseExternalPlaylistModel::~BaseExternalPlaylistModel() {
 }
 
+// DJNote
 CoverInfo BaseExternalPlaylistModel::getCoverInfo(const QModelIndex& index) const {
     return m_pCoverColumn->coverInfo(index);
 }
 
+// DJNote
 bool BaseExternalPlaylistModel::prepareSort(int column, Qt::SortOrder order) {
     return m_pCoverColumn->sortRequested(column, order);
 }
@@ -152,13 +154,13 @@ void BaseExternalPlaylistModel::setPlaylistById(int playlistId) {
     auto playlistViewColumns = QStringList{
             PLAYLISTTRACKSTABLE_TRACKID,
             PLAYLISTTRACKSTABLE_POSITION,
-            QStringLiteral("'' AS ") + LIBRARYTABLE_PREVIEW,
-            // DJNote
-            m_pCoverColumn->viewColumn(
-                    QStringLiteral("(SELECT location FROM %1 WHERE %1.id = %2.%3)")
-                            .arg(m_trackSource->tableName(),
-                                    m_playlistTracksTable,
-                                    PLAYLISTTRACKSTABLE_TRACKID))};
+            QStringLiteral("'' AS ") + LIBRARYTABLE_PREVIEW};
+    // DJNote: the cover column, right after Preview (see below).
+    playlistViewColumns.append(m_pCoverColumn->viewColumn(
+            QStringLiteral("(SELECT location FROM %1 WHERE %1.id = %2.%3)")
+                    .arg(m_trackSource->tableName(),
+                            m_playlistTracksTable,
+                            PLAYLISTTRACKSTABLE_TRACKID)));
     const auto queryString =
             QStringLiteral(
                     "CREATE TEMPORARY VIEW IF NOT EXISTS %1 AS "
@@ -178,12 +180,11 @@ void BaseExternalPlaylistModel::setPlaylistById(int playlistId) {
     }
 
     m_currentPlaylistId = playlistId;
-    playlistViewColumns[2] = LIBRARYTABLE_PREVIEW;
-    playlistViewColumns[3] = LIBRARYTABLE_COVERART; // DJNote
+    playlistViewColumns.removeLast(); // DJNote: the cover column, appended again
+    playlistViewColumns.last() = LIBRARYTABLE_PREVIEW;
+    playlistViewColumns.append(LIBRARYTABLE_COVERART); // DJNote
     setTable(playlistViewTable, playlistViewColumns.first(), playlistViewColumns, m_trackSource);
-    // DJNote: the order of the previous playlist's view, until sorted again.
-    m_tableOrderBy.clear();
-    m_pCoverColumn->tableSet();
+    m_pCoverColumn->tableSet(); // DJNote
     setDefaultSort(fieldIndex(ColumnCache::COLUMN_PLAYLISTTRACKSTABLE_POSITION),
             Qt::AscendingOrder);
     // Restore search text

@@ -6,7 +6,7 @@
 #include "library/basesqltablemodel.h"
 #include "library/trackmodel.h"
 
-class ExternalCoverColumn;
+class ExternalCoverColumn; // DJNote
 class QModelIndex;
 
 class BaseExternalPlaylistModel : public BaseSqlTableModel {
@@ -27,7 +27,7 @@ class BaseExternalPlaylistModel : public BaseSqlTableModel {
     Qt::ItemFlags flags(const QModelIndex& index) const override;
     Capabilities getCapabilities() const override;
     QString modelKey(bool noSearch) const override;
-    CoverInfo getCoverInfo(const QModelIndex& index) const override;
+    CoverInfo getCoverInfo(const QModelIndex& index) const override; // DJNote
 
   private:
     TrackId doGetTrackId(const TrackPointer& pTrack) const override;

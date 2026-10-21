@@ -4,7 +4,7 @@
 #include <QSqlQuery>
 
 #include "library/dao/trackschema.h"
-#include "library/externalcovercolumn.h"
+#include "library/externalcovercolumn.h" // DJNote
 #include "library/queryutil.h"
 #include "library/trackcollectionmanager.h"
 #include "mixer/playerinfo.h"
@@ -18,7 +18,7 @@ BaseExternalTrackModel::BaseExternalTrackModel(QObject* parent,
         const QString& trackTable,
         QSharedPointer<BaseTrackCache> trackSource)
         : BaseSqlTableModel(parent, pTrackCollectionManager, settingsNamespace),
-          m_pCoverColumn(new ExternalCoverColumn(this, m_database)) {
+          m_pCoverColumn(new ExternalCoverColumn(this, m_database)) { // DJNote
     QString viewTable = trackTable + "_view";
     QStringList columns;
     columns << "id";
@@ -50,10 +50,12 @@ BaseExternalTrackModel::BaseExternalTrackModel(QObject* parent,
 BaseExternalTrackModel::~BaseExternalTrackModel() {
 }
 
+// DJNote
 CoverInfo BaseExternalTrackModel::getCoverInfo(const QModelIndex& index) const {
     return m_pCoverColumn->coverInfo(index);
 }
 
+// DJNote
 bool BaseExternalTrackModel::prepareSort(int column, Qt::SortOrder order) {
     return m_pCoverColumn->sortRequested(column, order);
 }
