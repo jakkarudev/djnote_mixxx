@@ -32,18 +32,23 @@ inline double clamp255(double v) {
     return std::clamp(v, 0.0, 255.0);
 }
 
-} // namespace
-
-QImage overviewImage(const OverviewColumnsView& columns,
+// Draws the source pixels of columns [first, end) into `pImage` (Format_ARGB32,
+// end - first wide). Each column depends only on its own stored bytes.
+void drawSourceColumns(QImage* pImage,
+        const OverviewColumnsView& columns,
         const PhosphorOverviewSettings& settings,
-        int height) {
+        int first,
+        int end) {
+    const int width = end - first;
+    const int height = pImage->height();
     DEBUG_ASSERT(height > 0);
+    DEBUG_ASSERT(pImage->width() == width);
     // 62 rows, per channel B, G, R, A, as floats.
-    std::vector<double> src(static_cast<size_t>(kOverviewRows) * kOverviewColumns * 4, 0.0);
-    const int done = std::clamp(columns.columnsDone, 0, kOverviewColumns);
+    std::vector<double> src(static_cast<size_t>(kOverviewRows) * width * 4, 0.0);
+    const int done = std::clamp(columns.columnsDone, first, end);
     // A calibrated floor (research 9): about one sample of the two-column window.
     const double halfSample = 0.5 / std::max(1, columns.samplesPerColumn);
-    for (int c = 0; c < done; ++c) {
+    for (int c = first; c < done; ++c) {
         const uint8_t* density = columns.density + static_cast<size_t>(c) * kOverviewRows;
         int top = -1;
         int bottom = -1;
@@ -64,7 +69,7 @@ QImage overviewImage(const OverviewColumnsView& columns,
             // Digital silence (judged from the audio, not the gained levels): an
             // opaque black pixel one row above the row map's center, as Traktor
             // draws it (row 30, research 9).
-            src[(static_cast<size_t>(kOverviewCenterRow - 1) * kOverviewColumns + c) * 4 + 3] = 255.0;
+            src[(static_cast<size_t>(kOverviewCenterRow - 1) * width + c - first) * 4 + 3] = 255.0;
             continue;
         }
         const double lr = lv8[0] / 255.0 * settings.gainLow;
@@ -81,7 +86,7 @@ QImage overviewImage(const OverviewColumnsView& columns,
                                    kWeightB4 * std::pow(ub, 4)) *
                 std::pow(norm, settings.levelExponent) * settings.brightness;
         for (int r = top; r <= bottom; ++r) {
-            double* px = &src[(static_cast<size_t>(r) * kOverviewColumns + c) * 4];
+            double* px = &src[(static_cast<size_t>(r) * width + c - first) * 4];
             const double d = std::max(kDensityFull *
                                     std::pow(density[r] / 255.0, 1.0 / kDensityStorePower),
                     halfSample);
@@ -93,8 +98,7 @@ QImage overviewImage(const OverviewColumnsView& columns,
         }
     }
 
-    QImage image(kOverviewColumns, height, QImage::Format_ARGB32);
-    std::vector<double> acc(static_cast<size_t>(kOverviewColumns) * 4);
+    std::vector<double> acc(static_cast<size_t>(width) * 4);
     for (int y = 0; y < height; ++y) {
         // Area average of the source rows covered by output row y.
         const double lo = static_cast<double>(y) * kOverviewRows / height;
@@ -106,16 +110,65 @@ QImage overviewImage(const OverviewColumnsView& columns,
             if (w <= 0) {
                 continue;
             }
-            const double* row = &src[static_cast<size_t>(r) * kOverviewColumns * 4];
+            const double* row = &src[static_cast<size_t>(r) * width * 4];
             for (size_t i = 0; i < acc.size(); ++i) {
                 acc[i] += row[i] * w;
             }
         }
-        uint8_t* out = image.scanLine(y);
+        uint8_t* out = pImage->scanLine(y);
         for (size_t i = 0; i < acc.size(); ++i) {
             out[i] = roundU8(acc[i]);
         }
     }
+}
+
+// The on-screen colour of one source pixel, premultiplied.
+QRgb displayPixel(QRgb p) {
+    if (p == 0) {
+        return 0;
+    }
+    const double c[3] = {static_cast<double>(qRed(p)),
+            static_cast<double>(qGreen(p)),
+            static_cast<double>(qBlue(p))};
+    const double brightest = std::max({c[0], c[1], c[2]});
+    if (brightest <= 0) {
+        // Alpha without colour (the silence line): opaque black.
+        return qRgba(0, 0, 0, qAlpha(p) > 0 ? 255 : 0);
+    }
+    const double grey = kScreenDesat * std::min({c[0], c[1], c[2]});
+    double pre[3];
+    double top = 0;
+    for (int i = 0; i < 3; ++i) {
+        const double v = std::max(c[i] - grey, 0.0);
+        pre[i] = kScreenGain * kScreenBalance[i] *
+                std::pow(v / 255.0, kScreenExponent) * 255.0;
+        top = std::max(top, pre[i]);
+    }
+    const double scale = top > 255.0 ? 255.0 / top : 1.0;
+    const double cover = std::pow(
+            std::min(1.0, kScreenCoverGain * brightest / 255.0), kScreenCoverPower);
+    const uint8_t a = roundU8(cover * 255.0);
+    if (a == 0) {
+        return 0;
+    }
+    // The straight colour, rounded as the reference script does, then
+    // premultiplied.
+    const auto premul = [a](uint8_t v) {
+        return static_cast<int>((v * a + 127) / 255);
+    };
+    return qRgba(premul(roundU8(pre[0] * scale)),
+            premul(roundU8(pre[1] * scale)),
+            premul(roundU8(pre[2] * scale)),
+            a);
+}
+
+} // namespace
+
+QImage overviewImage(const OverviewColumnsView& columns,
+        const PhosphorOverviewSettings& settings,
+        int height) {
+    QImage image(kOverviewColumns, height, QImage::Format_ARGB32);
+    drawSourceColumns(&image, columns, settings, 0, kOverviewColumns);
     return image;
 }
 
@@ -128,49 +181,37 @@ QImage overviewDisplayImage(const QImage& overview) {
         const QRgb* src = reinterpret_cast<const QRgb*>(in.constScanLine(y));
         QRgb* dst = reinterpret_cast<QRgb*>(out.scanLine(y));
         for (int x = 0; x < w; ++x) {
-            const QRgb p = src[x];
-            if (p == 0) {
-                dst[x] = 0;
-                continue;
-            }
-            const double c[3] = {static_cast<double>(qRed(p)),
-                    static_cast<double>(qGreen(p)),
-                    static_cast<double>(qBlue(p))};
-            const double brightest = std::max({c[0], c[1], c[2]});
-            if (brightest <= 0) {
-                // Alpha without colour (the silence line): opaque black.
-                dst[x] = qRgba(0, 0, 0, qAlpha(p) > 0 ? 255 : 0);
-                continue;
-            }
-            const double grey = kScreenDesat * std::min({c[0], c[1], c[2]});
-            double pre[3];
-            double top = 0;
-            for (int i = 0; i < 3; ++i) {
-                const double v = std::max(c[i] - grey, 0.0);
-                pre[i] = kScreenGain * kScreenBalance[i] *
-                        std::pow(v / 255.0, kScreenExponent) * 255.0;
-                top = std::max(top, pre[i]);
-            }
-            const double scale = top > 255.0 ? 255.0 / top : 1.0;
-            const double cover = std::pow(
-                    std::min(1.0, kScreenCoverGain * brightest / 255.0), kScreenCoverPower);
-            const uint8_t a = roundU8(cover * 255.0);
-            if (a == 0) {
-                dst[x] = 0;
-                continue;
-            }
-            // The straight colour, rounded as the reference script does, then
-            // premultiplied.
-            const auto premul = [a](uint8_t v) {
-                return static_cast<int>((v * a + 127) / 255);
-            };
-            dst[x] = qRgba(premul(roundU8(pre[0] * scale)),
-                    premul(roundU8(pre[1] * scale)),
-                    premul(roundU8(pre[2] * scale)),
-                    a);
+            dst[x] = displayPixel(src[x]);
         }
     }
     return out;
+}
+
+void drawOverviewColumns(QImage* pImage,
+        const OverviewColumnsView& columns,
+        const PhosphorOverviewSettings& settings,
+        int height,
+        int firstColumn) {
+    if (pImage->width() != kOverviewColumns || pImage->height() != height ||
+            pImage->format() != QImage::Format_ARGB32_Premultiplied) {
+        *pImage = QImage(kOverviewColumns, height, QImage::Format_ARGB32_Premultiplied);
+        pImage->fill(0);
+        firstColumn = 0;
+    }
+    const int first = std::clamp(firstColumn, 0, kOverviewColumns);
+    const int end = std::clamp(columns.columnsDone, first, kOverviewColumns);
+    if (end <= first) {
+        return;
+    }
+    QImage source(end - first, height, QImage::Format_ARGB32);
+    drawSourceColumns(&source, columns, settings, first, end);
+    for (int y = 0; y < height; ++y) {
+        const QRgb* src = reinterpret_cast<const QRgb*>(source.constScanLine(y));
+        QRgb* dst = reinterpret_cast<QRgb*>(pImage->scanLine(y)) + first;
+        for (int x = 0; x < end - first; ++x) {
+            dst[x] = displayPixel(src[x]);
+        }
+    }
 }
 
 int overviewExtentRows(const OverviewColumnsView& columns) {

@@ -70,6 +70,19 @@ QImage overviewImage(const OverviewColumnsView& columns,
 /// black, an empty pixel stays transparent. Format_ARGB32_Premultiplied. Pure.
 QImage overviewDisplayImage(const QImage& overview);
 
+/// Draws the overview columns built since `firstColumn` into `pImage`, the
+/// widget's display image, `height` rows: afterwards it equals
+/// overviewDisplayImage(overviewImage(columns, settings, height)) as long as it
+/// held that image for an earlier columnsDone of the same columns and settings.
+/// Columns before `firstColumn` are left untouched, so a widget that draws as
+/// the analyzer progresses pays only for the new columns (issue #84). A null
+/// or wrongly sized image is replaced by an empty one and drawn in full.
+void drawOverviewColumns(QImage* pImage,
+        const OverviewColumnsView& columns,
+        const PhosphorOverviewSettings& settings,
+        int height,
+        int firstColumn);
+
 /// The outermost non-empty row of the built columns, as a distance from the
 /// center line in rows (0..31): 31 is a track that reaches 0 dBFS. Normalize
 /// crops to this once the data is complete.
