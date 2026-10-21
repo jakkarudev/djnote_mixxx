@@ -957,6 +957,7 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/library/coverart.cpp
   src/library/coverartcache.cpp
   src/library/coverartutils.cpp
+  src/library/coverlookup.cpp
   src/library/dao/analysisdao.cpp
   src/library/dao/autodjcratesdao.cpp
   src/library/dao/cuedao.cpp
@@ -2198,6 +2199,7 @@ if(BUILD_TESTING)
     src/test/coreservicestest.cpp
     src/test/coverartcache_test.cpp
     src/test/coverartutils_test.cpp
+    src/test/coverlookup_test.cpp
     src/test/cratestorage_test.cpp
     src/test/cue_test.cpp
     src/test/cuecontrol_test.cpp
