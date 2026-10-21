@@ -5,8 +5,11 @@
 #include <QStringList>
 #include <QUrl>
 
+#include "library/browse/browsecovercolumn.h"
 #include "library/browse/browsetablemodel.h"
 #include "library/browse/browsethread.h"
+#include "library/columncache.h"
+#include "library/dao/trackschema.h"
 #include "library/tabledelegates/previewbuttondelegate.h"
 #include "library/trackcollection.h"
 #include "library/trackcollectionmanager.h"
@@ -43,17 +46,21 @@ void listAppendOrReplaceAt(QList<T>* pList, int index, const T& value) {
 
 BrowseTableModel::BrowseTableModel(QObject* parent,
         TrackCollectionManager* pTrackCollectionManager,
-        RecordingManager* pRecordingManager)
+        RecordingManager* pRecordingManager,
+        CoverLookup* pCoverLookup)
         : TrackModel(pTrackCollectionManager->internalCollection()->database(),
                   "mixxx.db.model.browse"),
           QStandardItemModel(parent),
           m_pTrackCollectionManager(pTrackCollectionManager),
           m_pRecordingManager(pRecordingManager),
-          m_previewDeckGroup(PlayerManager::groupForPreviewDeck(0)) {
+          m_previewDeckGroup(PlayerManager::groupForPreviewDeck(0)),
+          m_pCoverColumn(new BrowseCoverColumn(
+                  this, COLUMN_COVERART, pCoverLookup, pRecordingManager)) {
     QStringList headerLabels;
     /// The order of the columns appended here must exactly match the ordering
     /// of the enum that is used for indexing.
     listAppendOrReplaceAt(&headerLabels, COLUMN_PREVIEW, tr("Preview"));
+    listAppendOrReplaceAt(&headerLabels, COLUMN_COVERART, tr("Cover Art"));
     listAppendOrReplaceAt(&headerLabels, COLUMN_FILENAME, tr("Filename"));
     listAppendOrReplaceAt(&headerLabels, COLUMN_ARTIST, tr("Artist"));
     listAppendOrReplaceAt(&headerLabels, COLUMN_TITLE, tr("Title"));
@@ -154,6 +161,14 @@ BrowseTableModel::BrowseTableModel(QObject* parent,
     }
 
     setHorizontalHeaderLabels(headerLabels);
+    // DJNote: same default width as the cover column in Tracks.
+    const int coverColumnWidth = ColumnCache::defaultColumnWidth() / 2;
+    setHeaderData(COLUMN_COVERART,
+            Qt::Horizontal,
+            coverColumnWidth,
+            TrackModel::kHeaderWidthRole);
+    BrowseCoverColumn::addToSavedHeaderState(
+            this, COLUMN_COVERART, NUM_COLUMNS, coverColumnWidth);
     // register the QList<T> as a metatype since we use QueuedConnection below
     qRegisterMetaType<QList<QList<QStandardItem*>>>(
             "QList< QList<QStandardItem*>>");
@@ -270,15 +285,8 @@ QUrl BrowseTableModel::getTrackUrl(const QModelIndex& index) const {
 }
 
 CoverInfo BrowseTableModel::getCoverInfo(const QModelIndex& index) const {
-    TrackPointer pTrack = getTrack(index);
-    if (pTrack) {
-        return CoverInfo(pTrack->getCoverInfo(), getTrackLocation(index));
-    } else {
-        qWarning()
-                << "Track is not available in library"
-                << getTrackUrl(index);
-        return CoverInfo();
-    }
+    // DJNote: from the cover lookup, which never adds the track to the library.
+    return m_pCoverColumn->coverInfo(index);
 }
 
 const QVector<int> BrowseTableModel::getTrackRows(TrackId trackId) const {
@@ -361,6 +369,7 @@ QMimeData* BrowseTableModel::mimeData(const QModelIndexList& indexes) const {
 void BrowseTableModel::slotClear(BrowseTableModel* caller_object) {
     if (caller_object == this) {
         removeRows(0, rowCount());
+        m_pCoverColumn->clearRows();
     }
 }
 
@@ -395,6 +404,14 @@ QString BrowseTableModel::modelKey(bool noSearch) const {
     return QStringLiteral("browse:") + m_currentDirectory;
 }
 
+int BrowseTableModel::fieldIndex(const QString& fieldName) const {
+    // DJNote: lets the cover delegate find its column.
+    if (fieldName == LIBRARYTABLE_COVERART) {
+        return COLUMN_COVERART;
+    }
+    return TrackModel::fieldIndex(fieldName);
+}
+
 Qt::ItemFlags BrowseTableModel::flags(const QModelIndex& index) const {
     Qt::ItemFlags defaultFlags = QAbstractItemModel::flags(index);
 
@@ -405,6 +422,7 @@ Qt::ItemFlags BrowseTableModel::flags(const QModelIndex& index) const {
     int column = index.column();
 
     switch (column) {
+    case COLUMN_COVERART:
     case COLUMN_FILENAME:
     case COLUMN_BITRATE:
     case COLUMN_DURATION:
@@ -520,7 +538,8 @@ void BrowseTableModel::trackChanged(
 }
 
 bool BrowseTableModel::isColumnSortable(int column) const {
-    return COLUMN_PREVIEW != column;
+    // DJNote: the cover column is not sortable yet.
+    return COLUMN_PREVIEW != column && COLUMN_COVERART != column;
 }
 
 QAbstractItemDelegate* BrowseTableModel::delegateForColumn(const int i, QObject* pParent) {
@@ -528,6 +547,9 @@ QAbstractItemDelegate* BrowseTableModel::delegateForColumn(const int i, QObject*
     DEBUG_ASSERT(pTableView);
     if (PlayerInfo::instance().numPreviewDecks() > 0 && i == COLUMN_PREVIEW) {
         return new PreviewButtonDelegate(pTableView, i);
+    }
+    if (i == COLUMN_COVERART) {
+        return m_pCoverColumn->createDelegate(pParent);
     }
     return nullptr;
 }

@@ -949,6 +949,7 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/library/basesqltablemodel.cpp
   src/library/basetrackcache.cpp
   src/library/basetracktablemodel.cpp
+  src/library/browse/browsecovercolumn.cpp
   src/library/browse/browsefeature.cpp
   src/library/browse/browsetablemodel.cpp
   src/library/browse/browsethread.cpp

@@ -45,7 +45,10 @@ BrowseFeature::BrowseFeature(
         RecordingManager* pRecordingManager)
         : LibraryFeature(pLibrary, pConfig, QString("computer")),
           m_pTrackCollection(pLibrary->trackCollectionManager()->internalCollection()),
-          m_browseModel(this, pLibrary->trackCollectionManager(), pRecordingManager),
+          m_browseModel(this,
+                  pLibrary->trackCollectionManager(),
+                  pRecordingManager,
+                  pLibrary->coverLookup()),
           m_proxyModel(&m_browseModel, true),
           m_pSidebarModel(new FolderTreeModel(this)) {
     connect(&m_browseModel,

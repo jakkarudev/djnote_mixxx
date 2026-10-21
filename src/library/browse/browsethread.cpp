@@ -160,6 +160,9 @@ void BrowseThread::populateModel() {
         item->setData("0", Qt::UserRole);
         row_data.insert(COLUMN_PREVIEW, item);
 
+        // DJNote: the cover column's cells are drawn from the cover lookup.
+        row_data.insert(COLUMN_COVERART, new QStandardItem());
+
         const auto fileAccess = mixxx::FileAccess(
                 mixxx::FileInfo(fileIt.next()),
                 thisPath.token());

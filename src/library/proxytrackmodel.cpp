@@ -148,6 +148,12 @@ QAbstractItemDelegate* ProxyTrackModel::delegateForColumn(const int i, QObject* 
     return m_pTrackModel ? m_pTrackModel->delegateForColumn(i, pParent) : nullptr;
 }
 
+int ProxyTrackModel::fieldIndex(const QString& fieldName) const {
+    // DJNote: columns map one to one, so the composed model's field indexes
+    // hold here too (the cover delegate needs its column).
+    return m_pTrackModel ? m_pTrackModel->fieldIndex(fieldName) : -1;
+}
+
 TrackModel::Capabilities ProxyTrackModel::getCapabilities() const {
     return m_pTrackModel ? m_pTrackModel->getCapabilities() : Capability::None;
 }
