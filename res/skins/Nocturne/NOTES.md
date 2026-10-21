@@ -42,6 +42,15 @@ Where Traktor shows something Mixxx has no control for, Nocturne drops it instea
 - Left as upstream: library sidebar feature icons (orange, from `res/images`), VU-meter PNGs.
 - `skin_preview_Nocturne.png` is currently LateNight's PaleMoon preview; replace it with a capture of the finished skin.
 
+## Header (ticket #74)
+
+- Layout: NOCTURNE wordmark | main VU (two thin rows), CPU meter, clock, battery, REC, ON AIR, VINYL | SETTINGS, LIBRARY.
+  A DECKS toggle appears next to the wordmark only while the library is maximised. LateNight's section toggles (waveforms, 4 decks,
+  mixer, effects, samplers, mic/aux) are no longer in the header; they stay in the skin settings pane.
+- VINYL toggles `[Nocturne],show_vinylcontrol` (the per-deck vinyl status panel).
+- Dropped: fullscreen button (no Mixxx control exists for it; View > Full Screen is a menu action only).
+- The battery widget hides itself on machines without a battery.
+
 ## Known consequences of not using `[Skin]` keys
 
 Some `[Skin]` controls are created and used by C++ and have no Nocturne equivalent:

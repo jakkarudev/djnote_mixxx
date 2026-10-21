@@ -3344,3 +3344,47 @@ WTrackTableViewHeader::section {
   color: #6d6d6d;
   font-size: 11px;
 }
+
+/* === Nocturne: header === */
+#ToolBar {
+  background-color: #181818;
+  border-bottom: 1px solid #000000;
+  padding: 0px 6px 0px 6px;
+}
+WLabel#NocturneWordmark {
+  color: #fefefe;
+  font-family: "Barlow Semi Condensed SemiBold", "Barlow Semi Condensed";
+  font-size: 22px;
+  letter-spacing: 1px;
+  background: transparent;
+}
+#HeaderVuBox {
+  background-color: transparent;
+  border: none;
+}
+#LatencyLabel {
+  color: #afafaf;
+  font-size: 12px;
+  margin: 0px;
+  background: transparent;
+}
+#LatencyMeterBox {
+  background-color: transparent;
+}
+#ClockWidget {
+  color: #afafaf;
+  font-size: 14px;
+  background: transparent;
+}
+/* ON AIR: no legacy icons */
+WPushButton#BroadcastButton[displayValue="0"],
+WPushButton#BroadcastButton[displayValue="1"],
+WPushButton#BroadcastButton[displayValue="2"],
+WPushButton#BroadcastButton[displayValue="3"],
+WPushButton#BroadcastButton[displayValue="4"] {
+  image: none;
+}
+#ToolBar WPushButton#NocturneBtn {
+  font-size: 12px;
+}
+/* === /Nocturne: header === */
