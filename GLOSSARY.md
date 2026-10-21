@@ -124,3 +124,15 @@ _Avoid_: browser, file browser, explorer
 **Quick Link**:
 A folder from Computer that the DJ has added, by right-clicking it, to the Quick Links list at the top of Computer, so it can be opened without browsing the whole folder tree. It comes from Mixxx.
 _Avoid_: pin, pinned folder, favorite, shortcut
+
+**External library**:
+A library section that shows another app's collection (Rekordbox, Serato, Traktor, iTunes, Rhythmbox, Banshee), read from that app's own files. Its tracks are not in the library until one is selected or loaded.
+_Avoid_: external source, third-party library, import
+
+**Cover column**:
+The track list column that shows a small cover art thumbnail on each track's row.
+_Avoid_: cover art (on its own), thumbnail column, artwork column
+
+**Cover panel**:
+The cover art of the selected track, shown under the library sidebar. Skin settings can hide it.
+_Avoid_: cover art (on its own), sidebar cover, cover widget, artwork preview
