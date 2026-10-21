@@ -331,7 +331,8 @@ void BrowseFeature::activateChild(const QModelIndex& index) {
     if (path == QUICK_LINK_NODE || path == DEVICE_NODE) {
         emit disableSearch();
     }
-    emit enableCoverArtDisplay(true); // DJNote: cover panel in Computer
+    // DJNote: the cover panel for folders (track lists), not the root pages.
+    emit enableCoverArtDisplay(path != QUICK_LINK_NODE && path != DEVICE_NODE);
 }
 
 void BrowseFeature::onRightClickChild(const QPoint& globalPos, const QModelIndex& index) {
