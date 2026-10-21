@@ -4156,11 +4156,15 @@ WEffectChainPresetSelector#NocturneFltrSelector::down-arrow {
   height: 5px;
 }
 
-/* --- decks and mixer butt together, split by black lines (no raised LateNight borders) --- */
+/* --- black separator lines, Traktor's 2 px: under the waveforms, either side of the mixer,
+  under the deck/mixer band and under the strip. Decks and mixer sit flush against them
+  (no LateNight margins or raised borders). --- */
 #Deck1, #Deck2, #Deck3, #Deck4,
-#MixerDecks {
+#MixerDecks,
+#MixerDecks[highlight="1"] {
   border: none;
   border-radius: 0px;
+  margin: 0px;
   background-color: #181818;
 }
 #Deck1, #Deck3 {
@@ -4168,6 +4172,28 @@ WEffectChainPresetSelector#NocturneFltrSelector::down-arrow {
 }
 #Deck2, #Deck4 {
   border-left: 2px solid #000000;
+}
+/* 4 decks: C / D sit under A / B */
+#Deck3, #Deck4 {
+  border-top: 2px solid #000000;
+}
+#WaveformsContainer {
+  border: none;
+  padding-bottom: 0px;
+}
+/* waveforms / decks splitter: a plain black line instead of the grip */
+#WaveformSplitter::handle,
+#WaveformSplitter::handle:pressed {
+  image: none;
+  background-color: #000000;
+  height: 2px;
+}
+#NocturneDeckRows {
+  border-bottom: none;
+}
+/* the grey lower panel runs down to the line under the band */
+#DeckRows12345 {
+  padding-bottom: 0px;
 }
 
 /* --- header --- */
@@ -4202,7 +4228,8 @@ WLabel#NocturneWordmark {
 
 /* --- strip --- */
 #NocturneStrip {
-  border-top: none;
+  border-top: 2px solid #000000;
+  border-bottom: 2px solid #000000;
 }
 WLabel#NocturneStripLabel {
   color: #8a8a8a;
