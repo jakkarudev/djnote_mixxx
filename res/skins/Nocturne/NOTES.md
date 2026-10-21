@@ -3,6 +3,12 @@
 Nocturne is DJNote's Traktor-like skin. It is a copy of LateNight (see `docs/adr/0006-nocturne-copies-latenight.md`);
 LateNight and the other upstream skins are not edited. Spec: issue #71 in the private issues repo.
 
+## Library (#80)
+- Layout is LateNight's: search box above the sidebar (left), track table on the right. Preview deck stays hidden by default; favourites bar and status bar do not exist.
+- Row height is the library setting `[Library],RowHeight` (Preferences > Library); QSS cannot set it (Mixxx applies it as the section size). Set it to about 40 px for cover-art-tall rows as in Traktor. Which columns show and their widths are library settings too.
+- Column header text cannot be uppercased (QSS has no `text-transform`; text comes from C++). Headers are small and grey instead.
+- Sidebar item icons are set in C++ and keep their own colours.
+
 ## Dropped Traktor elements
 
 Where Traktor shows something Mixxx has no control for, Nocturne drops it instead of faking it:
