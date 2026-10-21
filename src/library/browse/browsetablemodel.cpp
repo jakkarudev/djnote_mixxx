@@ -145,6 +145,9 @@ BrowseTableModel::BrowseTableModel(QObject* parent,
     m_columnIndexBySortColumnId[static_cast<int>(
             TrackModel::SortColumnId::FileModifiedTime)] =
             COLUMN_FILE_MODIFIED_TIME;
+    // DJNote: the cover column sorts by cover, as in Tracks.
+    m_columnIndexBySortColumnId[static_cast<int>(
+            TrackModel::SortColumnId::CoverArt)] = COLUMN_COVERART;
     m_columnIndexBySortColumnId[static_cast<int>(
             TrackModel::SortColumnId::FileCreationTime)] =
             COLUMN_FILE_CREATION_TIME;
@@ -404,6 +407,11 @@ QString BrowseTableModel::modelKey(bool noSearch) const {
     return QStringLiteral("browse:") + m_currentDirectory;
 }
 
+bool BrowseTableModel::prepareSort(
+        QSortFilterProxyModel* pProxy, int column, Qt::SortOrder order) {
+    return m_pCoverColumn->sortRequested(pProxy, column, order);
+}
+
 int BrowseTableModel::fieldIndex(const QString& fieldName) const {
     // DJNote: lets the cover delegate find its column.
     if (fieldName == LIBRARYTABLE_COVERART) {
@@ -538,8 +546,7 @@ void BrowseTableModel::trackChanged(
 }
 
 bool BrowseTableModel::isColumnSortable(int column) const {
-    // DJNote: the cover column is not sortable yet.
-    return COLUMN_PREVIEW != column && COLUMN_COVERART != column;
+    return COLUMN_PREVIEW != column;
 }
 
 QAbstractItemDelegate* BrowseTableModel::delegateForColumn(const int i, QObject* pParent) {

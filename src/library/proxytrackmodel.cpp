@@ -235,6 +235,11 @@ bool ProxyTrackModel::setModelSetting(const QString& name, const QVariant& value
 
 void ProxyTrackModel::sort(int column, Qt::SortOrder order) {
     if (m_pTrackModel->isColumnSortable(column)) {
+        // DJNote: sorting by cover may first have to read the covers.
+        auto* pBrowseModel = qobject_cast<BrowseTableModel*>(sourceModel());
+        if (pBrowseModel && !pBrowseModel->prepareSort(this, column, order)) {
+            return;
+        }
         QSortFilterProxyModel::sort(column, order);
     }
 }

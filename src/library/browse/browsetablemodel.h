@@ -35,6 +35,7 @@ class BrowseCoverColumn;
 class CoverLookup;
 class TrackCollectionManager;
 class QMimeData;
+class QSortFilterProxyModel;
 class RecordingManager;
 
 namespace mixxx {
@@ -98,6 +99,10 @@ class BrowseTableModel final : public QStandardItemModel, public virtual TrackMo
     int columnIndexFromSortColumnId(TrackModel::SortColumnId sortColumn) const override;
     QString modelKey(bool noSearch) const override;
     int fieldIndex(const QString& fieldName) const override;
+
+    /// DJNote: called when `pProxy` is asked to sort. Returns whether to
+    /// sort now; the cover column first reads the covers not known yet.
+    bool prepareSort(QSortFilterProxyModel* pProxy, int column, Qt::SortOrder order);
 
     bool updateTrackGenre(
             Track* pTrack,
