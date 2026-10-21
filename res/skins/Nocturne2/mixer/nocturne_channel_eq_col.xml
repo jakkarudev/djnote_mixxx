@@ -1,0 +1,73 @@
+<!DOCTYPE template>
+<!-- Nocturne2: mixer. EQ column of a channel (56 px): HI / MID / LO at Traktor's 55/54 px pitch, then the
+  channel fader centred under the knobs. The fader graphics are exactly widget-sized (34x52 groove,
+  34x13 cap, no scaling); the level bar sits on the track centre (BarAxisPos 17) and BarMargins are half
+  the cap length, so the bar always ends at the cap's centre. Variable: ChanNum -->
+<Template>
+  <SetVariable name="Group">[Channel<Variable name="ChanNum"/>]</SetVariable>
+  <SetVariable name="EqFxUnit">[EqualizerRack1_<Variable name="Group"/>]</SetVariable>
+  <SetVariable name="EqEffect">[EqualizerRack1_<Variable name="Group"/>_Effect1]</SetVariable>
+  <WidgetGroup>
+    <ObjectName>NocturneMixEq</ObjectName>
+    <Layout>vertical</Layout>
+    <Size>56f,0me</Size>
+    <Children>
+
+      <WidgetGroup><Size>1f,8f</Size></WidgetGroup>
+
+      <WidgetGroup><!-- EQ knobs, shown by the EQ knob setting -->
+        <Layout>vertical</Layout>
+        <SizePolicy>min,min</SizePolicy>
+        <Children>
+          <Template src="skins:Nocturne2/mixer/nocturne_eq_knob.xml">
+            <SetVariable name="EqParameter">3</SetVariable>
+            <SetVariable name="EqRange">High</SetVariable>
+            <SetVariable name="Label">HI</SetVariable>
+          </Template>
+          <WidgetGroup><Size>1f,6f</Size></WidgetGroup>
+          <Template src="skins:Nocturne2/mixer/nocturne_eq_knob.xml">
+            <SetVariable name="EqParameter">2</SetVariable>
+            <SetVariable name="EqRange">Mid</SetVariable>
+            <SetVariable name="Label">MID</SetVariable>
+          </Template>
+          <WidgetGroup><Size>1f,5f</Size></WidgetGroup>
+          <Template src="skins:Nocturne2/mixer/nocturne_eq_knob.xml">
+            <SetVariable name="EqParameter">1</SetVariable>
+            <SetVariable name="EqRange">Low</SetVariable>
+            <SetVariable name="Label">LO</SetVariable>
+          </Template>
+          <WidgetGroup><Size>1f,10f</Size></WidgetGroup>
+        </Children>
+        <Connection>
+          <ConfigKey persist="true">[Nocturne2],show_eq_knobs</ConfigKey>
+          <BindProperty>visible</BindProperty>
+        </Connection>
+      </WidgetGroup>
+
+      <WidgetGroup>
+        <Layout>horizontal</Layout>
+        <Size>56f,52f</Size>
+        <Children>
+          <WidgetGroup><Size>11f,1f</Size></WidgetGroup>
+          <SliderComposed><!-- channel fader -->
+            <TooltipId>channel_volume</TooltipId>
+            <Size>34f,52f</Size>
+            <Handle scalemode="STRETCH">skins:Nocturne2/<Variable name="SliderScheme"/>/sliders/nocturne_fader_cap.svg</Handle>
+            <Slider scalemode="STRETCH">skins:Nocturne2/<Variable name="SliderScheme"/>/sliders/nocturne_fader_groove.svg</Slider>
+            <Horizontal>false</Horizontal>
+            <BarColor><Variable name="BarColorVolume"/></BarColor>
+            <BarWidth>2</BarWidth>
+            <BarMargins>6.5,6.5</BarMargins>
+            <BarAxisPos>17</BarAxisPos>
+            <Connection>
+              <ConfigKey><Variable name="Group"/>,volume</ConfigKey>
+            </Connection>
+          </SliderComposed>
+          <WidgetGroup><Size>0me,1f</Size></WidgetGroup>
+        </Children>
+      </WidgetGroup>
+
+      <WidgetGroup><Size>1f,0me</Size></WidgetGroup>
+    </Children>
+  </WidgetGroup>
+</Template>

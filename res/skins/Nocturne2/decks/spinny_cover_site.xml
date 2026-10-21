@@ -1,0 +1,77 @@
+<!--
+Description:
+  Spinny or cover art of a deck, placed at one site of a deck layout.
+  Nocturne cannot use LateNight's C++-derived [Skin],show_*spinny_or_cover controls
+  (it reads no [Skin] key), so the "spinny OR cover" logic is rebuilt here:
+  two sibling containers, each gated on its own [Nocturne2] key. The spinny container
+  shows when show_spinnies is on, the cover container when show_spinnies is off and
+  show_coverart is on. At most one of them is visible, so nothing is left behind.
+Variables:
+  ChanNum       : deck number
+  ContainerName : ObjectName of both containers (sized by QSS)
+-->
+<Template>
+  <SetVariable name="Group">[Channel<Variable name="ChanNum"/>]</SetVariable>
+
+  <!-- Spinny (it shows the cover in its centre when show_coverart is on) -->
+  <WidgetGroup>
+    <ObjectName><Variable name="ContainerName"/></ObjectName>
+    <Layout>horizontal</Layout>
+    <SizePolicy>f,f</SizePolicy>
+    <Children>
+      <Spinny>
+        <TooltipId>spinny</TooltipId>
+        <SizePolicy>me,me</SizePolicy>
+        <MinimumSize>40,40</MinimumSize>
+        <Group><Variable name="Group"/></Group>
+        <PathBackground scalemode="STRETCH_ASPECT">skins:Nocturne2/<Variable name="StyleScheme"/>/style/spinny_bg.svg</PathBackground>
+        <PathMask scalemode="STRETCH_ASPECT">skins:Nocturne2/<Variable name="StyleScheme"/>/style/spinny_mask_<Variable name="DeckGroup"/>.svg</PathMask>
+        <PathForeground>skins:Nocturne2/<Variable name="StyleScheme"/>/style/spinny_indicator.svg</PathForeground>
+        <PathGhost>skins:Nocturne2/<Variable name="StyleScheme"/>/style/spinny_indicator_ghost.svg</PathGhost>
+        <ShowCoverControl>[Nocturne2],show_coverart</ShowCoverControl>
+      </Spinny>
+    </Children>
+    <Connection>
+      <ConfigKey persist="true">[Nocturne2],show_spinnies</ConfigKey>
+      <BindProperty>visible</BindProperty>
+    </Connection>
+  </WidgetGroup>
+
+  <!-- Cover art, only when there is no spinny -->
+  <WidgetGroup>
+    <Layout>horizontal</Layout>
+    <SizePolicy>min,min</SizePolicy>
+    <Children>
+      <WidgetGroup>
+        <ObjectName><Variable name="ContainerName"/></ObjectName>
+        <Layout>horizontal</Layout>
+        <SizePolicy>f,f</SizePolicy>
+        <Children>
+          <WidgetGroup>
+            <ObjectName>CoverArtContainer</ObjectName>
+            <Layout>horizontal</Layout>
+            <SizePolicy>me,me</SizePolicy>
+            <Children>
+              <CoverArt>
+                <TooltipId>coverart</TooltipId>
+                <SizePolicy>me,me</SizePolicy>
+                <MinimumSize>40,40</MinimumSize>
+                <Group><Variable name="Group"/></Group>
+                <DefaultCover>skins:Nocturne2/<Variable name="StyleScheme"/>/style/cover_default.svg</DefaultCover>
+              </CoverArt>
+            </Children>
+          </WidgetGroup>
+        </Children>
+        <Connection>
+          <ConfigKey persist="true">[Nocturne2],show_coverart</ConfigKey>
+          <BindProperty>visible</BindProperty>
+        </Connection>
+      </WidgetGroup>
+    </Children>
+    <Connection>
+      <ConfigKey persist="true">[Nocturne2],show_spinnies</ConfigKey>
+      <Transform><Not/></Transform>
+      <BindProperty>visible</BindProperty>
+    </Connection>
+  </WidgetGroup>
+</Template>

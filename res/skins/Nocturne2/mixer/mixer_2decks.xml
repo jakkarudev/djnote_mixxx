@@ -1,0 +1,28 @@
+<Template>
+  <!-- Nocturne2: 2-deck mixer, Traktor grid (248 px):
+       outer column 60 | VU 8 | EQ column 56 | centre line 2 | EQ 56 | VU 8 | outer 60.
+       Channel 2 mirrors channel 1. The headphone cue buttons sit in the strip next to the crossfader
+       (mixer/nocturne_strip.xml); Traktor shows none in the mixer. -->
+  <WidgetGroup>
+    <ObjectName>NocturneMixer</ObjectName>
+    <Layout>horizontal</Layout>
+    <Size>248f,0me</Size>
+    <Children>
+      <Template src="skins:Nocturne2/mixer/nocturne_channel_gain_col.xml"><SetVariable name="ChanNum">1</SetVariable></Template>
+      <Template src="skins:Nocturne2/mixer/nocturne_channel_vu.xml"><SetVariable name="ChanNum">1</SetVariable></Template>
+      <Template src="skins:Nocturne2/mixer/nocturne_channel_eq_col.xml"><SetVariable name="ChanNum">1</SetVariable></Template>
+      <WidgetGroup>
+        <ObjectName>NocturneMixCenterLine</ObjectName>
+        <Size>2f,0me</Size>
+      </WidgetGroup>
+      <Template src="skins:Nocturne2/mixer/nocturne_channel_eq_col.xml"><SetVariable name="ChanNum">2</SetVariable></Template>
+      <Template src="skins:Nocturne2/mixer/nocturne_channel_vu.xml"><SetVariable name="ChanNum">2</SetVariable></Template>
+      <Template src="skins:Nocturne2/mixer/nocturne_channel_gain_col.xml"><SetVariable name="ChanNum">2</SetVariable></Template>
+    </Children>
+    <Connection>
+      <ConfigKey persist="true">[Nocturne2],show_4decks</ConfigKey>
+      <Transform><Not/></Transform>
+      <BindProperty>visible</BindProperty>
+    </Connection>
+  </WidgetGroup>
+</Template>

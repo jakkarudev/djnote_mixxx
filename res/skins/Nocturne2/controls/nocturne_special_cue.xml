@@ -1,0 +1,36 @@
+<!--
+Description:
+  Nocturne flat text button for the intro / outro cue markers. Left click sets or jumps (_activate),
+  right click clears (_clear); lit (blue) while the cue is set.
+Variables:
+  Group, CueType (intro_start, intro_end, outro_start, outro_end), Text
+-->
+<Template>
+  <PushButton>
+    <TooltipId><Variable name="CueType"/></TooltipId>
+    <ObjectName>NocturneBtnFlat</ObjectName>
+    <Size>26,19f</Size>
+    <NumberStates>2</NumberStates>
+    <RightClickIsPushButton>false</RightClickIsPushButton>
+    <State>
+      <Number>0</Number>
+      <Text><Variable name="Text"/></Text>
+    </State>
+    <State>
+      <Number>1</Number>
+      <Text><Variable name="Text"/></Text>
+    </State>
+    <Connection>
+      <ConfigKey><Variable name="Group"/>,<Variable name="CueType"/>_activate</ConfigKey>
+      <ButtonState>LeftButton</ButtonState>
+    </Connection>
+    <Connection>
+      <ConfigKey><Variable name="Group"/>,<Variable name="CueType"/>_clear</ConfigKey>
+      <ButtonState>RightButton</ButtonState>
+    </Connection>
+    <Connection>
+      <ConfigKey><Variable name="Group"/>,<Variable name="CueType"/>_enabled</ConfigKey>
+      <ConnectValueFromWidget>false</ConnectValueFromWidget>
+    </Connection>
+  </PushButton>
+</Template>

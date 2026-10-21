@@ -1,0 +1,33 @@
+<!DOCTYPE template>
+<!-- Nocturne2: mixer knob row. A 35x35 Traktor knob centred in a column of ColW px, KnobPad px from its left edge (the caption row uses the same pad): solid disc
+  (knob_bg_mixer.svg) + pointer (knob_indicator_mixer_grey.svg), the open ring is the ArcBg drawn by
+  Mixxx, centred exactly on the widget (no centre offset), so ring, disc and pointer share one centre.
+  Variables: ColW, KnobPad, Group, Control, TooltipId, ArcColor. The value arc starts at the knob centre (ArcUnipolar false), as Traktor. -->
+<Template>
+  <WidgetGroup>
+    <Layout>horizontal</Layout>
+    <Size><Variable name="ColW"/>f,35f</Size>
+    <Children>
+      <WidgetGroup><Size><Variable name="KnobPad"/>f,1f</Size></WidgetGroup>
+      <KnobComposed>
+        <TooltipId><Variable name="TooltipId"/></TooltipId>
+        <Size>35f,35f</Size>
+        <Knob>skins:Nocturne2/<Variable name="KnobScheme"/>/knobs/knob_indicator_mixer_grey.svg</Knob>
+        <BackPath>skins:Nocturne2/<Variable name="KnobScheme"/>/knobs/knob_bg_mixer.svg</BackPath>
+        <MinAngle><Variable name="PotiMinAngle"/></MinAngle>
+        <MaxAngle><Variable name="PotiMaxAngle"/></MaxAngle>
+        <ArcRadius>16</ArcRadius>
+        <ArcThickness>3</ArcThickness>
+        <ArcColor><Variable name="ArcColor"/></ArcColor>
+        <ArcBgThickness>3</ArcBgThickness>
+        <ArcBgColor><Variable name="ArcBgColor"/></ArcBgColor>
+        <ArcRoundCaps>false</ArcRoundCaps>
+        <ArcUnipolar>false</ArcUnipolar>
+        <Connection>
+          <ConfigKey><Variable name="Group"/>,<Variable name="Control"/></ConfigKey>
+        </Connection>
+      </KnobComposed>
+      <WidgetGroup><Size>0me,1f</Size></WidgetGroup>
+    </Children>
+  </WidgetGroup>
+</Template>
