@@ -8,9 +8,12 @@ Same rules as Nocturne: skin XML, QSS and SVG only, no C++ changes, nothing Mixx
   their own choices. Template paths are `skins:Nocturne2/...`. The colour scheme is still called "Nocturne", so the preview
   file stays `skin_preview_Nocturne.png` (Mixxx names previews after the scheme).
 - Font: Open Sans Regular (bundled with Mixxx) instead of Barlow Semi Condensed; Traktor's text is a regular-width sans.
-- Lower deck panel (transport, hotcues, MOVE/GRID) is Traktor's grey `#262626` band with a black bottom edge. Play and reloop are
+- Lower deck panel (transport, hotcues, MOVE/GRID) is Traktor's grey `#262626` band, running down to the line under the decks. Play and reloop are
   outlined cells with drawn glyphs (`nocturne/buttons/nocturne_play_*.svg`, `nocturne_loop_*.svg`); loop sizes and IN | OUT are
   outlined groups split by 1px lines. The selected loop size is a grey fill, as in Traktor; blue only while that loop plays.
+- Separator lines are Traktor's 2 px black: the waveform/deck splitter handle (no grip), either side of the mixer (deck
+  borders), under the deck/mixer band and under the strip (`#NocturneStrip` top/bottom). Decks and mixer have no margins, so
+  the lines join and the mixer sits flush between them.
 - Hotcue slots: flat `#323232` bars with 2px gaps. Set slots still show the cue colour (WHotcueButton paints it; QSS cannot override).
 - SYNC / MASTER and tempo bend: borderless `#262626` cells on a `#1f1f1f` row.
 - Knobs: solid `#3c3c3c` disc + light pointer (`nocturne/knobs/*.svg`); the grey open ring is the knob's `ArcBgThickness` /
