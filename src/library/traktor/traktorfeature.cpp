@@ -15,6 +15,7 @@
 #include "library/queryutil.h"
 #include "library/trackcollection.h"
 #include "library/trackcollectionmanager.h"
+#include "library/traktor/traktorkey.h"
 #include "library/treeitem.h"
 #include "moc_traktorfeature.cpp"
 #include "track/keyutils.h"
@@ -371,10 +372,10 @@ void TraktorFeature::parseTrack(QXmlStreamReader &xml, QSqlQuery &query) {
             }
             if (xml.name() == QLatin1String("MUSICAL_KEY")) {
                 QXmlStreamAttributes attr = xml.attributes();
-                // Traktor happens to use the same key numbering
+                // Traktor's key numbering is offset by one from Mixxx's
                 key = KeyUtils::keyToString(
-                        KeyUtils::keyFromNumericValue(
-                                attr.value("VALUE").toInt()),
+                        mixxx::traktor::keyFromTraktorMusicalKeyValue(
+                                attr.value("VALUE").toString()),
                         KeyUtils::KeyNotation::Custom);
                 continue;
             }

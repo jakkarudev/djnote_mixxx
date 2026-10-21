@@ -1047,6 +1047,7 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/library/trackset/setlogfeature.cpp
   src/library/trackset/tracksettablemodel.cpp
   src/library/traktor/traktorfeature.cpp
+  src/library/traktor/traktorkey.cpp
   src/library/treeitem.cpp
   src/library/treeitemmodel.cpp
   src/mixer/auxiliary.cpp
@@ -2293,6 +2294,7 @@ if(BUILD_TESTING)
     src/test/tracknumberstest.cpp
     src/test/trackreftest.cpp
     src/test/trackupdate_test.cpp
+    src/test/traktorkeytest.cpp
     src/test/uuid_test.cpp
     src/test/wbatterytest.cpp
     src/test/wpushbutton_test.cpp
