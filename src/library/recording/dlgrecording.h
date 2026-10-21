@@ -40,6 +40,7 @@ class DlgRecording : public QWidget, public Ui::DlgRecording, public virtual Lib
     void loadTrackToPlayer(TrackPointer tio, const QString& group, bool play);
     void restoreSearch(const QString& search);
     void restoreModelState();
+    void trackSelected(TrackPointer pTrack); // DJNote: cover panel
 
   private:
     UserSettingsPointer m_pConfig;

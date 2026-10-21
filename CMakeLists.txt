@@ -949,6 +949,7 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/library/basesqltablemodel.cpp
   src/library/basetrackcache.cpp
   src/library/basetracktablemodel.cpp
+  src/library/browse/browsecovercolumn.cpp
   src/library/browse/browsefeature.cpp
   src/library/browse/browsetablemodel.cpp
   src/library/browse/browsethread.cpp
@@ -957,6 +958,8 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/library/coverart.cpp
   src/library/coverartcache.cpp
   src/library/coverartutils.cpp
+  src/library/covercolumnsort.cpp
+  src/library/coverlookup.cpp
   src/library/dao/analysisdao.cpp
   src/library/dao/autodjcratesdao.cpp
   src/library/dao/cuedao.cpp
@@ -981,6 +984,7 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/library/export/trackexportdlg.cpp
   src/library/export/trackexportwizard.cpp
   src/library/export/trackexportworker.cpp
+  src/library/externalcovercolumn.cpp
   src/library/externaltrackcollection.cpp
   src/library/itunes/itunesdao.cpp
   src/library/itunes/itunesfeature.cpp
@@ -1010,6 +1014,7 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/library/recording/recordingfeature.cpp
   src/library/rekordbox/rekordboxfeature.cpp
   src/library/rhythmbox/rhythmboxfeature.cpp
+  src/library/savedheaderstate.cpp
   src/library/scanner/importfilestask.cpp
   src/library/scanner/libraryscanner.cpp
   src/library/scanner/libraryscannerdlg.cpp
@@ -2179,6 +2184,7 @@ if(BUILD_TESTING)
     src/test/bpmcontrol_test.cpp
     src/test/broadcastprofile_test.cpp
     src/test/broadcastsettings_test.cpp
+    src/test/browsecovercolumn_test.cpp
     src/test/cache_test.cpp
     src/test/channelhandle_test.cpp
     src/test/chrono_clock_resolution_test.cpp
@@ -2198,6 +2204,7 @@ if(BUILD_TESTING)
     src/test/coreservicestest.cpp
     src/test/coverartcache_test.cpp
     src/test/coverartutils_test.cpp
+    src/test/coverlookup_test.cpp
     src/test/cratestorage_test.cpp
     src/test/cue_test.cpp
     src/test/cuecontrol_test.cpp
@@ -2227,6 +2234,7 @@ if(BUILD_TESTING)
     src/test/enginemixertest.cpp
     src/test/enginemicrophonetest.cpp
     src/test/enginesynctest.cpp
+    src/test/externalcovercolumn_test.cpp
     src/test/fileinfo_test.cpp
     src/test/frametest.cpp
     src/test/globaltrackcache_test.cpp

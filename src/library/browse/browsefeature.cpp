@@ -45,7 +45,10 @@ BrowseFeature::BrowseFeature(
         RecordingManager* pRecordingManager)
         : LibraryFeature(pLibrary, pConfig, QString("computer")),
           m_pTrackCollection(pLibrary->trackCollectionManager()->internalCollection()),
-          m_browseModel(this, pLibrary->trackCollectionManager(), pRecordingManager),
+          m_browseModel(this,
+                  pLibrary->trackCollectionManager(),
+                  pRecordingManager,
+                  pLibrary->coverLookup()), // DJNote
           m_proxyModel(&m_browseModel, true),
           m_pSidebarModel(new FolderTreeModel(this)) {
     connect(&m_browseModel,
@@ -328,7 +331,8 @@ void BrowseFeature::activateChild(const QModelIndex& index) {
     if (path == QUICK_LINK_NODE || path == DEVICE_NODE) {
         emit disableSearch();
     }
-    emit enableCoverArtDisplay(false);
+    // DJNote: the cover panel for folders (track lists), not the root pages.
+    emit enableCoverArtDisplay(path != QUICK_LINK_NODE && path != DEVICE_NODE);
 }
 
 void BrowseFeature::onRightClickChild(const QPoint& globalPos, const QModelIndex& index) {

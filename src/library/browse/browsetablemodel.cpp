@@ -5,8 +5,10 @@
 #include <QStringList>
 #include <QUrl>
 
+#include "library/browse/browsecovercolumn.h" // DJNote
 #include "library/browse/browsetablemodel.h"
 #include "library/browse/browsethread.h"
+#include "library/dao/trackschema.h" // DJNote
 #include "library/tabledelegates/previewbuttondelegate.h"
 #include "library/trackcollection.h"
 #include "library/trackcollectionmanager.h"
@@ -43,13 +45,17 @@ void listAppendOrReplaceAt(QList<T>* pList, int index, const T& value) {
 
 BrowseTableModel::BrowseTableModel(QObject* parent,
         TrackCollectionManager* pTrackCollectionManager,
-        RecordingManager* pRecordingManager)
+        RecordingManager* pRecordingManager,
+        CoverLookup* pCoverLookup) // DJNote
         : TrackModel(pTrackCollectionManager->internalCollection()->database(),
                   "mixxx.db.model.browse"),
           QStandardItemModel(parent),
           m_pTrackCollectionManager(pTrackCollectionManager),
           m_pRecordingManager(pRecordingManager),
-          m_previewDeckGroup(PlayerManager::groupForPreviewDeck(0)) {
+          m_previewDeckGroup(PlayerManager::groupForPreviewDeck(0)),
+          // DJNote
+          m_pCoverColumn(new BrowseCoverColumn(
+                  this, COLUMN_COVERART, pCoverLookup, pRecordingManager)) {
     QStringList headerLabels;
     /// The order of the columns appended here must exactly match the ordering
     /// of the enum that is used for indexing.
@@ -74,6 +80,7 @@ BrowseTableModel::BrowseTableModel(QObject* parent,
     listAppendOrReplaceAt(&headerLabels, COLUMN_FILE_MODIFIED_TIME, tr("File Modified"));
     listAppendOrReplaceAt(&headerLabels, COLUMN_FILE_CREATION_TIME, tr("File Created"));
     listAppendOrReplaceAt(&headerLabels, COLUMN_REPLAYGAIN, tr("ReplayGain"));
+    listAppendOrReplaceAt(&headerLabels, COLUMN_COVERART, tr("Cover Art")); // DJNote
 
     m_searchColumns = {
             COLUMN_FILENAME,
@@ -138,6 +145,9 @@ BrowseTableModel::BrowseTableModel(QObject* parent,
     m_columnIndexBySortColumnId[static_cast<int>(
             TrackModel::SortColumnId::FileModifiedTime)] =
             COLUMN_FILE_MODIFIED_TIME;
+    // DJNote: the cover column sorts by cover, as in Tracks.
+    m_columnIndexBySortColumnId[static_cast<int>(
+            TrackModel::SortColumnId::CoverArt)] = COLUMN_COVERART;
     m_columnIndexBySortColumnId[static_cast<int>(
             TrackModel::SortColumnId::FileCreationTime)] =
             COLUMN_FILE_CREATION_TIME;
@@ -154,6 +164,7 @@ BrowseTableModel::BrowseTableModel(QObject* parent,
     }
 
     setHorizontalHeaderLabels(headerLabels);
+    m_pCoverColumn->addToHeader(); // DJNote
     // register the QList<T> as a metatype since we use QueuedConnection below
     qRegisterMetaType<QList<QList<QStandardItem*>>>(
             "QList< QList<QStandardItem*>>");
@@ -270,15 +281,8 @@ QUrl BrowseTableModel::getTrackUrl(const QModelIndex& index) const {
 }
 
 CoverInfo BrowseTableModel::getCoverInfo(const QModelIndex& index) const {
-    TrackPointer pTrack = getTrack(index);
-    if (pTrack) {
-        return CoverInfo(pTrack->getCoverInfo(), getTrackLocation(index));
-    } else {
-        qWarning()
-                << "Track is not available in library"
-                << getTrackUrl(index);
-        return CoverInfo();
-    }
+    // DJNote: from the cover lookup, which never adds the track to the library.
+    return m_pCoverColumn->coverInfo(index);
 }
 
 const QVector<int> BrowseTableModel::getTrackRows(TrackId trackId) const {
@@ -361,6 +365,7 @@ QMimeData* BrowseTableModel::mimeData(const QModelIndexList& indexes) const {
 void BrowseTableModel::slotClear(BrowseTableModel* caller_object) {
     if (caller_object == this) {
         removeRows(0, rowCount());
+        m_pCoverColumn->clearRows(); // DJNote
     }
 }
 
@@ -395,6 +400,20 @@ QString BrowseTableModel::modelKey(bool noSearch) const {
     return QStringLiteral("browse:") + m_currentDirectory;
 }
 
+// DJNote
+bool BrowseTableModel::prepareProxySort(
+        QSortFilterProxyModel* pProxy, int column, Qt::SortOrder order) {
+    return m_pCoverColumn->sortRequested(pProxy, column, order);
+}
+
+// DJNote: lets the cover delegate find its column.
+int BrowseTableModel::fieldIndex(const QString& fieldName) const {
+    if (fieldName == LIBRARYTABLE_COVERART) {
+        return COLUMN_COVERART;
+    }
+    return TrackModel::fieldIndex(fieldName);
+}
+
 Qt::ItemFlags BrowseTableModel::flags(const QModelIndex& index) const {
     Qt::ItemFlags defaultFlags = QAbstractItemModel::flags(index);
 
@@ -405,6 +424,7 @@ Qt::ItemFlags BrowseTableModel::flags(const QModelIndex& index) const {
     int column = index.column();
 
     switch (column) {
+    case COLUMN_COVERART: // DJNote
     case COLUMN_FILENAME:
     case COLUMN_BITRATE:
     case COLUMN_DURATION:
@@ -528,6 +548,9 @@ QAbstractItemDelegate* BrowseTableModel::delegateForColumn(const int i, QObject*
     DEBUG_ASSERT(pTableView);
     if (PlayerInfo::instance().numPreviewDecks() > 0 && i == COLUMN_PREVIEW) {
         return new PreviewButtonDelegate(pTableView, i);
+    }
+    if (i == COLUMN_COVERART) { // DJNote
+        return m_pCoverColumn->createDelegate(pParent);
     }
     return nullptr;
 }

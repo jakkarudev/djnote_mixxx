@@ -148,6 +148,12 @@ QAbstractItemDelegate* ProxyTrackModel::delegateForColumn(const int i, QObject* 
     return m_pTrackModel ? m_pTrackModel->delegateForColumn(i, pParent) : nullptr;
 }
 
+// DJNote: columns map one to one, so the composed model's field indexes
+// hold here too (the cover delegate needs its column).
+int ProxyTrackModel::fieldIndex(const QString& fieldName) const {
+    return m_pTrackModel ? m_pTrackModel->fieldIndex(fieldName) : -1;
+}
+
 TrackModel::Capabilities ProxyTrackModel::getCapabilities() const {
     return m_pTrackModel ? m_pTrackModel->getCapabilities() : Capability::None;
 }
@@ -229,6 +235,10 @@ bool ProxyTrackModel::setModelSetting(const QString& name, const QVariant& value
 
 void ProxyTrackModel::sort(int column, Qt::SortOrder order) {
     if (m_pTrackModel->isColumnSortable(column)) {
+        // DJNote: sorting by cover may first have to read the covers.
+        if (!m_pTrackModel->prepareProxySort(this, column, order)) {
+            return;
+        }
         QSortFilterProxyModel::sort(column, order);
     }
 }

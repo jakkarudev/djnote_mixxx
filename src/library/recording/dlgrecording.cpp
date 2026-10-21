@@ -22,7 +22,10 @@ DlgRecording::DlgRecording(
                           pConfig,
                           pLibrary,
                           parent->getTrackTableBackgroundColorOpacity())),
-          m_browseModel(this, pLibrary->trackCollectionManager(), pRecordingManager),
+          m_browseModel(this,
+                  pLibrary->trackCollectionManager(),
+                  pRecordingManager,
+                  pLibrary->coverLookup()), // DJNote
           m_proxyModel(&m_browseModel, true),
           m_bytesRecordedStr("--"),
           m_durationRecordedStr("--:--"),
@@ -39,6 +42,11 @@ DlgRecording::DlgRecording(
             &WTrackTableView::loadTrackToPlayer,
             this,
             &DlgRecording::loadTrackToPlayer);
+    // DJNote: forward selection to the cover panel
+    connect(m_pTrackTableView,
+            &WTrackTableView::trackSelected,
+            this,
+            &DlgRecording::trackSelected);
     connect(pLibrary,
             &Library::setTrackTableFont,
             m_pTrackTableView,

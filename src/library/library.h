@@ -18,6 +18,7 @@
 class AnalysisFeature;
 class BrowseFeature;
 class ControlObject;
+class CoverLookup; // DJNote
 class CrateFeature;
 class LibraryControl;
 class LibraryFeature;
@@ -61,6 +62,11 @@ class Library: public QObject {
     }
 
     TrackCollectionManager* trackCollectionManager() const;
+
+    /// DJNote: covers of files by location, for views whose rows are files.
+    CoverLookup* coverLookup() const {
+        return m_pCoverLookup.get();
+    }
 
     TrackAnalysisScheduler::Pointer createTrackAnalysisScheduler(
             int numWorkerThreads,
@@ -164,6 +170,7 @@ class Library: public QObject {
 
     parented_ptr<SidebarModel> m_pSidebarModel;
     parented_ptr<LibraryControl> m_pLibraryControl;
+    parented_ptr<CoverLookup> m_pCoverLookup; // DJNote
 
     QList<LibraryFeature*> m_features;
     const static QString m_sTrackViewName;

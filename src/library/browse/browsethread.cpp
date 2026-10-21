@@ -304,6 +304,8 @@ void BrowseThread::populateModel() {
             item->setData(item->text(), Qt::UserRole);
             row_data.insert(COLUMN_REPLAYGAIN, item);
         }
+        // DJNote: the cover column's cells are drawn from the cover lookup.
+        row_data.insert(COLUMN_COVERART, new QStandardItem());
 
         rows.append(row_data);
         row_data.clear();

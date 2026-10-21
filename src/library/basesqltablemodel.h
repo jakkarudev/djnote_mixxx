@@ -100,6 +100,14 @@ class BaseSqlTableModel : public BaseTrackTableModel {
 
     virtual void initSortColumnMapping();
 
+    /// DJNote: asked by sort() before it sorts. Returning false keeps the
+    /// current rows and order, e.g. while the covers of a cover sort are read.
+    virtual bool prepareSort(int column, Qt::SortOrder order) {
+        Q_UNUSED(column);
+        Q_UNUSED(order);
+        return true;
+    }
+
     TrackCollectionManager* const m_pTrackCollectionManager;
 
     QList<TrackRef> getTrackRefs(const QModelIndexList& indices) const;

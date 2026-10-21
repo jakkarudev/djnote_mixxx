@@ -10,6 +10,8 @@
 #include "library/autodj/autodjfeature.h"
 #include "library/banshee/bansheefeature.h"
 #include "library/browse/browsefeature.h"
+#include "library/coverlookup.h"         // DJNote
+#include "library/externalcovercolumn.h" // DJNote
 #ifdef __ENGINEPRIME__
 #include "library/export/libraryexporter.h"
 #endif
@@ -69,6 +71,9 @@ Library::Library(
           m_pTrackCollectionManager(pTrackCollectionManager),
           m_pSidebarModel(make_parented<SidebarModel>(this)),
           m_pLibraryControl(make_parented<LibraryControl>(this)),
+          // DJNote
+          m_pCoverLookup(make_parented<CoverLookup>(
+                  pTrackCollectionManager->internalCollection(), this)),
           m_pLibraryWidget(nullptr),
           m_pMixxxLibraryFeature(nullptr),
           m_pPlaylistFeature(nullptr),
@@ -537,6 +542,8 @@ void Library::slotShowTrackModel(QAbstractItemModel* model) {
     VERIFY_OR_DEBUG_ASSERT(trackModel) {
         return;
     }
+    // DJNote: the external libraries' cover column answers covers by location.
+    ExternalCoverColumn::attachCoverLookup(model, m_pCoverLookup.get());
     emit showTrackModel(model);
     emit switchToView(m_sTrackViewName);
     emit restoreSearch(trackModel->currentSearch());
