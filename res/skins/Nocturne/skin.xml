@@ -433,9 +433,34 @@
                           </Children>
                         </WidgetGroup>
 
+                        <!-- Nocturne: strip (2 decks): mic/aux | crossfader | headphone + main gain -->
+                        <WidgetGroup>
+                          <Layout>vertical</Layout>
+                          <SizePolicy>me,max</SizePolicy>
+                          <Children>
+                            <Template src="skins:Nocturne/mixer/nocturne_strip.xml"/>
+                          </Children>
+                          <Connection>
+                            <ConfigKey persist="true">[Nocturne],show_4decks</ConfigKey>
+                            <Transform><Not/></Transform>
+                            <BindProperty>visible</BindProperty>
+                          </Connection>
+                        </WidgetGroup>
+
                         <Template src="skins:Nocturne/fx_rack.xml"/>
                         <Template src="skins:Nocturne/samplers_rack.xml"/>
-                        <Template src="skins:Nocturne/mic_aux_rack.xml"/>
+                        <!-- 4 decks: the strip is hidden, mic/aux keeps its own row -->
+                        <WidgetGroup>
+                          <Layout>vertical</Layout>
+                          <SizePolicy>me,max</SizePolicy>
+                          <Children>
+                            <Template src="skins:Nocturne/mic_aux_rack.xml"/>
+                          </Children>
+                          <Connection>
+                            <ConfigKey persist="true">[Nocturne],show_4decks</ConfigKey>
+                            <BindProperty>visible</BindProperty>
+                          </Connection>
+                        </WidgetGroup>
 
                         <SingletonContainer>
                           <ObjectName>LibrarySingleton</ObjectName>

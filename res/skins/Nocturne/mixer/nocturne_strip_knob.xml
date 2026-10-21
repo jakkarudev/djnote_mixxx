@@ -1,0 +1,26 @@
+<!DOCTYPE template>
+<!-- Nocturne: strip. Small ring knob with a caption to its right (MIX, VOL, MAIN).
+  Variables: Group, Control, TooltipId, Label -->
+<Template>
+  <SetVariable name="KnobBg">small</SetVariable>
+  <SetVariable name="KnobIndicator">small</SetVariable>
+  <SetVariable name="ArcRadius"><Variable name="ArcRadiusCompact"/></SetVariable>
+  <SetVariable name="ArcThickness"><Variable name="ArcThicknessBig"/></SetVariable>
+  <SetVariable name="KnobColor">grey</SetVariable>
+  <SetVariable name="Size">30f,30f</SetVariable>
+  <WidgetGroup>
+    <ObjectName>NocturneStripKnob</ObjectName>
+    <Layout>horizontal</Layout>
+    <SizePolicy>min,min</SizePolicy>
+    <Children>
+      <Template src="skins:Nocturne/controls/knob.xml"/>
+      <Label>
+        <ObjectName>NocturneStripLabel</ObjectName>
+        <SizePolicy>min,f</SizePolicy>
+        <Size>0min,30f</Size>
+        <Text><Variable name="Label"/></Text>
+        <Alignment>left</Alignment>
+      </Label>
+    </Children>
+  </WidgetGroup>
+</Template>

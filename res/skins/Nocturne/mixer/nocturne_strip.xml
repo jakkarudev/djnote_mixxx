@@ -1,0 +1,124 @@
+<!DOCTYPE template>
+<!-- Nocturne: strip. Row between the decks and the library (2 decks): mic/aux at the left,
+  crossfader in the centre, headphone MIX / VOL and main gain at the right. -->
+<Template>
+  <WidgetGroup>
+    <ObjectName>NocturneStrip</ObjectName>
+    <Layout>horizontal</Layout>
+    <SizePolicy>me,max</SizePolicy>
+    <Children>
+
+      <!-- left: mic/aux (skin setting show_microphones, hidden by default) -->
+      <WidgetGroup>
+        <Layout>horizontal</Layout>
+        <SizePolicy>me,min</SizePolicy>
+        <Children>
+          <Template src="skins:Nocturne/mic_aux_rack.xml"/>
+        </Children>
+      </WidgetGroup>
+
+      <!-- centre: crossfader (skin setting show_xfader) -->
+      <WidgetGroup>
+        <Layout>horizontal</Layout>
+        <SizePolicy>min,min</SizePolicy>
+        <Children>
+          <WidgetGroup>
+            <Layout>horizontal</Layout>
+            <SizePolicy>min,min</SizePolicy>
+            <Children>
+              <Label>
+                <ObjectName>NocturneStripDeckA</ObjectName>
+                <Size>20f,30f</Size>
+                <Text>A</Text>
+                <Alignment>center</Alignment>
+              </Label>
+              <WidgetGroup>
+                <ObjectName>CrossfaderContainer</ObjectName>
+                <Layout>horizontal</Layout>
+                <SizePolicy>min,min</SizePolicy>
+                <Children>
+                  <SliderComposed>
+                    <TooltipId>crossfader</TooltipId>
+                    <ObjectName>NocturneCrossfader</ObjectName>
+                    <Size>160f,30f</Size>
+                    <Handle scalemode="STRETCH_ASPECT">skins:Nocturne/<Variable name="SliderScheme"/>/sliders/knob_crossfader_strip.svg</Handle>
+                    <Slider scalemode="STRETCH_ASPECT">skins:Nocturne/<Variable name="SliderScheme"/>/sliders/slider_crossfader_strip.svg</Slider>
+                    <Horizontal>true</Horizontal>
+                    <Connection>
+                      <ConfigKey>[Master],crossfader</ConfigKey>
+                    </Connection>
+                  </SliderComposed>
+                </Children>
+                <Connection>
+                  <ConfigKey>[AutoDJ],enabled</ConfigKey>
+                  <BindProperty>highlight</BindProperty>
+                </Connection>
+              </WidgetGroup>
+              <Label>
+                <ObjectName>NocturneStripDeckB</ObjectName>
+                <Size>20f,30f</Size>
+                <Text>B</Text>
+                <Alignment>center</Alignment>
+              </Label>
+            </Children>
+            <Connection>
+              <ConfigKey persist="true">[Nocturne],show_xfader</ConfigKey>
+              <BindProperty>visible</BindProperty>
+            </Connection>
+          </WidgetGroup>
+        </Children>
+      </WidgetGroup>
+
+      <!-- right: headphone MIX, VOL and main gain (skin setting show_main_head_mixer) -->
+      <WidgetGroup>
+        <Layout>horizontal</Layout>
+        <SizePolicy>me,min</SizePolicy>
+        <Children>
+          <WidgetGroup><Size>0me,0min</Size></WidgetGroup>
+          <WidgetGroup>
+            <Layout>horizontal</Layout>
+            <SizePolicy>min,min</SizePolicy>
+            <Children>
+              <WidgetGroup>
+                <ObjectName>NocturneStripHeadIcon</ObjectName>
+                <Size>20f,30f</Size>
+              </WidgetGroup>
+              <WidgetGroup><Size>6f,0min</Size></WidgetGroup>
+              <Template src="skins:Nocturne/mixer/nocturne_strip_knob.xml">
+                <SetVariable name="Group">[Master]</SetVariable>
+                <SetVariable name="Control">headMix</SetVariable>
+                <SetVariable name="TooltipId">headMix</SetVariable>
+                <SetVariable name="Label">MIX</SetVariable>
+                <SetVariable name="ArcColor"><Variable name="ArcColorMstBal"/></SetVariable>
+              </Template>
+              <WidgetGroup><Size>10f,0min</Size></WidgetGroup>
+              <Template src="skins:Nocturne/mixer/nocturne_strip_knob.xml">
+                <SetVariable name="Group">[Master]</SetVariable>
+                <SetVariable name="Control">headGain</SetVariable>
+                <SetVariable name="TooltipId">headphone_gain</SetVariable>
+                <SetVariable name="Label">VOL</SetVariable>
+                <SetVariable name="ArcColor"><Variable name="ArcColorGainLow"/></SetVariable>
+                <SetVariable name="ArcUnipolar">true</SetVariable>
+              </Template>
+              <WidgetGroup><Size>10f,0min</Size></WidgetGroup>
+              <Template src="skins:Nocturne/mixer/nocturne_strip_knob.xml">
+                <SetVariable name="Group">[Master]</SetVariable>
+                <SetVariable name="Control">gain</SetVariable>
+                <SetVariable name="TooltipId">main_gain</SetVariable>
+                <SetVariable name="Label">MAIN</SetVariable>
+                <SetVariable name="ArcColor"><Variable name="ArcColorGainLow"/></SetVariable>
+                <SetVariable name="ArcUnipolar">true</SetVariable>
+              </Template>
+              <WidgetGroup><Size>12f,0min</Size></WidgetGroup>
+            </Children>
+            <Connection>
+              <ConfigKey persist="true">[Nocturne],show_main_head_mixer</ConfigKey>
+              <BindProperty>visible</BindProperty>
+            </Connection>
+          </WidgetGroup>
+        </Children>
+      </WidgetGroup>
+
+    </Children>
+  </WidgetGroup>
+</Template>
