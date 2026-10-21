@@ -29,7 +29,7 @@
             <Children>
 
               <Template src="skins:Nocturne/mic_aux/ducking_controls.xml">
-                <SetVariable name="KnobColor">red</SetVariable>
+                <SetVariable name="KnobColor">grey</SetVariable>
               </Template>
 
               <WidgetGroup>

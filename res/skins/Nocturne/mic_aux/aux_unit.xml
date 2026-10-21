@@ -72,7 +72,7 @@
                   <Template src="skins:Nocturne/controls/knob.xml">
                     <SetVariable name="TooltipId">auxiliary_pregain</SetVariable>
                     <SetVariable name="Size">35f,30f</SetVariable>
-                    <SetVariable name="KnobColor">orange</SetVariable>
+                    <SetVariable name="KnobColor">grey</SetVariable>
                     <SetVariable name="ArcColor"><Variable name="ArcColorGain"/></SetVariable>
                     <SetVariable name="Control">pregain</SetVariable>
                   </Template>

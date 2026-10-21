@@ -200,7 +200,7 @@
             <SetVariable name="ObjectName">DryWetKnob</SetVariable>
             <SetVariable name="KnobBg">small</SetVariable>
             <SetVariable name="KnobIndicator">small</SetVariable>
-            <SetVariable name="KnobColor">red</SetVariable>
+            <SetVariable name="KnobColor">grey</SetVariable>
             <SetVariable name="ArcColor"><Variable name="ArcColorFxMix"/></SetVariable>
             <SetVariable name="TooltipId">EffectUnit_mix</SetVariable>
             <SetVariable name="Group">[<Variable name="FxRack_FxUnit"/>]</SetVariable>

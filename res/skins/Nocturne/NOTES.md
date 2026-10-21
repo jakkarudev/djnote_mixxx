@@ -24,7 +24,22 @@ Where Traktor shows something Mixxx has no control for, Nocturne drops it instea
 - Defaults (declared in the `skin.xml` manifest): shown = stacked waveforms, cover art (no spinnies), 8 hotcues, loop and beatjump,
   rate controls, key controls, crossfader, EQ knobs; hidden = effect rack, samplers, mic/aux, preview deck.
 - Defaults only apply while the key is not yet saved in `mixxx.cfg`.
-- One colour scheme, "Nocturne", still using PaleMoon's graphics (`palemoon/`). More schemes can be added to `skin.xml`.
+- One colour scheme, "Nocturne", using its own graphics in `nocturne/` (`BtnScheme`/`KnobScheme`/`SliderScheme`/`StyleScheme` = `nocturne`).
+  More schemes can be added to `skin.xml`.
+
+## Nocturne base look (ticket #73)
+
+- Font: Barlow Semi Condensed Regular + SemiBold (OFL, `res/fonts/`), set in `style.qss`; only Nocturne references it.
+- Palette: scheme variables `ColorBg`, `ColorLine`, `ColorRaised`, `ColorRaisedDark`, `ColorOutline`, `ColorRing`, `ColorText`,
+  `ColorTextDim`, `ColorTextBright`, `ColorBlue`, `ColorBlueDark`, `ColorDeckA`, `ColorDeckB` in `skin.xml`. QSS repeats the literals
+  (see the "Nocturne base look" block at the end of `style_nocturne.qss`).
+- Buttons are flat: `btn_embedded_*.svg` are 1px outlines (grey, blue when active); fills come from QSS. Text buttons: template
+  `controls/button_flat_text.xml` with ObjectName `NocturneBtn` / `NocturneBtnFlat` / `NocturneBtnCell`.
+- Knobs: thin ring (`nocturne/knobs/knob_bg_*.svg`) + pointer (`knob_indicator_<size>_<grey|blue>.svg`); the value arc is the skin's
+  arc rendering, all arcs blue.
+- Every selection and active state is `#448bf6` (selected rows/items use `#253b5b`). Red stays for recording/clip/error, orange for
+  warnings/pending.
+- Left as upstream: library sidebar feature icons (orange, from `res/images`), VU-meter PNGs.
 - `skin_preview_Nocturne.png` is currently LateNight's PaleMoon preview; replace it with a capture of the finished skin.
 
 ## Known consequences of not using `[Skin]` keys

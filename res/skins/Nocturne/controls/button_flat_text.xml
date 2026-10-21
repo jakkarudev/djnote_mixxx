@@ -1,0 +1,34 @@
+<!--
+Description:
+  Nocturne's flat text pushbutton: no graphics, styled only by QSS
+  (WPushButton#NocturneBtn / #NocturneBtnFlat / #NocturneBtnCell in style_nocturne.qss).
+  Off = grey box, hover = lighter, pressed = lighter still, on = Traktor blue.
+Variables:
+  ObjectName : NocturneBtn (boxed), NocturneBtnFlat (no box) or NocturneBtnCell
+  TooltipId  : standard Tooltip from mixxx db
+  Size       : button size, e.g. 40f,24f
+  Text       : label
+  ConfigKey  : control toggled by left click, e.g. [Channel1],sync_enabled
+  RightConfigKey (optional) : control for right click
+-->
+<Template>
+  <PushButton>
+    <TooltipId><Variable name="TooltipId"/></TooltipId>
+    <ObjectName><Variable name="ObjectName"/></ObjectName>
+    <Size><Variable name="Size"/></Size>
+    <NumberStates>2</NumberStates>
+    <RightClickIsPushButton>false</RightClickIsPushButton>
+    <State>
+      <Number>0</Number>
+      <Text><Variable name="Text"/></Text>
+    </State>
+    <State>
+      <Number>1</Number>
+      <Text><Variable name="Text"/></Text>
+    </State>
+    <Connection>
+      <ConfigKey><Variable name="ConfigKey"/></ConfigKey>
+      <ButtonState>LeftButton</ButtonState>
+    </Connection>
+  </PushButton>
+</Template>

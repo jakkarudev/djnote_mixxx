@@ -69,7 +69,7 @@
             <Mark>
               <Control>loop_start_position</Control>
               <Text>&#8635;</Text>
-              <Icon>skins:Nocturne/palemoon/style/mark_loop.svg</Icon>
+              <Icon>skins:Nocturne/nocturne/style/mark_loop.svg</Icon>
               <Align>top|left</Align>
               <Color><Variable name="LoopColor"/></Color>
               <TextColor>#FFFFFF</TextColor>
@@ -94,7 +94,7 @@
             <Mark>
               <Control>intro_start_position</Control>
               <Text>&#9698;</Text>
-              <Icon>skins:Nocturne/palemoon/style/mark_intro.svg</Icon>
+              <Icon>skins:Nocturne/nocturne/style/mark_intro.svg</Icon>
               <VisibilityControl>[Nocturne],show_intro_outro_cues</VisibilityControl>
               <Align>top|right</Align>
               <Color><Variable name="IntroOutroColor"/></Color>
@@ -104,7 +104,7 @@
               <Control>intro_end_position</Control>
               <VisibilityControl>[Nocturne],show_intro_outro_cues</VisibilityControl>
               <Text>&#9698;</Text>
-              <Icon>skins:Nocturne/palemoon/style/mark_intro.svg</Icon>
+              <Icon>skins:Nocturne/nocturne/style/mark_intro.svg</Icon>
               <Align>top|left</Align>
               <Color><Variable name="IntroOutroColor"/></Color>
               <TextColor>#FFFFFF</TextColor>
@@ -123,7 +123,7 @@
               <Control>outro_start_position</Control>
               <VisibilityControl>[Nocturne],show_intro_outro_cues</VisibilityControl>
               <Text>&#9699;</Text>
-              <Icon>skins:Nocturne/palemoon/style/mark_outro.svg</Icon>
+              <Icon>skins:Nocturne/nocturne/style/mark_outro.svg</Icon>
               <Align>top|right</Align>
               <Color><Variable name="IntroOutroColor"/></Color>
               <TextColor>#FFFFFF</TextColor>
@@ -131,7 +131,7 @@
             <Mark>
               <Control>outro_end_position</Control>
               <Text>&#9699;</Text>
-              <Icon>skins:Nocturne/palemoon/style/mark_outro.svg</Icon>
+              <Icon>skins:Nocturne/nocturne/style/mark_outro.svg</Icon>
               <VisibilityControl>[Nocturne],show_intro_outro_cues</VisibilityControl>
               <Align>top|left</Align>
               <Color><Variable name="IntroOutroColor"/></Color>

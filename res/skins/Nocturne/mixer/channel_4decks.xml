@@ -21,7 +21,7 @@
         <Children>
           <Template src="skins:Nocturne/controls/knob.xml">
             <SetVariable name="Size">40f,34f</SetVariable>
-            <SetVariable name="KnobColor">orange</SetVariable>
+            <SetVariable name="KnobColor">grey</SetVariable>
             <SetVariable name="ArcColor"><Variable name="ArcColorGain"/></SetVariable>
             <SetVariable name="Control">pregain</SetVariable>
             <SetVariable name="TooltipId">pregain</SetVariable>
