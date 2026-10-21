@@ -6,10 +6,29 @@
   <SetVariable name="CoverConfigKey"><Variable name="Group"/>,bpmlock</SetVariable>
 
   <WidgetGroup>
+    <ObjectName>WaveformLane</ObjectName>
+    <Layout>vertical</Layout>
+    <SizePolicy>me,me</SizePolicy>
+    <Children>
+  <WidgetGroup>
     <ObjectName>Waveform</ObjectName>
     <Layout>horizontal</Layout>
     <SizePolicy>me,me</SizePolicy>
     <Children>
+      <WidgetGroup><!-- Nocturne: deck letter at the left edge of the lane -->
+        <ObjectName>WaveformLetterBox<Variable name="ChanNum"/></ObjectName>
+        <Layout>vertical</Layout>
+        <Size>34f,1me</Size>
+        <Children>
+          <WidgetGroup><Size>1me,1me</Size></WidgetGroup>
+          <Label>
+            <ObjectName>WaveformLetter<Variable name="ChanNum"/></ObjectName>
+            <Size>34f,40f</Size>
+            <Text><Variable name="DeckLetter"/></Text>
+          </Label>
+          <WidgetGroup><Size>1me,1me</Size></WidgetGroup>
+        </Children>
+      </WidgetGroup>
       <WidgetGroup>
         <ObjectName>WaveformBox<Variable name="ChanNum"/></ObjectName>
         <Layout>horizontal</Layout>
@@ -282,5 +301,11 @@
         </Connection>
       </WidgetGroup><!-- BeatgridControls -->
     </Children>
+  </WidgetGroup><!-- Waveform -->
+  <WidgetGroup><!-- Nocturne: thin divider below the lane -->
+    <ObjectName>WaveformLaneDivider<Variable name="ChanNum"/></ObjectName>
+    <Size>1me,2f</Size>
   </WidgetGroup>
+    </Children>
+  </WidgetGroup><!-- WaveformLane -->
 </Template>

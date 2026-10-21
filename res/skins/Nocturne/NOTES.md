@@ -3,6 +3,12 @@
 Nocturne is DJNote's Traktor-like skin. It is a copy of LateNight (see `docs/adr/0006-nocturne-copies-latenight.md`);
 LateNight and the other upstream skins are not edited. Spec: issue #71 in the private issues repo.
 
+## Library (#80)
+- Layout is LateNight's: search box above the sidebar (left), track table on the right. Preview deck stays hidden by default; favourites bar and status bar do not exist.
+- Row height is the library setting `[Library],RowHeight` (Preferences > Library); QSS cannot set it (Mixxx applies it as the section size). Set it to about 40 px for cover-art-tall rows as in Traktor. Which columns show and their widths are library settings too.
+- Column header text cannot be uppercased (QSS has no `text-transform`; text comes from C++). Headers are small and grey instead.
+- Sidebar item icons are set in C++ and keep their own colours.
+
 ## Dropped Traktor elements
 
 Where Traktor shows something Mixxx has no control for, Nocturne drops it instead of faking it:
@@ -41,6 +47,15 @@ Where Traktor shows something Mixxx has no control for, Nocturne drops it instea
   warnings/pending.
 - Left as upstream: library sidebar feature icons (orange, from `res/images`), VU-meter PNGs.
 - `skin_preview_Nocturne.png` is currently LateNight's PaleMoon preview; replace it with a capture of the finished skin.
+
+## Header (ticket #74)
+
+- Layout: NOCTURNE wordmark | main VU (two thin rows), CPU meter, clock, battery, REC, ON AIR, VINYL | SETTINGS, LIBRARY.
+  A DECKS toggle appears next to the wordmark only while the library is maximised. LateNight's section toggles (waveforms, 4 decks,
+  mixer, effects, samplers, mic/aux) are no longer in the header; they stay in the skin settings pane.
+- VINYL toggles `[Nocturne],show_vinylcontrol` (the per-deck vinyl status panel).
+- Dropped: fullscreen button (no Mixxx control exists for it; View > Full Screen is a menu action only).
+- The battery widget hides itself on machines without a battery.
 
 ## Known consequences of not using `[Skin]` keys
 

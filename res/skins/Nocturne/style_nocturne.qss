@@ -3409,3 +3409,128 @@ WTrackTableViewHeader::section {
   color: #6d6d6d;
   font-size: 11px;
 }
+
+/* === Nocturne: header === */
+#ToolBar {
+  background-color: #181818;
+  border-bottom: 1px solid #000000;
+  padding: 0px 6px 0px 6px;
+}
+WLabel#NocturneWordmark {
+  color: #fefefe;
+  font-family: "Barlow Semi Condensed SemiBold", "Barlow Semi Condensed";
+  font-size: 22px;
+  letter-spacing: 1px;
+  background: transparent;
+}
+#HeaderVuBox {
+  background-color: transparent;
+  border: none;
+}
+#LatencyLabel {
+  color: #afafaf;
+  font-size: 12px;
+  margin: 0px;
+  background: transparent;
+}
+#LatencyMeterBox {
+  background-color: transparent;
+}
+#ClockWidget {
+  color: #afafaf;
+  font-size: 14px;
+  background: transparent;
+}
+/* ON AIR: no legacy icons */
+WPushButton#BroadcastButton[displayValue="0"],
+WPushButton#BroadcastButton[displayValue="1"],
+WPushButton#BroadcastButton[displayValue="2"],
+WPushButton#BroadcastButton[displayValue="3"],
+WPushButton#BroadcastButton[displayValue="4"] {
+  image: none;
+}
+#ToolBar WPushButton#NocturneBtn {
+  font-size: 12px;
+}
+/* === /Nocturne: header === */
+
+/* === Nocturne: waveform lanes ============================================ */
+/* Stacked lanes: deck letter column at the left edge + thin divider below a lane.
+   The waveform itself (Visual) is not styled here. */
+#WaveformBox1,
+#WaveformBox2,
+#WaveformBox3,
+#WaveformBox4 {
+  border: 0px;
+  background-color: #181818;
+}
+#WaveformLetterBox1,
+#WaveformLetterBox2,
+#WaveformLetterBox3,
+#WaveformLetterBox4 {
+  background-color: #181818;
+}
+#WaveformLetter1,
+#WaveformLetter2,
+#WaveformLetter3,
+#WaveformLetter4 {
+  background: transparent;
+  font-family: "Barlow Semi Condensed";
+  font-size: 30px;
+  qproperty-alignment: AlignCenter;
+}
+#WaveformLetter1,
+#WaveformLetter3 {
+  color: #fefefe;
+}
+#WaveformLetter2,
+#WaveformLetter4 {
+  color: #fa7242;
+}
+#WaveformLaneDivider1,
+#WaveformLaneDivider3 {
+  background-color: #000000;
+}
+#WaveformLaneDivider2,
+#WaveformLaneDivider4 {
+  background-color: transparent;
+}
+/* === /Nocturne: waveform lanes =========================================== */
+
+/* === Nocturne: library === */
+/* Traktor browser: search above sidebar, big readable rows, small grey headers.
+   Row height ([Library],RowHeight) is a library setting and cannot be set from QSS;
+   see NOTES.md. Column header text is uppercased by Traktor, QSS has no text-transform. */
+WTrackTableView {
+  font-family: "Barlow Semi Condensed";
+  font-size: 16px;
+  gridline-color: #181818;
+}
+WLibrarySidebar {
+  font-family: "Barlow Semi Condensed";
+  font-size: 16px;
+}
+WLibrarySidebar::item {
+  min-height: 26px;
+  padding: 0px 2px;
+}
+WLibrarySidebar::item:selected {
+  background-color: #253b5b;
+  color: #fefefe;
+}
+WTrackTableViewHeader::section {
+  font-family: "Barlow Semi Condensed SemiBold", "Barlow Semi Condensed";
+  font-size: 12px;
+  padding: 2px 4px;
+  border: 0px;
+  border-right: 1px solid #181818;
+}
+WSearchLineEdit {
+  font-family: "Barlow Semi Condensed";
+  font-size: 16px;
+  min-height: 26px;
+  background-color: #1c1c1c;
+  border: 1px solid #323232;
+  border-radius: 0px;
+}
+/* === end Nocturne: library === */
