@@ -1,0 +1,42 @@
+<Template>
+  <WidgetGroup>
+    <Layout>vertical</Layout>
+    <SizePolicy>max,min</SizePolicy>
+    <Children>
+
+      <!-- spacer to center channel controls without crossfader without
+          stretching them -->
+      <WidgetGroup><SizePolicy>min,e</SizePolicy></WidgetGroup>
+
+      <WidgetGroup><!-- Channel controls -->
+        <ObjectName>AlignHCenter</ObjectName>
+        <SizePolicy>min,min</SizePolicy>
+        <Layout>horizontal</Layout>
+        <Children>
+
+          <!-- Nocturne: mixer. Channel 1 = gain column | VU+PFL | EQ+fader; channel 2 mirrors it. -->
+          <Template src="skins:Nocturne/mixer/nocturne_channel_gain_col.xml"><SetVariable name="ChanNum">1</SetVariable></Template>
+          <Template src="skins:Nocturne/mixer/nocturne_channel_vu.xml"><SetVariable name="ChanNum">1</SetVariable></Template>
+          <Template src="skins:Nocturne/mixer/nocturne_channel_eq_col.xml"><SetVariable name="ChanNum">1</SetVariable></Template>
+          <Template src="skins:Nocturne/mixer/nocturne_channel_eq_col.xml"><SetVariable name="ChanNum">2</SetVariable></Template>
+          <Template src="skins:Nocturne/mixer/nocturne_channel_vu.xml"><SetVariable name="ChanNum">2</SetVariable></Template>
+          <Template src="skins:Nocturne/mixer/nocturne_channel_gain_col.xml"><SetVariable name="ChanNum">2</SetVariable></Template>
+
+        </Children>
+      </WidgetGroup><!-- /Channel controls -->
+
+      <!-- Nocturne: strip. The crossfader (and its channel assign switches / quick effect
+           selectors, dropped) moved to mixer/nocturne_strip.xml under the decks. -->
+
+      <!-- spacer to center channel controls without crossfader without
+          stretching them -->
+      <WidgetGroup><SizePolicy>min,e</SizePolicy></WidgetGroup>
+
+    </Children>
+    <Connection>
+      <ConfigKey persist="true">[Nocturne],show_4decks</ConfigKey>
+      <Transform><Not/></Transform>
+      <BindProperty>visible</BindProperty>
+    </Connection>
+  </WidgetGroup><!-- MixerDecks -->
+</Template>

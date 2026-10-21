@@ -1,0 +1,278 @@
+<!-- Nocturne header bar (ticket #74): wordmark | main VU, CPU, clock, battery, REC, ON AIR, VINYL | SETTINGS, LIBRARY -->
+<Template>
+  <WidgetGroup>
+    <ObjectName>ToolBar</ObjectName>
+    <Layout>horizontal</Layout>
+    <SizePolicy>e,min</SizePolicy>
+    <Children>
+
+      <Label>
+        <ObjectName>NocturneWordmark</ObjectName>
+        <Size>130f,28f</Size>
+        <Text>NOCTURNE</Text>
+      </Label>
+
+      <WidgetGroup><!-- deck toggle, only while the library is maximised -->
+        <ObjectName>ToolBarSection</ObjectName>
+        <SizePolicy>min,min</SizePolicy>
+        <Layout>horizontal</Layout>
+        <Children>
+          <Template src="skins:Nocturne/controls/button_2state.xml">
+            <SetVariable name="TooltipId">show_waveforms</SetVariable>
+            <SetVariable name="ObjectName">GuiToggleButton</SetVariable>
+            <SetVariable name="Size">56f,20f</SetVariable>
+            <SetVariable name="state_0_text">DECKS</SetVariable>
+            <SetVariable name="state_1_text">DECKS</SetVariable>
+            <SetVariable name="ConfigKey">[Nocturne],max_lib_show_decks</SetVariable>
+          </Template>
+        </Children>
+        <Connection>
+          <ConfigKey>[Nocturne],show_maximized_library</ConfigKey>
+          <BindProperty>visible</BindProperty>
+        </Connection>
+      </WidgetGroup>
+
+      <WidgetGroup><Size>me,min</Size></WidgetGroup>
+
+      <StatusLight>
+        <TooltipId>autodj_status</TooltipId>
+        <ObjectName>AutoDjStatus</ObjectName>
+        <Size>30f,22f</Size>
+        <NumberPos>3</NumberPos>
+        <PathStatusLight1>skins:Nocturne/<Variable name="StyleScheme"/>/style/autodj_status.svg</PathStatusLight1>
+        <PathStatusLight2>skins:Nocturne/<Variable name="StyleScheme"/>/style/autodj_status.svg</PathStatusLight2>
+        <PathStatusLight3>skins:Nocturne/<Variable name="StyleScheme"/>/style/autodj_status.svg</PathStatusLight3>
+        <Connection>
+          <ConfigKey>[AutoDJ],enabled</ConfigKey>
+        </Connection>
+        <Connection>
+          <ConfigKey>[AutoDJ],enabled</ConfigKey>
+          <BindProperty>visible</BindProperty>
+        </Connection>
+      </StatusLight>
+
+      <WidgetGroup>
+        <ObjectName>HeaderMeters</ObjectName>
+        <Layout>vertical</Layout>
+        <SizePolicy>min,min</SizePolicy>
+        <Children>
+          <WidgetGroup><Size>,0min</Size></WidgetGroup>
+          <WidgetGroup>
+            <ObjectName>HeaderVuBox</ObjectName>
+            <Layout>vertical</Layout>
+            <SizePolicy>min,min</SizePolicy>
+            <Children>
+              <VuMeter>
+                <TooltipId>main_VuMeterL</TooltipId>
+                <ObjectName>HeaderVu</ObjectName>
+                <Size>150f,4f</Size>
+                <PathBack>skins:Nocturne/<Variable name="StyleScheme"/>/style/header_vu_bg.png</PathBack>
+                <PathVu>skins:Nocturne/<Variable name="StyleScheme"/>/style/header_vu_active.png</PathVu>
+                <Horizontal>true</Horizontal>
+                <PeakHoldSize>3</PeakHoldSize>
+                <PeakHoldTime>500</PeakHoldTime>
+                <PeakFallTime>50</PeakFallTime>
+                <PeakFallStep>2</PeakFallStep>
+                <Connection>
+                  <ConfigKey>[Main],vu_meter_left</ConfigKey>
+                </Connection>
+              </VuMeter>
+              <VuMeter>
+                <TooltipId>main_VuMeterR</TooltipId>
+                <ObjectName>HeaderVu</ObjectName>
+                <Size>150f,4f</Size>
+                <PathBack>skins:Nocturne/<Variable name="StyleScheme"/>/style/header_vu_bg.png</PathBack>
+                <PathVu>skins:Nocturne/<Variable name="StyleScheme"/>/style/header_vu_active.png</PathVu>
+                <Horizontal>true</Horizontal>
+                <PeakHoldSize>3</PeakHoldSize>
+                <PeakHoldTime>500</PeakHoldTime>
+                <PeakFallTime>50</PeakFallTime>
+                <PeakFallStep>2</PeakFallStep>
+                <Connection>
+                  <ConfigKey>[Main],vu_meter_right</ConfigKey>
+                </Connection>
+              </VuMeter>
+            </Children>
+          </WidgetGroup>
+          <WidgetGroup><Size>,0min</Size></WidgetGroup>
+        </Children>
+      </WidgetGroup>
+
+      <WidgetGroup><Size>12f,1min</Size></WidgetGroup>
+      <Label>
+        <ObjectName>LatencyLabel</ObjectName>
+        <TooltipId>audio_latency_usage</TooltipId>
+        <Size>26f,20f</Size>
+        <Alignment>right</Alignment>
+        <Text>CPU</Text>
+      </Label>
+      <WidgetGroup><Size>4f,1min</Size></WidgetGroup>
+      <WidgetGroup>
+        <ObjectName>LatencyBatteryContainer</ObjectName>
+        <Layout>vertical</Layout>
+        <SizePolicy>min,min</SizePolicy>
+        <Children>
+          <WidgetGroup><Size>,0min</Size></WidgetGroup>
+          <WidgetGroup>
+            <ObjectName>LatencyMeterBox</ObjectName>
+            <Size>61f,7f</Size>
+            <Layout>vertical</Layout>
+            <Children>
+              <VuMeter>
+                <TooltipId>audio_latency_usage</TooltipId>
+                <Size>59f,5f</Size>
+                <PathBack>skins:Nocturne/<Variable name="StyleScheme"/>/style/latency_bg.png</PathBack>
+                <PathVu>skins:Nocturne/<Variable name="StyleScheme"/>/style/latency_over.png</PathVu>
+                <Horizontal>true</Horizontal>
+                <PeakHoldSize>5</PeakHoldSize>
+                <PeakHoldTime>1000</PeakHoldTime>
+                <PeakFallTime>100</PeakFallTime>
+                <PeakFallStep>1</PeakFallStep>
+                <Connection>
+                  <ConfigKey>[App],audio_latency_usage</ConfigKey>
+                </Connection>
+              </VuMeter>
+            </Children>
+            <Connection>
+              <ConfigKey>[App],audio_latency_overload</ConfigKey>
+              <BindProperty>highlight</BindProperty>
+            </Connection>
+          </WidgetGroup><!-- LatencyMeterBox -->
+          <WidgetGroup><Size>,0min</Size></WidgetGroup>
+        </Children>
+      </WidgetGroup><!-- LatencyBatteryContainer -->
+
+      <WidgetGroup><Size>14f,1min</Size></WidgetGroup>
+      <WidgetGroup>
+        <ObjectName>ClockWidget</ObjectName>
+        <Layout>horizontal</Layout>
+        <SizePolicy>min,min</SizePolicy>
+        <Children>
+          <Time>
+            <TooltipId>time</TooltipId>
+          </Time>
+        </Children>
+      </WidgetGroup>
+
+      <WidgetGroup><Size>6f,1min</Size></WidgetGroup>
+      <WidgetGroup>
+        <ObjectName>BatteryBox</ObjectName>
+        <Layout>horizontal</Layout>
+        <Children>
+          <Battery>
+            <ObjectName>Battery</ObjectName>
+            <Size>24,24</Size>
+            <SizePolicy>f,f</SizePolicy>
+            <PixmapCharged scalemode="STRETCH_ASPECT">skins:Nocturne/<Variable name="StyleScheme"/>/style/batt/ic_battery_charged.svg</PixmapCharged>
+            <NumberStates>8</NumberStates>
+            <PixmapsCharging scalemode="STRETCH_ASPECT">skins:Nocturne/<Variable name="StyleScheme"/>/style/batt/ic_battery_charging_%1.svg</PixmapsCharging>
+            <PixmapsDischarging scalemode="STRETCH_ASPECT">skins:Nocturne/<Variable name="StyleScheme"/>/style/batt/ic_battery_discharging_%1.svg</PixmapsDischarging>
+          </Battery>
+        </Children>
+      </WidgetGroup><!-- BatteryBox -->
+
+
+      <WidgetGroup><Size>12f,1min</Size></WidgetGroup>
+      <WidgetGroup><!-- Recording button & recording duration label -->
+        <ObjectName>RecBox</ObjectName>
+        <Layout>stacked</Layout>
+        <Size>72f,20f</Size>
+        <!-- minus 1px border
+            = 70x18 available for text -->
+        <Children>
+          <!-- invisible Rec button -->
+          <Template src="skins:Nocturne/controls/button_2state.xml">
+            <SetVariable name="ObjectName">RecButton</SetVariable>
+            <SetVariable name="TooltipId">toggle_recording</SetVariable>
+            <SetVariable name="Size">68f,20f</SetVariable>
+            <SetVariable name="ConfigKey">[Recording],toggle_recording</SetVariable>
+          </Template>
+
+          <WidgetGroup><!-- Rec dot + RecDuration -->
+            <Layout>horizontal</Layout>
+            <Size>68f,20f</Size>
+            <Children>
+              <Label>
+                <ObjectName>RecDot</ObjectName>
+                <Size>15f,20f</Size>
+                <Connection>
+                  <ConfigKey>[Recording],status</ConfigKey>
+                  <BindProperty>highlight</BindProperty>
+                </Connection>
+              </Label>
+
+              <RecordingDuration>
+                <ObjectName>RecDuration</ObjectName>
+                <Size>53f,20f</Size>
+                <InactiveText>REC</InactiveText>
+                <Alignment>center</Alignment>
+                <Connection>
+                  <ConfigKey>[Recording],status</ConfigKey>
+                  <BindProperty>highlight</BindProperty>
+                </Connection>
+              </RecordingDuration>
+            </Children>
+          </WidgetGroup><!-- /Rec dot + RecDuration -->
+
+          <!-- Rec feedback color -->
+          <Template src="skins:Nocturne/controls/button_3state_display.xml">
+            <SetVariable name="ObjectName">RecFeedback</SetVariable>
+            <SetVariable name="Size">72f,20f</SetVariable>
+            <SetVariable name="ConfigKey">[Recording],toggle_recording</SetVariable>
+            <SetVariable name="ConfigKeyDisp">[Recording],status</SetVariable>
+          </Template>
+        </Children>
+      </WidgetGroup><!-- /Recording button & recording duration label -->
+
+
+      <WidgetGroup><Size>4f,1min</Size></WidgetGroup>
+      <Template src="skins:Nocturne/controls/button_4state_display.xml">
+        <SetVariable name="ObjectName">BroadcastButton</SetVariable>
+        <SetVariable name="TooltipId">broadcast_enabled</SetVariable>
+        <SetVariable name="Size">72f,20f</SetVariable>
+        <SetVariable name="state_0_text">ON AIR</SetVariable>
+        <SetVariable name="state_1_text">...</SetVariable>
+        <SetVariable name="state_2_text">ON AIR</SetVariable>
+        <SetVariable name="state_3_text">ERROR</SetVariable>
+        <SetVariable name="ConfigKey">[Shoutcast],enabled</SetVariable>
+        <SetVariable name="ConfigKeyDisp">[Shoutcast],status</SetVariable>
+      </Template>
+
+
+      <WidgetGroup><Size>4f,1min</Size></WidgetGroup>
+      <Template src="skins:Nocturne/controls/button_flat_text.xml">
+        <SetVariable name="TooltipId">show_vinylcontrol</SetVariable>
+        <SetVariable name="ObjectName">NocturneBtn</SetVariable>
+        <SetVariable name="Size">52f,20f</SetVariable>
+        <SetVariable name="Text">VINYL</SetVariable>
+        <SetVariable name="ConfigKey">[Nocturne],show_vinylcontrol</SetVariable>
+      </Template>
+
+      <WidgetGroup><Size>me,min</Size></WidgetGroup>
+
+      <Template src="skins:Nocturne/controls/button_flat_text.xml">
+        <SetVariable name="TooltipId">skin_settings</SetVariable>
+        <SetVariable name="ObjectName">NocturneBtn</SetVariable>
+        <SetVariable name="Size">72f,20f</SetVariable>
+        <SetVariable name="Text">SETTINGS</SetVariable>
+        <SetVariable name="ConfigKey">[Nocturne],show_settings</SetVariable>
+      </Template>
+
+      <WidgetGroup><Size>4f,1min</Size></WidgetGroup>
+      <Template src="skins:Nocturne/controls/button_flat_text.xml">
+        <SetVariable name="TooltipId">maximize_library</SetVariable>
+        <SetVariable name="ObjectName">NocturneBtn</SetVariable>
+        <SetVariable name="Size">64f,20f</SetVariable>
+        <SetVariable name="Text">LIBRARY</SetVariable>
+        <SetVariable name="ConfigKey">[Nocturne],show_maximized_library</SetVariable>
+      </Template>
+
+      <WidgetGroup><Size>2f,min</Size></WidgetGroup>
+
+    </Children>
+    <Connection>
+      <ConfigKey>[Nocturne],show_waveforms</ConfigKey>
+      <BindProperty>highlight</BindProperty>
+    </Connection>
+  </WidgetGroup>
+</Template>

@@ -1,0 +1,30 @@
+<!--
+Description:
+  Translucent layer that covers skin settings that are inactive while neither
+  spinnies nor cover art are shown (= LateNight's [Skin],show_spinny_or_cover == 0,
+  rebuilt from [Nocturne] keys: visible only if show_spinnies == 0 AND show_coverart == 0).
+-->
+<Template>
+
+  <WidgetGroup>
+    <Layout>vertical</Layout>
+    <SizePolicy>me,min</SizePolicy>
+    <Children>
+      <WidgetGroup>
+        <ObjectName>SubmenuCover</ObjectName>
+        <Layout>vertical</Layout>
+        <SizePolicy>me,min</SizePolicy>
+        <Connection>
+          <ConfigKey>[Nocturne],show_coverart</ConfigKey>
+          <Transform><Not/></Transform>
+          <BindProperty>visible</BindProperty>
+        </Connection>
+      </WidgetGroup>
+    </Children>
+    <Connection>
+      <ConfigKey>[Nocturne],show_spinnies</ConfigKey>
+      <Transform><Not/></Transform>
+      <BindProperty>visible</BindProperty>
+    </Connection>
+  </WidgetGroup>
+</Template>

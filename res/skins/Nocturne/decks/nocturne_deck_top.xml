@@ -1,0 +1,274 @@
+<!--
+Description:
+  Nocturne deck top half, Traktor style (ticket #76):
+    left column : header (cover, title/artist/album, elapsed + track length, BPM + tempo %),
+                  SYNC / MASTER + tempo bend row, overview row (overview + key lock note)
+    right column: large deck letter, vertical rate fader (deck's outer edge)
+  Styled by the "Nocturne: deck header" block at the end of style_nocturne.qss.
+  All ObjectNames start with NocturneDeck so they never collide with LateNight-derived rules.
+Variables:
+  ChanNum, DeckLetter (set by skin.xml)
+-->
+<Template>
+  <SetVariable name="Group">[Channel<Variable name="ChanNum"/>]</SetVariable>
+
+  <WidgetGroup>
+    <ObjectName>NocturneDeckTop</ObjectName>
+    <Layout>horizontal</Layout>
+    <SizePolicy>me,min</SizePolicy>
+    <Children>
+
+      <!-- Left column -->
+      <WidgetGroup>
+        <ObjectName>NocturneDeckTopMain</ObjectName>
+        <Layout>vertical</Layout>
+        <SizePolicy>me,min</SizePolicy>
+        <Children>
+
+          <!-- Header -->
+          <WidgetGroup>
+            <ObjectName>NocturneDeckHeader</ObjectName>
+            <Layout>horizontal</Layout>
+            <SizePolicy>me,min</SizePolicy>
+            <Children>
+
+              <WidgetGroup>
+                <Layout>horizontal</Layout>
+                <SizePolicy>min,min</SizePolicy>
+                <Children>
+                  <Template src="skins:Nocturne/decks/spinny_cover_site.xml">
+                    <SetVariable name="ContainerName">NocturneDeckCover</SetVariable>
+                  </Template>
+                </Children>
+              </WidgetGroup>
+
+              <WidgetGroup>
+                <ObjectName>NocturneDeckInfo</ObjectName>
+                <Layout>vertical</Layout>
+                <SizePolicy>i,min</SizePolicy>
+                <Children>
+                  <TrackProperty>
+                    <ObjectName>NocturneDeckTitle</ObjectName>
+                    <Size>0me,22f</Size>
+                    <TooltipId>track_title</TooltipId>
+                    <Property>title</Property>
+                    <Alignment>Left</Alignment>
+                    <Elide>right</Elide>
+                    <Channel><Variable name="ChanNum"/></Channel>
+                  </TrackProperty>
+                  <TrackProperty>
+                    <ObjectName>NocturneDeckArtist</ObjectName>
+                    <Size>0me,17f</Size>
+                    <TooltipId>track_artist</TooltipId>
+                    <Property>artist</Property>
+                    <Alignment>Left</Alignment>
+                    <Elide>right</Elide>
+                    <Channel><Variable name="ChanNum"/></Channel>
+                  </TrackProperty>
+                  <TrackProperty>
+                    <ObjectName>NocturneDeckAlbum</ObjectName>
+                    <Size>0me,17f</Size>
+                    <TooltipId>track_album</TooltipId>
+                    <Property>album</Property>
+                    <Alignment>Left</Alignment>
+                    <Elide>right</Elide>
+                    <Channel><Variable name="ChanNum"/></Channel>
+                  </TrackProperty>
+                </Children>
+              </WidgetGroup>
+
+              <!-- Elapsed (click cycles elapsed / remaining / both, as everywhere in Mixxx) over track length -->
+              <WidgetGroup>
+                <ObjectName>NocturneDeckTime</ObjectName>
+                <Layout>vertical</Layout>
+                <SizePolicy>f,min</SizePolicy>
+                <Children>
+                  <NumberPos>
+                    <ObjectName>NocturneDeckElapsed</ObjectName>
+                    <TooltipId>track_time</TooltipId>
+                    <Size>170f,22f</Size>
+                    <Alignment>right</Alignment>
+                    <Channel><Variable name="ChanNum"/></Channel>
+                    <Connection>
+                      <ConfigKey><Variable name="Group"/>,playposition</ConfigKey>
+                    </Connection>
+                  </NumberPos>
+                  <TrackProperty>
+                    <ObjectName>NocturneDeckDuration</ObjectName>
+                    <TooltipId>track_duration</TooltipId>
+                    <Size>170f,17f</Size>
+                    <Alignment>right</Alignment>
+                    <Property>durationTextSeconds</Property>
+                    <Channel><Variable name="ChanNum"/></Channel>
+                  </TrackProperty>
+                </Children>
+              </WidgetGroup>
+
+              <!-- BPM over tempo percent -->
+              <WidgetGroup>
+                <ObjectName>NocturneDeckBpm</ObjectName>
+                <Layout>vertical</Layout>
+                <SizePolicy>f,min</SizePolicy>
+                <Children>
+                  <Number>
+                    <ObjectName>NocturneDeckBpmText</ObjectName>
+                    <TooltipId>visual_bpm</TooltipId>
+                    <Size>72f,22f</Size>
+                    <Alignment>right</Alignment>
+                    <NumberOfDigits>2</NumberOfDigits>
+                    <Connection>
+                      <ConfigKey><Variable name="Group"/>,visual_bpm</ConfigKey>
+                    </Connection>
+                  </Number>
+                  <NumberRate>
+                    <ObjectName>NocturneDeckRateText</ObjectName>
+                    <TooltipId>rate_display</TooltipId>
+                    <Size>72f,17f</Size>
+                    <Alignment>right</Alignment>
+                    <Channel><Variable name="ChanNum"/></Channel>
+                    <NumberOfDigits>2</NumberOfDigits>
+                  </NumberRate>
+                </Children>
+              </WidgetGroup>
+
+            </Children>
+          </WidgetGroup><!-- NocturneDeckHeader -->
+
+          <!-- SYNC MASTER ......... bend down / up -->
+          <WidgetGroup>
+            <ObjectName>NocturneDeckSyncRow</ObjectName>
+            <Layout>horizontal</Layout>
+            <SizePolicy>me,min</SizePolicy>
+            <Children>
+              <Template src="skins:Nocturne/controls/button_flat_text.xml">
+                <SetVariable name="TooltipId">sync_enabled</SetVariable>
+                <SetVariable name="ObjectName">NocturneBtn</SetVariable>
+                <SetVariable name="Size">46f,20f</SetVariable>
+                <SetVariable name="Text">SYNC</SetVariable>
+                <SetVariable name="ConfigKey"><Variable name="Group"/>,sync_enabled</SetVariable>
+              </Template>
+              <WidgetGroup><Size>3f,1f</Size></WidgetGroup>
+              <Template src="skins:Nocturne/controls/button_flat_text.xml">
+                <SetVariable name="TooltipId">sync_leader</SetVariable>
+                <SetVariable name="ObjectName">NocturneBtn</SetVariable>
+                <SetVariable name="Size">56f,20f</SetVariable>
+                <SetVariable name="Text">MASTER</SetVariable>
+                <SetVariable name="ConfigKey"><Variable name="Group"/>,sync_leader</SetVariable>
+              </Template>
+              <!-- Vinyl control status/mode/cue/pass (VINYL header toggle, #81) -->
+              <WidgetGroup><Size>6f,1f</Size></WidgetGroup>
+              <Template src="skins:Nocturne/decks/vinyl_controls.xml"/>
+              <WidgetGroup><Size>0me,1f</Size></WidgetGroup>
+              <WidgetGroup><!-- tempo bend arrows, Rate Adjust Buttons setting -->
+                <Layout>horizontal</Layout>
+                <SizePolicy>min,min</SizePolicy>
+                <Children>
+                <PushButton>
+                  <ObjectName>NocturneDeckBendDown</ObjectName>
+                  <TooltipId>rate_temp_down_rate_temp_down_small</TooltipId>
+                  <Size>30f,20f</Size>
+                  <NumberStates>1</NumberStates>
+                  <Connection>
+                    <ConfigKey><Variable name="Group"/>,rate_temp_down</ConfigKey>
+                    <ButtonState>LeftButton</ButtonState>
+                  </Connection>
+                  <Connection>
+                    <ConfigKey><Variable name="Group"/>,rate_temp_down_small</ConfigKey>
+                    <ButtonState>RightButton</ButtonState>
+                  </Connection>
+                </PushButton>
+                <WidgetGroup><Size>3f,1f</Size></WidgetGroup>
+                <PushButton>
+                  <ObjectName>NocturneDeckBendUp</ObjectName>
+                  <TooltipId>rate_temp_up_rate_temp_up_small</TooltipId>
+                  <Size>30f,20f</Size>
+                  <NumberStates>1</NumberStates>
+                  <Connection>
+                    <ConfigKey><Variable name="Group"/>,rate_temp_up</ConfigKey>
+                    <ButtonState>LeftButton</ButtonState>
+                  </Connection>
+                  <Connection>
+                    <ConfigKey><Variable name="Group"/>,rate_temp_up_small</ConfigKey>
+                    <ButtonState>RightButton</ButtonState>
+                  </Connection>
+                </PushButton>
+                <WidgetGroup><Size>3f,1f</Size></WidgetGroup>
+                </Children>
+                <Connection>
+                  <ConfigKey persist="true">[Nocturne],show_rate_control_buttons</ConfigKey>
+                  <BindProperty>visible</BindProperty>
+                </Connection>
+              </WidgetGroup>
+            </Children>
+          </WidgetGroup><!-- NocturneDeckSyncRow -->
+
+          <!-- Overview + key lock note -->
+          <WidgetGroup>
+            <ObjectName>NocturneDeckOverviewRow</ObjectName>
+            <Layout>horizontal</Layout>
+            <SizePolicy>me,min</SizePolicy>
+            <Children>
+              <WidgetGroup>
+                <ObjectName>NocturneDeckOverviewBox</ObjectName>
+                <Size>me,40f</Size>
+                <Layout>horizontal</Layout>
+                <Children>
+                  <SingletonContainer>
+                    <ObjectName>DeckOverview<Variable name="ChanNum"/></ObjectName>
+                  </SingletonContainer>
+                </Children>
+                <Connection>
+                  <ConfigKey><Variable name="Group"/>,track_loaded</ConfigKey>
+                  <BindProperty>highlight</BindProperty>
+                </Connection>
+              </WidgetGroup>
+              <PushButton>
+                <ObjectName>NocturneDeckKeylock</ObjectName>
+                <TooltipId>keylock</TooltipId>
+                <Size>30f,40f</Size>
+                <NumberStates>2</NumberStates>
+                <Connection>
+                  <ConfigKey><Variable name="Group"/>,keylock</ConfigKey>
+                  <ButtonState>LeftButton</ButtonState>
+                </Connection>
+              </PushButton>
+            </Children>
+          </WidgetGroup><!-- NocturneDeckOverviewRow -->
+
+        </Children>
+      </WidgetGroup><!-- NocturneDeckTopMain -->
+
+      <!-- Right column: deck letter + vertical rate fader -->
+      <WidgetGroup>
+        <ObjectName>NocturneDeckEdge</ObjectName>
+        <Layout>vertical</Layout>
+        <SizePolicy>min,me</SizePolicy>
+        <Children>
+          <Label>
+            <ObjectName>NocturneDeckLetter<Variable name="ChanNum"/></ObjectName>
+            <Size>34f,40f</Size>
+            <Text><Variable name="DeckLetter"/></Text>
+            <Alignment>center</Alignment>
+          </Label>
+          <WidgetGroup><Size>1f,0me</Size></WidgetGroup>
+          <SliderComposed>
+            <ObjectName>NocturneDeckRate</ObjectName>
+            <TooltipId>rate</TooltipId>
+            <Size>34f,64f</Size>
+            <Handle>skins:Nocturne/nocturne/sliders/rate_mini_handle.svg</Handle>
+            <Slider>skins:Nocturne/nocturne/sliders/rate_mini_groove.svg</Slider>
+            <Horizontal>false</Horizontal>
+            <Connection>
+              <ConfigKey><Variable name="Group"/>,rate</ConfigKey>
+            </Connection>
+            <Connection>
+              <ConfigKey>[Nocturne],show_rate_controls</ConfigKey>
+              <BindProperty>visible</BindProperty>
+            </Connection>
+          </SliderComposed>
+        </Children>
+      </WidgetGroup><!-- NocturneDeckEdge -->
+
+    </Children>
+  </WidgetGroup><!-- NocturneDeckTop -->
+</Template>

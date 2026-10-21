@@ -1978,6 +1978,17 @@ if(APPLE OR WIN32)
     DESTINATION
       "${MIXXX_INSTALL_DATADIR}"
   )
+else()
+  # DJNote: Barlow Semi Condensed (Nocturne skin) has no Debian package, so
+  # install just those files on Linux/BSD.
+  install(
+    DIRECTORY
+      "${CMAKE_CURRENT_SOURCE_DIR}/res/fonts"
+    DESTINATION
+      "${MIXXX_INSTALL_DATADIR}"
+    FILES_MATCHING PATTERN
+      "BarlowSemiCondensed*"
+  )
 endif()
 
 # Keyboard mapping(s)

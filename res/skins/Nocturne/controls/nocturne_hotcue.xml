@@ -1,0 +1,28 @@
+<!-- Nocturne hotcue slot: shows its number, filled with the cue colour when set (WHotcueButton
+     paints the colour; right-click clears, as in LateNight). Variable: number, Group -->
+<Template>
+  <HotcueButton>
+    <TooltipId>hotcue</TooltipId>
+    <ObjectName>NocturneHotcue</ObjectName>
+    <Size>20me,22f</Size>
+    <Group><Variable name="Group"/></Group>
+    <Hotcue><Variable name="number"/></Hotcue>
+    <NumberStates>3</NumberStates>
+    <DimBrightThreshold><Variable name="DimBrightThresholdHotcueBtn"/></DimBrightThreshold>
+    <State>
+      <Number>0</Number>
+      <Text><Variable name="number"/></Text>
+      <Alignment>left</Alignment>
+    </State>
+    <State>
+      <Number>1</Number>
+      <Text><Variable name="number"/></Text>
+      <Alignment>left</Alignment>
+    </State>
+    <State>
+      <Number>2</Number>
+      <Text><Variable name="number"/></Text>
+      <Alignment>left</Alignment>
+    </State>
+  </HotcueButton>
+</Template>
