@@ -52,7 +52,21 @@ class CoverLookupTest : public LibraryTest {
         return query.value(0).toInt();
     }
 
+    /// Copies of a track with an embedded cover, in `folder`.
+    QStringList copiesOfTrackWithCover(const QTemporaryDir& folder, int count) const {
+        QStringList locations;
+        for (int i = 0; i < count; ++i) {
+            const QString location = folder.filePath(QStringLiteral("track%1.mp3").arg(i));
+            if (!QFile::copy(testFile(kEmbeddedPngTrack), location)) {
+                ADD_FAILURE() << "Copying " << location.toStdString() << " failed";
+            }
+            locations.append(location);
+        }
+        return locations;
+    }
+
     static constexpr int kReadTimeoutMillis = 5000;
+    static constexpr int kNoReadTimeoutMillis = 500;
 };
 
 TEST_F(CoverLookupTest, fileNotInLibraryAnswersEmbeddedCover) {
@@ -226,6 +240,101 @@ TEST_F(CoverLookupTest, lookingUpFilesNotInLibraryAddsNoTracks) {
     coverInfoAfterReading(&lookup, folder.filePath(QStringLiteral("missing.mp3")));
 
     EXPECT_EQ(tracksBefore, libraryTrackCount());
+}
+
+TEST_F(CoverLookupTest, batchReportsProgressAndFinishesWithEveryCoverKnown) {
+    QTemporaryDir folder;
+    ASSERT_TRUE(folder.isValid());
+    const QString embedded = folder.filePath(QStringLiteral("embedded.mp3"));
+    ASSERT_TRUE(QFile::copy(testFile(kEmbeddedPngTrack), embedded));
+    QTemporaryDir otherFolder;
+    ASSERT_TRUE(otherFolder.isValid());
+    const QString withFolderImage = otherFolder.filePath(QStringLiteral("track.mp3"));
+    ASSERT_TRUE(QFile::copy(testFile(kNoCoverTrack), withFolderImage));
+    ASSERT_TRUE(QFile::copy(testFile(kReferenceJpg), otherFolder.filePath("folder.jpg")));
+    const QString missing = folder.filePath(QStringLiteral("missing.mp3"));
+    const TrackPointer pLibraryTrack = getOrAddTrackByLocation(testFile(kEmbeddedPngTrack));
+    ASSERT_TRUE(pLibraryTrack);
+    const QString inLibrary = pLibraryTrack->getLocation();
+    const int tracksBefore = libraryTrackCount();
+
+    CoverLookup lookup(internalCollection());
+    const auto pBatch = lookup.readCovers({embedded, withFolderImage, missing, inLibrary});
+    QSignalSpy progress(pBatch.get(), &CoverBatch::progress);
+    QSignalSpy finished(pBatch.get(), &CoverBatch::finished);
+    ASSERT_TRUE(finished.wait(kReadTimeoutMillis));
+
+    EXPECT_TRUE(pBatch->isFinished());
+    EXPECT_EQ(4, pBatch->total());
+    EXPECT_EQ(4, pBatch->done());
+    ASSERT_FALSE(progress.isEmpty());
+    EXPECT_EQ((QVariantList{4, 4}), progress.last());
+    // Every answer is known: asking reads nothing more.
+    QSignalSpy changed(&lookup, &CoverLookup::coverInfoChanged);
+    EXPECT_TRUE(lookup.coverInfo(embedded).hasImage());
+    EXPECT_EQ(CoverInfo::FILE, lookup.coverInfo(withFolderImage).type);
+    EXPECT_FALSE(lookup.coverInfo(missing).hasImage());
+    EXPECT_EQ(pLibraryTrack->getCoverInfoWithLocation(), lookup.coverInfo(inLibrary));
+    QCoreApplication::processEvents();
+    EXPECT_TRUE(changed.isEmpty());
+    EXPECT_EQ(tracksBefore, libraryTrackCount());
+}
+
+TEST_F(CoverLookupTest, cancellingBatchStopsReading) {
+    QTemporaryDir folder;
+    ASSERT_TRUE(folder.isValid());
+    const QStringList locations = copiesOfTrackWithCover(folder, 30);
+    CoverLookup lookup(internalCollection());
+    const auto pBatch = lookup.readCovers(locations);
+    QSignalSpy finished(pBatch.get(), &CoverBatch::finished);
+    ASSERT_FALSE(pBatch->isFinished());
+
+    pBatch->cancel();
+
+    EXPECT_FALSE(finished.wait(kNoReadTimeoutMillis));
+    EXPECT_TRUE(pBatch->isCancelled());
+    EXPECT_FALSE(pBatch->isFinished());
+    // The last cover was not read.
+    EXPECT_FALSE(lookup.coverInfo(locations.last()).hasImage());
+}
+
+TEST_F(CoverLookupTest, cancellingBatchStillAnswersCoversAskedFor) {
+    QTemporaryDir folder;
+    ASSERT_TRUE(folder.isValid());
+    const QStringList locations = copiesOfTrackWithCover(folder, 30);
+    CoverLookup lookup(internalCollection());
+    const auto pBatch = lookup.readCovers(locations);
+    // As when a cell is drawn while the batch is read.
+    const QString asked = locations.last();
+    QSignalSpy changed(&lookup, &CoverLookup::coverInfoChanged);
+    lookup.coverInfo(asked);
+
+    pBatch->cancel();
+
+    while (!changed.contains(QVariantList{asked})) {
+        if (!changed.wait(kReadTimeoutMillis)) {
+            ADD_FAILURE() << "No cover read for the cell";
+            break;
+        }
+    }
+    EXPECT_TRUE(lookup.coverInfo(asked).hasImage());
+}
+
+TEST_F(CoverLookupTest, batchOfKnownCoversIsFinishedRightAway) {
+    QTemporaryDir folder;
+    ASSERT_TRUE(folder.isValid());
+    const QStringList locations = copiesOfTrackWithCover(folder, 3);
+    CoverLookup lookup(internalCollection());
+    {
+        const auto pFirstBatch = lookup.readCovers(locations);
+        QSignalSpy finished(pFirstBatch.get(), &CoverBatch::finished);
+        ASSERT_TRUE(finished.wait(kReadTimeoutMillis));
+    }
+
+    const auto pBatch = lookup.readCovers(locations);
+
+    EXPECT_TRUE(pBatch->isFinished());
+    EXPECT_EQ(3, pBatch->done());
 }
 
 TEST_F(CoverLookupTest, libraryTrackAnswersLibraryCover) {
