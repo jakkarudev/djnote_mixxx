@@ -3344,3 +3344,46 @@ WTrackTableViewHeader::section {
   color: #6d6d6d;
   font-size: 11px;
 }
+
+/* === Nocturne: waveform lanes ============================================ */
+/* Stacked lanes: deck letter column at the left edge + thin divider below a lane.
+   The waveform itself (Visual) is not styled here. */
+#WaveformBox1,
+#WaveformBox2,
+#WaveformBox3,
+#WaveformBox4 {
+  border: 0px;
+  background-color: #181818;
+}
+#WaveformLetterBox1,
+#WaveformLetterBox2,
+#WaveformLetterBox3,
+#WaveformLetterBox4 {
+  background-color: #181818;
+}
+#WaveformLetter1,
+#WaveformLetter2,
+#WaveformLetter3,
+#WaveformLetter4 {
+  background: transparent;
+  font-family: "Barlow Semi Condensed";
+  font-size: 30px;
+  qproperty-alignment: AlignCenter;
+}
+#WaveformLetter1,
+#WaveformLetter3 {
+  color: #fefefe;
+}
+#WaveformLetter2,
+#WaveformLetter4 {
+  color: #fa7242;
+}
+#WaveformLaneDivider1,
+#WaveformLaneDivider3 {
+  background-color: #000000;
+}
+#WaveformLaneDivider2,
+#WaveformLaneDivider4 {
+  background-color: transparent;
+}
+/* === /Nocturne: waveform lanes =========================================== */
