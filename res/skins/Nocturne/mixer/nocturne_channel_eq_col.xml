@@ -1,0 +1,71 @@
+<!DOCTYPE template>
+<!-- Nocturne: mixer. Inner column of a channel: HI / MID / LO and the channel fader. Variable: ChanNum -->
+<Template>
+  <SetVariable name="Group">[Channel<Variable name="ChanNum"/>]</SetVariable>
+  <SetVariable name="EqFxUnit">[EqualizerRack1_<Variable name="Group"/>]</SetVariable>
+  <SetVariable name="EqEffect">[EqualizerRack1_<Variable name="Group"/>_Effect1]</SetVariable>
+  <WidgetGroup>
+    <ObjectName>NocturneMixCol</ObjectName>
+    <Layout>vertical</Layout>
+    <SizePolicy>min,min</SizePolicy>
+    <Children>
+
+      <WidgetGroup><Size>0min,3f</Size></WidgetGroup>
+
+      <WidgetGroup><!-- EQ knobs, shown by the EQ knob setting -->
+        <Layout>vertical</Layout>
+        <SizePolicy>min,min</SizePolicy>
+        <Children>
+          <Template src="skins:Nocturne/mixer/nocturne_eq_knob.xml">
+            <SetVariable name="EqParameter">3</SetVariable>
+            <SetVariable name="EqRange">High</SetVariable>
+            <SetVariable name="Label">HI</SetVariable>
+          </Template>
+          <WidgetGroup><Size>0min,3f</Size></WidgetGroup>
+          <Template src="skins:Nocturne/mixer/nocturne_eq_knob.xml">
+            <SetVariable name="EqParameter">2</SetVariable>
+            <SetVariable name="EqRange">Mid</SetVariable>
+            <SetVariable name="Label">MID</SetVariable>
+          </Template>
+          <WidgetGroup><Size>0min,3f</Size></WidgetGroup>
+          <Template src="skins:Nocturne/mixer/nocturne_eq_knob.xml">
+            <SetVariable name="EqParameter">1</SetVariable>
+            <SetVariable name="EqRange">Low</SetVariable>
+            <SetVariable name="Label">LO</SetVariable>
+          </Template>
+          <WidgetGroup><Size>0min,3f</Size></WidgetGroup>
+        </Children>
+        <Connection>
+          <ConfigKey persist="true">[Nocturne],show_eq_knobs</ConfigKey>
+          <BindProperty>visible</BindProperty>
+        </Connection>
+      </WidgetGroup>
+
+      <WidgetGroup>
+        <Layout>horizontal</Layout>
+        <SizePolicy>min,min</SizePolicy>
+        <Children>
+          <WidgetGroup><Size>0me,0min</Size></WidgetGroup>
+          <SliderComposed><!-- channel fader -->
+            <TooltipId>channel_volume</TooltipId>
+            <Size>42f,66f</Size>
+            <Handle scalemode="STRETCH_ASPECT">skins:Nocturne/<Variable name="SliderScheme"/>/sliders/knob_volume_deck.svg</Handle>
+            <Slider scalemode="STRETCH_ASPECT">skins:Nocturne/<Variable name="SliderScheme"/>/sliders/slider_volume_deck.svg</Slider>
+            <Horizontal>false</Horizontal>
+            <BarColor><Variable name="BarColorVolume"/></BarColor>
+            <BarWidth><Variable name="BarWidth"/></BarWidth>
+            <BarMargins><Variable name="BarMarginVolume"/></BarMargins>
+            <BarRoundCaps>true</BarRoundCaps>
+            <BarAxisPos>21.0</BarAxisPos>
+            <Connection>
+              <ConfigKey><Variable name="Group"/>,volume</ConfigKey>
+            </Connection>
+          </SliderComposed>
+          <WidgetGroup><Size>0me,0min</Size></WidgetGroup>
+        </Children>
+      </WidgetGroup>
+
+      <WidgetGroup><Size>0min,0me</Size></WidgetGroup>
+    </Children>
+  </WidgetGroup>
+</Template>

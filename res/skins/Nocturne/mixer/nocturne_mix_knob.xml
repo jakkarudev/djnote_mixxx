@@ -1,0 +1,44 @@
+<!DOCTYPE template>
+<!-- Nocturne: mixer. Knob with a caption and a toggle dot underneath (FLTR, KEY).
+  Variables: Group, Control, TooltipId, Label, DotGroup, DotControl, DotTooltipId, DotVisKey -->
+<Template>
+  <SetVariable name="KnobBg">regular</SetVariable>
+  <SetVariable name="KnobIndicator">regular</SetVariable>
+  <SetVariable name="ArcRadius"><Variable name="ArcRadiusBig"/></SetVariable>
+  <SetVariable name="ArcThickness"><Variable name="ArcThicknessBig"/></SetVariable>
+  <SetVariable name="ArcColor"><Variable name="ArcColorGain"/></SetVariable>
+  <SetVariable name="KnobColor">grey</SetVariable>
+  <SetVariable name="Size">36f,31f</SetVariable>
+  <WidgetGroup>
+    <ObjectName>NocturneMixCell</ObjectName>
+    <Layout>vertical</Layout>
+    <SizePolicy>min,min</SizePolicy>
+    <Children>
+      <WidgetGroup>
+        <Layout>horizontal</Layout>
+        <Size>52f,31f</Size>
+        <Children>
+          <WidgetGroup><Size>8me,0min</Size></WidgetGroup>
+          <Template src="skins:Nocturne/controls/knob.xml"/>
+          <WidgetGroup><Size>8me,0min</Size></WidgetGroup>
+        </Children>
+      </WidgetGroup>
+      <WidgetGroup>
+        <Layout>horizontal</Layout>
+        <Size>52f,12f</Size>
+        <Children>
+          <WidgetGroup><Size>9f,0min</Size></WidgetGroup>
+          <WidgetGroup><Size>0me,0min</Size></WidgetGroup>
+          <Label>
+            <ObjectName>NocturneMixLabel</ObjectName>
+            <SizePolicy>min,f</SizePolicy>
+            <Text><Variable name="Label"/></Text>
+            <Alignment>center</Alignment>
+          </Label>
+          <WidgetGroup><Size>0me,0min</Size></WidgetGroup>
+          <Template src="skins:Nocturne/mixer/nocturne_dot.xml"/>
+        </Children>
+      </WidgetGroup>
+    </Children>
+  </WidgetGroup>
+</Template>
