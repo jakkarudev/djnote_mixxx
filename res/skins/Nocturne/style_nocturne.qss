@@ -3344,3 +3344,41 @@ WTrackTableViewHeader::section {
   color: #6d6d6d;
   font-size: 11px;
 }
+
+/* === Nocturne: library === */
+/* Traktor browser: search above sidebar, big readable rows, small grey headers.
+   Row height ([Library],RowHeight) is a library setting and cannot be set from QSS;
+   see NOTES.md. Column header text is uppercased by Traktor, QSS has no text-transform. */
+WTrackTableView {
+  font-family: "Barlow Semi Condensed";
+  font-size: 16px;
+  gridline-color: #181818;
+}
+WLibrarySidebar {
+  font-family: "Barlow Semi Condensed";
+  font-size: 16px;
+}
+WLibrarySidebar::item {
+  min-height: 26px;
+  padding: 0px 2px;
+}
+WLibrarySidebar::item:selected {
+  background-color: #253b5b;
+  color: #fefefe;
+}
+WTrackTableViewHeader::section {
+  font-family: "Barlow Semi Condensed SemiBold", "Barlow Semi Condensed";
+  font-size: 12px;
+  padding: 2px 4px;
+  border: 0px;
+  border-right: 1px solid #181818;
+}
+WSearchLineEdit {
+  font-family: "Barlow Semi Condensed";
+  font-size: 16px;
+  min-height: 26px;
+  background-color: #1c1c1c;
+  border: 1px solid #323232;
+  border-radius: 0px;
+}
+/* === end Nocturne: library === */
