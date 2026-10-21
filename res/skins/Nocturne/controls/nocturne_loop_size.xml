@@ -3,7 +3,7 @@
   <Template src="skins:Nocturne/controls/nocturne_btn_disp.xml">
     <SetVariable name="TooltipId">beatloop_size</SetVariable>
     <SetVariable name="ObjectName">NocturneBtnCell</SetVariable>
-    <SetVariable name="Size">24me,26f</SetVariable>
+    <SetVariable name="Size">21me,26f</SetVariable>
     <SetVariable name="ConfigKey"><Variable name="Group"/>,beatloop_<Variable name="LoopSize"/>_toggle</SetVariable>
     <SetVariable name="ConfigKeyDisp"><Variable name="Group"/>,beatloop_<Variable name="LoopSize"/>_enabled</SetVariable>
   </Template>

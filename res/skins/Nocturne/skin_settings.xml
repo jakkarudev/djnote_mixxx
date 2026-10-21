@@ -242,30 +242,6 @@ Description:
                     <SetVariable name="Width">190me</SetVariable>
                   </Template>
 
-                  <!-- Cue shift buttons in beatgrid editing section -->
-                  <WidgetGroup>
-                    <ObjectName>SkinSettingsCategory</ObjectName>
-                    <SizePolicy>me,f</SizePolicy>
-                    <Layout>stacked</Layout>
-                    <Children>
-                      <!-- translucent cover when waveforms are hidden -->
-                      <Template src="skins:Nocturne/helpers/skin_settings_cover_inverted.xml">
-                        <SetVariable name="Setting">[Nocturne],show_waveforms</SetVariable>
-                      </Template>
-
-                      <!-- translucent cover when beatgrid controls are hidden -->
-                      <Template src="skins:Nocturne/helpers/skin_settings_cover_inverted.xml">
-                        <SetVariable name="Setting">[Nocturne],show_beatgrid_controls</SetVariable>
-                      </Template>
-
-                      <Template src="skins:Nocturne/helpers/skin_settings_button_2state.xml">
-                        <SetVariable name="TooltipId">show_intro_outro_cues</SetVariable>
-                        <SetVariable name="Text">Hotcue Shift Buttons</SetVariable>
-                        <SetVariable name="Setting">[Nocturne],timing_shift_buttons</SetVariable>
-                      </Template>
-
-                    </Children>
-                  </WidgetGroup>
                 </Children>
               </WidgetGroup>
             </Children>

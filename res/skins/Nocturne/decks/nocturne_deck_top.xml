@@ -155,6 +155,9 @@ Variables:
                 <SetVariable name="Text">MASTER</SetVariable>
                 <SetVariable name="ConfigKey"><Variable name="Group"/>,sync_leader</SetVariable>
               </Template>
+              <!-- Vinyl control status/mode/cue/pass (VINYL header toggle, #81) -->
+              <WidgetGroup><Size>6f,1f</Size></WidgetGroup>
+              <Template src="skins:Nocturne/decks/vinyl_controls.xml"/>
               <WidgetGroup><Size>0me,1f</Size></WidgetGroup>
               <PushButton>
                 <ObjectName>NocturneDeckBendDown</ObjectName>
@@ -247,6 +250,10 @@ Variables:
             <Horizontal>false</Horizontal>
             <Connection>
               <ConfigKey><Variable name="Group"/>,rate</ConfigKey>
+            </Connection>
+            <Connection>
+              <ConfigKey>[Nocturne],show_rate_controls</ConfigKey>
+              <BindProperty>visible</BindProperty>
             </Connection>
           </SliderComposed>
         </Children>

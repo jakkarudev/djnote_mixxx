@@ -3722,6 +3722,9 @@ WBeatSpinBox#NocturneSpinbox {
 #NocturneIntroOutro {
   margin-left: 6px;
 }
+#NocturneLoopSizes WPushButton#NocturneBtnCell {
+  font-size: 12px;
+}
 /* === /Nocturne: deck rows =============================================== */
 
 /* === Nocturne: strip === */

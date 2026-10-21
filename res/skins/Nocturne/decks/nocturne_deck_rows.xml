@@ -26,7 +26,7 @@ Variables:
               <Template src="skins:Nocturne/controls/nocturne_btn_disp.xml">
                 <SetVariable name="TooltipId">play_cue_set</SetVariable>
                 <SetVariable name="ObjectName">NocturneBtn</SetVariable>
-                <SetVariable name="Size">40,26f</SetVariable>
+                <SetVariable name="Size">34,26f</SetVariable>
                 <SetVariable name="Text">&#9654;</SetVariable>
                 <SetVariable name="ConfigKey"><Variable name="Group"/>,play</SetVariable>
                 <SetVariable name="ConfigKeyDisp"><Variable name="Group"/>,play_latched</SetVariable>
@@ -35,28 +35,28 @@ Variables:
               <Template src="skins:Nocturne/controls/button_flat_text.xml">
                 <SetVariable name="TooltipId">cue_default_cue_gotoandstop</SetVariable>
                 <SetVariable name="ObjectName">NocturneBtnFlat</SetVariable>
-                <SetVariable name="Size">42,26f</SetVariable>
+                <SetVariable name="Size">34,26f</SetVariable>
                 <SetVariable name="Text">CUE</SetVariable>
                 <SetVariable name="ConfigKey"><Variable name="Group"/>,cue_default</SetVariable>
               </Template>
               <Template src="skins:Nocturne/controls/button_flat_text.xml">
                 <SetVariable name="TooltipId">cue_gotoandplay_cue_default</SetVariable>
                 <SetVariable name="ObjectName">NocturneBtnFlat</SetVariable>
-                <SetVariable name="Size">42,26f</SetVariable>
+                <SetVariable name="Size">34,26f</SetVariable>
                 <SetVariable name="Text">CUP</SetVariable>
                 <SetVariable name="ConfigKey"><Variable name="Group"/>,cue_gotoandplay</SetVariable>
               </Template>
               <Template src="skins:Nocturne/controls/button_flat_text.xml">
                 <SetVariable name="TooltipId">slip_mode</SetVariable>
                 <SetVariable name="ObjectName">NocturneBtnFlat</SetVariable>
-                <SetVariable name="Size">38,26f</SetVariable>
+                <SetVariable name="Size">32,26f</SetVariable>
                 <SetVariable name="Text">FLX</SetVariable>
                 <SetVariable name="ConfigKey"><Variable name="Group"/>,slip_enabled</SetVariable>
               </Template>
               <Template src="skins:Nocturne/controls/button_flat_text.xml">
                 <SetVariable name="TooltipId">reverse</SetVariable>
                 <SetVariable name="ObjectName">NocturneBtnFlat</SetVariable>
-                <SetVariable name="Size">42,26f</SetVariable>
+                <SetVariable name="Size">34,26f</SetVariable>
                 <SetVariable name="Text">REV</SetVariable>
                 <SetVariable name="ConfigKey"><Variable name="Group"/>,reverse</SetVariable>
               </Template>
@@ -71,7 +71,7 @@ Variables:
               <Template src="skins:Nocturne/controls/button_flat_text.xml">
                 <SetVariable name="TooltipId">loop_halve</SetVariable>
                 <SetVariable name="ObjectName">NocturneBtnFlat</SetVariable>
-                <SetVariable name="Size">22,26f</SetVariable>
+                <SetVariable name="Size">14,26f</SetVariable>
                 <SetVariable name="Text">&#8249;</SetVariable>
                 <SetVariable name="ConfigKey"><Variable name="Group"/>,loop_halve</SetVariable>
               </Template>
@@ -110,7 +110,7 @@ Variables:
               <Template src="skins:Nocturne/controls/button_flat_text.xml">
                 <SetVariable name="TooltipId">loop_double</SetVariable>
                 <SetVariable name="ObjectName">NocturneBtnFlat</SetVariable>
-                <SetVariable name="Size">22,26f</SetVariable>
+                <SetVariable name="Size">14,26f</SetVariable>
                 <SetVariable name="Text">&#8250;</SetVariable>
                 <SetVariable name="ConfigKey"><Variable name="Group"/>,loop_double</SetVariable>
               </Template>
@@ -130,21 +130,21 @@ Variables:
               <Template src="skins:Nocturne/controls/button_flat_text.xml">
                 <SetVariable name="TooltipId">loop_in</SetVariable>
                 <SetVariable name="ObjectName">NocturneBtnFlat</SetVariable>
-                <SetVariable name="Size">38,26f</SetVariable>
+                <SetVariable name="Size">32,26f</SetVariable>
                 <SetVariable name="Text">IN</SetVariable>
                 <SetVariable name="ConfigKey"><Variable name="Group"/>,loop_in</SetVariable>
               </Template>
               <Template src="skins:Nocturne/controls/button_flat_text.xml">
                 <SetVariable name="TooltipId">loop_out</SetVariable>
                 <SetVariable name="ObjectName">NocturneBtnFlat</SetVariable>
-                <SetVariable name="Size">38,26f</SetVariable>
+                <SetVariable name="Size">32,26f</SetVariable>
                 <SetVariable name="Text">OUT</SetVariable>
                 <SetVariable name="ConfigKey"><Variable name="Group"/>,loop_out</SetVariable>
               </Template>
               <Template src="skins:Nocturne/controls/nocturne_btn_disp.xml">
                 <SetVariable name="TooltipId">reloop_toggle</SetVariable>
                 <SetVariable name="ObjectName">NocturneBtn</SetVariable>
-                <SetVariable name="Size">38,26f</SetVariable>
+                <SetVariable name="Size">32,26f</SetVariable>
                 <SetVariable name="Text">&#8635;</SetVariable>
                 <SetVariable name="ConfigKey"><Variable name="Group"/>,reloop_toggle</SetVariable>
                 <SetVariable name="ConfigKeyDisp"><Variable name="Group"/>,loop_enabled</SetVariable>
@@ -222,17 +222,21 @@ Variables:
             <Layout>horizontal</Layout>
             <SizePolicy>min,min</SizePolicy>
             <Children>
-              <Template src="skins:Nocturne/controls/button_special_cue.xml">
+              <Template src="skins:Nocturne/controls/nocturne_special_cue.xml">
                 <SetVariable name="CueType">intro_start</SetVariable>
+                <SetVariable name="Text">IS</SetVariable>
               </Template>
-              <Template src="skins:Nocturne/controls/button_special_cue.xml">
+              <Template src="skins:Nocturne/controls/nocturne_special_cue.xml">
                 <SetVariable name="CueType">intro_end</SetVariable>
+                <SetVariable name="Text">IE</SetVariable>
               </Template>
-              <Template src="skins:Nocturne/controls/button_special_cue.xml">
+              <Template src="skins:Nocturne/controls/nocturne_special_cue.xml">
                 <SetVariable name="CueType">outro_start</SetVariable>
+                <SetVariable name="Text">OS</SetVariable>
               </Template>
-              <Template src="skins:Nocturne/controls/button_special_cue.xml">
+              <Template src="skins:Nocturne/controls/nocturne_special_cue.xml">
                 <SetVariable name="CueType">outro_end</SetVariable>
+                <SetVariable name="Text">OE</SetVariable>
               </Template>
             </Children>
             <Connection>
