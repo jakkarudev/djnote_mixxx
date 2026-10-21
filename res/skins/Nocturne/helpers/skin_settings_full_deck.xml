@@ -87,6 +87,20 @@ Description:
         <SetVariable name="Setting">[Nocturne],show_rate_controls</SetVariable>
       </Template>
 
+      <!-- Rate Adjust Buttons (tempo bend arrows) -->
+      <Template src="skins:Nocturne/helpers/skin_settings_button_2state.xml">
+        <SetVariable name="TooltipId">rate_toggle</SetVariable>
+        <SetVariable name="Text">Rate Adjust Buttons</SetVariable>
+        <SetVariable name="Setting">[Nocturne],show_rate_control_buttons</SetVariable>
+      </Template>
+
+      <!-- Key Controls (mixer KEY knob) -->
+      <Template src="skins:Nocturne/helpers/skin_settings_button_2state.xml">
+        <SetVariable name="TooltipId">show_key_controls</SetVariable>
+        <SetVariable name="Text">Key Controls</SetVariable>
+        <SetVariable name="Setting">[Nocturne],show_key_controls</SetVariable>
+      </Template>
+
       <!-- Vinyl Control -->
       <Template src="skins:Nocturne/helpers/skin_settings_button_2state.xml">
         <SetVariable name="TooltipId">show_vinylcontrol</SetVariable>

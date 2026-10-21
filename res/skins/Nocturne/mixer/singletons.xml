@@ -2,7 +2,7 @@
 <Template>
   <SetVariable name="ChannelType">channel</SetVariable>
   <SetVariable name="VuSize">deck</SetVariable>
-  <SetVariable name="VuColor">dark</SetVariable>
+  <SetVariable name="VuColor">_dark</SetVariable>
 
   <SingletonDefinition>
     <ObjectName>CrossfaderSingleton</ObjectName>
@@ -108,7 +108,7 @@
         <Layout>horizontal</Layout>
         <Children>
           <Template src="skins:Nocturne/mixer/vumeter_main.xml">
-            <SetVariable name="VuColor">dark</SetVariable>
+            <SetVariable name="VuColor">_dark</SetVariable>
           </Template>
         </Children>
       </WidgetGroup>
@@ -122,7 +122,7 @@
         <Layout>horizontal</Layout>
         <Children>
           <Template src="skins:Nocturne/mixer/vumeter_main.xml">
-            <SetVariable name="VuColor">light</SetVariable>
+            <SetVariable name="VuColor">_light</SetVariable>
           </Template>
         </Children>
       </WidgetGroup>

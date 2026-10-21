@@ -47,7 +47,7 @@
       <attribute persist="true" config_key="[Nocturne],show_4decks">0</attribute>
       <attribute persist="true" config_key="[Nocturne],show_hotcues">1</attribute>
       <attribute persist="true" config_key="[Nocturne],show_8_hotcues">1</attribute>
-      <attribute persist="true" config_key="[Nocturne],show_intro_outro_cues">1</attribute>
+      <attribute persist="true" config_key="[Nocturne],show_intro_outro_cues">0</attribute>
       <attribute persist="true" config_key="[Nocturne],show_loop_controls">1</attribute>
       <attribute persist="true" config_key="[Nocturne],show_beatjump_controls">1</attribute>
       <attribute persist="true" config_key="[Nocturne],show_spinnies">0</attribute>
@@ -69,6 +69,8 @@
       <attribute persist="true" config_key="[Nocturne],show_beatjump_controls_compact">1</attribute>
       <attribute persist="true" config_key="[Nocturne],show_sync_button_compact">1</attribute>
       <attribute persist="true" config_key="[Nocturne],show_key_controls">1</attribute>
+      <!-- Key lock dot under the mixer KEY knob (the deck already has a key lock button); no setting, kept off -->
+      <attribute config_key="[Nocturne],show_key_lock_dot">0</attribute>
       <attribute persist="true" config_key="[Nocturne],show_key_controls_compact">1</attribute>
       <attribute persist="true" config_key="[Nocturne],show_vumeters_compact">1</attribute>
 
@@ -76,7 +78,7 @@
       <attribute persist="true" config_key="[Nocturne],show_mixer">1</attribute>
       <attribute persist="true" config_key="[Nocturne],show_main_head_mixer">1</attribute>
       <attribute persist="true" config_key="[Nocturne],show_eq_knobs">1</attribute>
-      <attribute persist="true" config_key="[Nocturne],show_eq_kill_buttons">1</attribute>
+      <attribute persist="true" config_key="[Nocturne],show_eq_kill_buttons">0</attribute>
       <attribute persist="true" config_key="[Nocturne],show_xfader">1</attribute>
       <attribute persist="true" config_key="[Nocturne],show_vumeters_compact">1</attribute>
     <!-- Effects -->
@@ -93,7 +95,7 @@
       <attribute persist="true" config_key="[Nocturne],show_microphones">0</attribute>
     <!-- Library -->
       <attribute config_key="[Nocturne],show_maximized_library">0</attribute>
-      <!-- [Skin],show_settings is created by C++ for LateNight; Nocturne declares its own -->
+      <!-- [Skin],show_settings is created by C++ for the other skins; Nocturne declares its own -->
       <attribute config_key="[Nocturne],show_settings">0</attribute>
       <attribute persist="true" config_key="[Nocturne],max_lib_show_decks">1</attribute>
       <attribute persist="true" config_key="[Nocturne],show_preview_decks">0</attribute>
@@ -126,15 +128,15 @@
   <Schemes>
     <Scheme>
       <Name>Nocturne</Name>
-      <!-- Mix any of the existing button, knob, slider or style theme subsets.
-        The button templates for example link to skins:Nocturne/BtnTheme/buttons/btn_...
+      <!-- Nocturne has a single set of button, knob, slider and style graphics (nocturne/).
+        The button templates for example link to skins:Nocturne/<BtnScheme>/buttons/btn_...
 
         BtnScheme     borders / background images for pushbuttons, spinboxes,
                       effect selector, AutoDJ fade mode selector.
                       If 'BtnSize' variable is undefined it links to transparent
                       dummy icons like btn_embedded__active.svg
               Note:   Icons for buttons that have images set in xml already are set
-                      in the respective style-[theme].qss
+                      in style_nocturne.qss
         KnobScheme    guess what
         SliderScheme  ...exactly!
         StyleScheme   icons & backgrounds for library, splitters, spinnies,
@@ -168,21 +170,18 @@
 
       <Style src="skins:Nocturne/style_nocturne.qss"/>
 
-      <!-- ===== Nocturne palette (single source of truth; sampled from the Traktor screenshots) =====
-           XML-side colours use these values. QSS cannot read skin variables, so style_nocturne.qss
-           repeats the same literals - see "Nocturne base look" in NOTES.md. -->
+      <!-- ===== Nocturne palette (sampled from the Traktor screenshots) =====
+           Only the colours XML can use are defined here; the colour variables below are
+           built from them. style_nocturne.qss and the SVG graphics cannot read skin variables
+           and repeat the same hex literals, so a palette change must be made in all three
+           places (see "Nocturne base look" in NOTES.md). -->
       <SetVariable name="ColorBg">#181818</SetVariable><!-- window / panels -->
-      <SetVariable name="ColorLine">#000000</SetVariable><!-- 1px dividers -->
-      <SetVariable name="ColorRaised">#262626</SetVariable><!-- transport row, table header -->
       <SetVariable name="ColorRaisedDark">#1f1f1f</SetVariable><!-- overview row -->
       <SetVariable name="ColorOutline">#323232</SetVariable><!-- button borders, search box -->
-      <SetVariable name="ColorRing">#3c3c3c</SetVariable><!-- knob rings, fader grooves -->
       <SetVariable name="ColorText">#afafaf</SetVariable><!-- main text -->
       <SetVariable name="ColorTextDim">#6d6d6d</SetVariable><!-- table headers, inactive -->
       <SetVariable name="ColorTextBright">#fefefe</SetVariable>
       <SetVariable name="ColorBlue">#448bf6</SetVariable><!-- every selection / active state -->
-      <SetVariable name="ColorBlueDark">#253b5b</SetVariable><!-- selected row background -->
-      <SetVariable name="ColorDeckA">#fefefe</SetVariable><!-- deck A letter -->
       <SetVariable name="ColorDeckB">#fa7242</SetVariable><!-- deck B letter -->
 
       <SetVariable name="BtnScheme">nocturne</SetVariable>
@@ -193,11 +192,11 @@
       <!-- Waveform & Overview colors -->
       <!-- This is a hack to have a grey background in empty decks.
           When a track is loaded the bg gets darker for better contrast -->
-      <SetVariable name="BgColorOverview_12">#1f1f1f</SetVariable>
-      <SetVariable name="BgColorOverview_34">#1f1f1f</SetVariable>
-      <SetVariable name="BgColorOverview_SamPre">#1f1f1f</SetVariable>
-      <SetVariable name="BgColorWaveform_12">#181818</SetVariable>
-      <SetVariable name="BgColorWaveform_34">#181818</SetVariable>
+      <SetVariable name="BgColorOverview_12"><Variable name="ColorRaisedDark"/></SetVariable>
+      <SetVariable name="BgColorOverview_34"><Variable name="ColorRaisedDark"/></SetVariable>
+      <SetVariable name="BgColorOverview_SamPre"><Variable name="ColorRaisedDark"/></SetVariable>
+      <SetVariable name="BgColorWaveform_12"><Variable name="ColorBg"/></SetVariable>
+      <SetVariable name="BgColorWaveform_34"><Variable name="ColorBg"/></SetVariable>
       <SetVariable name="SignalColor_12">#c0c0c0</SetVariable>
       <SetVariable name="SignalColor_34">#c0c0c0</SetVariable>
 
@@ -211,30 +210,28 @@
       <SetVariable name="DimBrightThresholdWaveform">105</SetVariable>
       <SetVariable name="DimBrightThresholdHotcueBtn">105</SetVariable>
 
-      <SetVariable name="AxesColor">#6d6d6d</SetVariable>
-      <SetVariable name="BeatColor">#afafaf</SetVariable>
-      <SetVariable name="PlayPosColor">#fefefe</SetVariable>
-      <SetVariable name="CueColor">#448bf6</SetVariable>
-      <SetVariable name="LoopColor">#448bf6</SetVariable>
-      <SetVariable name="IntroOutroColor">#448bf6</SetVariable>
+      <SetVariable name="AxesColor"><Variable name="ColorTextDim"/></SetVariable>
+      <SetVariable name="BeatColor"><Variable name="ColorText"/></SetVariable>
+      <SetVariable name="PlayPosColor"><Variable name="ColorTextBright"/></SetVariable>
+      <SetVariable name="CueColor"><Variable name="ColorBlue"/></SetVariable>
+      <SetVariable name="LoopColor"><Variable name="ColorBlue"/></SetVariable>
+      <SetVariable name="IntroOutroColor"><Variable name="ColorBlue"/></SetVariable>
       <SetVariable name="PlayedOverlayColor">#cc181818</SetVariable>
-      <SetVariable name="EndOfTrackColor">#fa7242</SetVariable>
-      <SetVariable name="SlipBorderOutlineColor">#448bf6</SetVariable>
-      <SetVariable name="PassthroughLabelColor">#fa7242</SetVariable>
+      <SetVariable name="EndOfTrackColor"><Variable name="ColorDeckB"/></SetVariable>
+      <SetVariable name="SlipBorderOutlineColor"><Variable name="ColorBlue"/></SetVariable>
+      <SetVariable name="PassthroughLabelColor"><Variable name="ColorDeckB"/></SetVariable>
       <SetVariable name="OverviewFontSizeDeck">13</SetVariable>
       <SetVariable name="OverviewFontSizeDeckMini">11</SetVariable>
       <SetVariable name="OverviewFontSizeSampler">10</SetVariable>
       <SetVariable name="OverviewFontSizePreview">9</SetVariable>
 
-      <!-- Set the button icons used by templates in LateNight/controls/button...xml
+      <!-- Set the button icons used by templates in Nocturne/controls/button...xml
            There, those border icons are stacked on top of the additional icons set in css.
            Other buttons that use text (like vinyl controls and Fx assign button) are styled
            in css via
               border-width: 2px;
               border-image: url(skins:Nocturne/path/to/btn_icon.svg) 2 2 2 2;
-        Example themes: (in PaleMoon only the embedded style is used)
-        * elevated: domed buttons that stand out, with a 3D border and a drop shadow
-        * embedded: slightly domed buttons that seem leveled with surface and a surrounding groove
+        Only the "embedded" style (flat outline buttons) exists in Nocturne.
        -->
       <!-- Buttons in top-level containers like mixer, rate controls, collapsed FxUnits etc. -->
       <SetVariable name="TopRegion_BtnType">embedded</SetVariable>
@@ -251,14 +248,14 @@
       <SetVariable name="ArcThicknessBig">1.5</SetVariable>
       <SetVariable name="ArcRoundCaps">true</SetVariable>
       <!-- Arc Colors -->
-      <SetVariable name="ArcColorEq">#448bf6</SetVariable>
-      <SetVariable name="ArcColorGain">#448bf6</SetVariable>
-      <SetVariable name="ArcColorFx12Quick">#448bf6</SetVariable>
-      <SetVariable name="ArcColorFx34">#448bf6</SetVariable>
-      <SetVariable name="ArcColorFxParameter">#448bf6</SetVariable>
-      <SetVariable name="ArcColorGainLow">#448bf6</SetVariable>
-      <SetVariable name="ArcColorMstBal">#448bf6</SetVariable>
-      <SetVariable name="ArcColorFxMix">#448bf6</SetVariable>
+      <SetVariable name="ArcColorEq"><Variable name="ColorBlue"/></SetVariable>
+      <SetVariable name="ArcColorGain"><Variable name="ColorBlue"/></SetVariable>
+      <SetVariable name="ArcColorFx12Quick"><Variable name="ColorBlue"/></SetVariable>
+      <SetVariable name="ArcColorFx34"><Variable name="ColorBlue"/></SetVariable>
+      <SetVariable name="ArcColorFxParameter"><Variable name="ColorBlue"/></SetVariable>
+      <SetVariable name="ArcColorGainLow"><Variable name="ColorBlue"/></SetVariable>
+      <SetVariable name="ArcColorMstBal"><Variable name="ColorBlue"/></SetVariable>
+      <SetVariable name="ArcColorFxMix"><Variable name="ColorBlue"/></SetVariable>
       <!-- Knob pointers = suffix for indicator image url -->
       <SetVariable name="KnobColorEq">grey</SetVariable>
       <SetVariable name="KnobColorQuickEffect">grey</SetVariable>
@@ -270,10 +267,10 @@
       <SetVariable name="EqKillDotSize">9f,9f</SetVariable>
 
       <!-- Slider bar settings -->
-      <SetVariable name="BarBgColor">#323232</SetVariable>
-      <SetVariable name="BarColorVolume">#448bf6</SetVariable>
-      <SetVariable name="BarColorCrossfader">#448bf6</SetVariable>
-      <SetVariable name="BarColorPitch">#6d6d6d</SetVariable>
+      <SetVariable name="BarBgColor"><Variable name="ColorOutline"/></SetVariable>
+      <SetVariable name="BarColorVolume"><Variable name="ColorBlue"/></SetVariable>
+      <SetVariable name="BarColorCrossfader"><Variable name="ColorBlue"/></SetVariable>
+      <SetVariable name="BarColorPitch"><Variable name="ColorTextDim"/></SetVariable>
       <SetVariable name="BarWidth">2</SetVariable>
       <SetVariable name="BarMarginVolume">8,8</SetVariable>
       <SetVariable name="BarMarginPitch">7,8</SetVariable>

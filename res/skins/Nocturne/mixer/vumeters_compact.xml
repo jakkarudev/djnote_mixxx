@@ -1,7 +1,7 @@
 <Template>
   <SetVariable name="ChannelType">channel</SetVariable>
   <SetVariable name="VuSize">deck</SetVariable>
-  <SetVariable name="VuColor">light</SetVariable>
+  <SetVariable name="VuColor">_light</SetVariable>
 
   <WidgetGroup>
     <SizePolicy>min,min</SizePolicy>

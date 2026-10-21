@@ -1,4 +1,4 @@
-/* LateNight 2.3 // PaleMoon theme
+/* Nocturne skin styles
 
 * containers
   * colors, borders, background tiles
@@ -379,7 +379,7 @@ WTrackProperty[selected="true"],
   max-height: 3px;
 }
 
-/* Since the toolbar is dim in PaleMoon, we don't need an extra margin
+/* The toolbar is dark, so we don't need an extra margin
     in between mini decks and the toolbar. */
 #MiniDecksTopSpacer {
   min-height: 0px;
@@ -1281,7 +1281,7 @@ WEffectChainPresetSelector:!editable:on,
   WEffectSelector:!editable:on,
   #fadeModeCombobox:!editable,
   #fadeModeCombobox:!editable:on {
-    /* use slightly larger labels than in Classic */
+    /* slightly larger labels */
     font-size: 14px;
   }
   /* dim² ivory */
@@ -3374,6 +3374,14 @@ WPushButton#NocturneBtnFlat[pressed="true"],
 WPushButton#NocturneBtnCell[pressed="true"] {
   color: #fefefe;
   background-color: #3c3c3c;
+}
+/* selected loop size (beatloop_size), not necessarily looping */
+#NocturneLoopCell[highlight="1"] WPushButton#NocturneBtnCell {
+  color: #448bf6;
+  border-color: #448bf6;
+}
+#NocturneLoopCell[highlight="1"] WPushButton#NocturneBtnCell[displayValue="1"] {
+  color: #fefefe;
 }
 WPushButton#NocturneBtn[displayValue="1"],
 WPushButton#NocturneBtnFlat[displayValue="1"],

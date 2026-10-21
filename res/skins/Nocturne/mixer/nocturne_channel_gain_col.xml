@@ -134,16 +134,27 @@
 
       <WidgetGroup><Size>0min,3f</Size></WidgetGroup>
 
-      <!-- KEY (key shift) + key lock dot -->
-      <Template src="skins:Nocturne/mixer/nocturne_mix_knob.xml">
-        <SetVariable name="Control">pitch_adjust</SetVariable>
-        <SetVariable name="TooltipId">pitch_adjust</SetVariable>
-        <SetVariable name="Label">KEY</SetVariable>
-        <SetVariable name="DotGroup"><Variable name="Group"/></SetVariable>
-        <SetVariable name="DotControl">keylock</SetVariable>
-        <SetVariable name="DotTooltipId">keylock</SetVariable>
-        <SetVariable name="DotVisKey">[Nocturne],show_mixer</SetVariable>
-      </Template>
+      <!-- KEY (key shift), gated by the Key Controls setting. The key lock dot is kept hidden:
+           the deck's key lock button already does that. -->
+      <WidgetGroup>
+        <Layout>vertical</Layout>
+        <SizePolicy>min,min</SizePolicy>
+        <Children>
+          <Template src="skins:Nocturne/mixer/nocturne_mix_knob.xml">
+            <SetVariable name="Control">pitch_adjust</SetVariable>
+            <SetVariable name="TooltipId">pitch_adjust</SetVariable>
+            <SetVariable name="Label">KEY</SetVariable>
+            <SetVariable name="DotGroup"><Variable name="Group"/></SetVariable>
+            <SetVariable name="DotControl">keylock</SetVariable>
+            <SetVariable name="DotTooltipId">keylock</SetVariable>
+            <SetVariable name="DotVisKey">[Nocturne],show_key_lock_dot</SetVariable>
+          </Template>
+        </Children>
+        <Connection>
+          <ConfigKey persist="true">[Nocturne],show_key_controls</ConfigKey>
+          <BindProperty>visible</BindProperty>
+        </Connection>
+      </WidgetGroup>
 
       <WidgetGroup><Size>0min,0me</Size></WidgetGroup>
     </Children>

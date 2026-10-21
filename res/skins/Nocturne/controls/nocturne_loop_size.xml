@@ -1,10 +1,40 @@
-<!-- Nocturne loop size cell. Variables: Group, Size (e.g. 0.25), Text -->
+<!-- Nocturne loop size cell. Variables: Group, LoopSize (e.g. 0.25), Text.
+  Click toggles a loop of that size, lit (blue fill) while that loop plays. Independent of that,
+  the cell of the currently selected size (beatloop_size) gets [highlight="1"] (blue text/border). -->
 <Template>
-  <Template src="skins:Nocturne/controls/nocturne_btn_disp.xml">
-    <SetVariable name="TooltipId">beatloop_size</SetVariable>
-    <SetVariable name="ObjectName">NocturneBtnCell</SetVariable>
-    <SetVariable name="Size">21me,26f</SetVariable>
-    <SetVariable name="ConfigKey"><Variable name="Group"/>,beatloop_<Variable name="LoopSize"/>_toggle</SetVariable>
-    <SetVariable name="ConfigKeyDisp"><Variable name="Group"/>,beatloop_<Variable name="LoopSize"/>_enabled</SetVariable>
-  </Template>
+  <WidgetGroup>
+    <ObjectName>NocturneLoopCell</ObjectName>
+    <Layout>horizontal</Layout>
+    <Size>21me,26f</Size>
+    <Children>
+  <PushButton>
+    <TooltipId>beatloop_size</TooltipId>
+    <ObjectName>NocturneBtnCell</ObjectName>
+    <Size>21me,26f</Size>
+    <NumberStates>2</NumberStates>
+    <RightClickIsPushButton>false</RightClickIsPushButton>
+    <State>
+      <Number>0</Number>
+      <Text><Variable name="Text"/></Text>
+    </State>
+    <State>
+      <Number>1</Number>
+      <Text><Variable name="Text"/></Text>
+    </State>
+    <Connection>
+      <ConfigKey><Variable name="Group"/>,beatloop_<Variable name="LoopSize"/>_toggle</ConfigKey>
+      <ButtonState>LeftButton</ButtonState>
+    </Connection>
+    <Connection>
+      <ConfigKey><Variable name="Group"/>,beatloop_<Variable name="LoopSize"/>_enabled</ConfigKey>
+      <ConnectValueFromWidget>false</ConnectValueFromWidget>
+    </Connection>
+  </PushButton>
+    </Children>
+    <Connection>
+      <ConfigKey><Variable name="Group"/>,beatloop_size</ConfigKey>
+      <Transform><IsEqual><Variable name="LoopSize"/></IsEqual></Transform>
+      <BindProperty>highlight</BindProperty>
+    </Connection>
+  </WidgetGroup>
 </Template>

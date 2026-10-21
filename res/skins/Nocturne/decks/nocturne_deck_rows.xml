@@ -3,7 +3,7 @@ Description:
   Nocturne deck lower rows, Traktor style (ticket #77):
     transport row : play, CUE, CUP, FLX, REV | loop sizes < 1/4 .. 32 > | IN OUT loop
     hotcue row    : 8 slots (number + cue colour, right-click clears) + intro/outro cues
-    move/grid row : MOVE beatjump size + back/forward, GRID earlier/later/slower/faster
+    move/grid row : MOVE beatjump size + back/forward, GRID earlier/later/slower/faster (no SET)
   Styled by the "Nocturne: deck rows" block at the end of style_nocturne.qss.
 Variables:
   ChanNum
@@ -332,13 +332,6 @@ Variables:
                 <SetVariable name="Size">28,26f</SetVariable>
                 <SetVariable name="Text">+</SetVariable>
                 <SetVariable name="ConfigKey"><Variable name="Group"/>,beats_adjust_faster</SetVariable>
-              </Template>
-              <Template src="skins:Nocturne/controls/button_flat_text.xml">
-                <SetVariable name="TooltipId">beats_translate_curpos</SetVariable>
-                <SetVariable name="ObjectName">NocturneBtn</SetVariable>
-                <SetVariable name="Size">34,26f</SetVariable>
-                <SetVariable name="Text">SET</SetVariable>
-                <SetVariable name="ConfigKey"><Variable name="Group"/>,beats_translate_curpos</SetVariable>
               </Template>
 
             </Children>

@@ -27,7 +27,13 @@
         <Layout>horizontal</Layout>
         <Size>52f,12f</Size>
         <Children>
-          <WidgetGroup><Size>9f,0min</Size></WidgetGroup>
+          <WidgetGroup><!-- balances the dot, hidden together with it -->
+            <Size>9f,0min</Size>
+            <Connection>
+              <ConfigKey persist="true"><Variable name="DotVisKey"/></ConfigKey>
+              <BindProperty>visible</BindProperty>
+            </Connection>
+          </WidgetGroup>
           <WidgetGroup><Size>0me,0min</Size></WidgetGroup>
           <Label>
             <ObjectName>NocturneMixLabel</ObjectName>
