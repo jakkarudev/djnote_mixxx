@@ -172,11 +172,12 @@ void CoverLookup::slotTracksAdded(const QSet<TrackId>& trackIds) {
 bool CoverLookup::lookUpLibraryCover(const QString& location, Answer* pAnswer) {
     QSqlQuery query(m_pTrackCollection->database());
     query.prepare(QStringLiteral(
-            "SELECT library.%1,library.%2,library.%3,library.%4,"
-            "library.%5,library.%6,library.%7 "
-            "FROM library INNER JOIN track_locations "
-            "ON library.%8=track_locations.id "
-            "WHERE track_locations.%9=:location")
+            "SELECT " LIBRARY_TABLE ".%1," LIBRARY_TABLE ".%2," LIBRARY_TABLE
+            ".%3," LIBRARY_TABLE ".%4," LIBRARY_TABLE ".%5," LIBRARY_TABLE
+            ".%6," LIBRARY_TABLE ".%7 "
+            "FROM " LIBRARY_TABLE " INNER JOIN " TRACKLOCATIONS_TABLE
+            " ON " LIBRARY_TABLE ".%8=" TRACKLOCATIONS_TABLE ".%10 "
+            "WHERE " TRACKLOCATIONS_TABLE ".%9=:location")
                     .arg(LIBRARYTABLE_ID,
                             LIBRARYTABLE_COVERART_SOURCE,
                             LIBRARYTABLE_COVERART_TYPE,
@@ -185,7 +186,8 @@ bool CoverLookup::lookUpLibraryCover(const QString& location, Answer* pAnswer) {
                             LIBRARYTABLE_COVERART_DIGEST,
                             LIBRARYTABLE_COVERART_HASH,
                             LIBRARYTABLE_LOCATION,
-                            TRACKLOCATIONSTABLE_LOCATION));
+                            TRACKLOCATIONSTABLE_LOCATION,
+                            TRACKLOCATIONSTABLE_ID));
     query.bindValue(QStringLiteral(":location"), location);
     if (!query.exec()) {
         LOG_FAILED_QUERY(query);

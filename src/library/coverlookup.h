@@ -19,8 +19,8 @@ class CoverBatch;
 class TrackCollection;
 
 /// DJNote: answers the cover of a track by its location, for track lists
-/// whose rows are files rather than library tracks (Computer, Recording,
-/// later the external libraries).
+/// whose rows are files rather than library tracks (Computer, Recording and
+/// the external libraries).
 ///
 /// Showing a cover never adds a track to the library:
 ///  - A track in the library answers the library's cover (which the DJ may
