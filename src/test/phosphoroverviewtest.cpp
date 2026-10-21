@@ -191,4 +191,95 @@ TEST_F(PhosphorOverviewTest, ExtentIsTheOutermostNonEmptyRow) {
     EXPECT_EQ(31, overviewExtentRows(view));
 }
 
+// A loud master with varied columns, for the progressive drawing tests.
+struct LoudColumns {
+    std::vector<uint8_t> levels = std::vector<uint8_t>(kOverviewColumns * 3);
+    std::vector<uint8_t> density =
+            std::vector<uint8_t>(static_cast<size_t>(kOverviewColumns) * kOverviewRows);
+    LoudColumns() {
+        uint32_t seed = 1;
+        const auto next = [&seed] {
+            seed = seed * 1664525 + 1013904223;
+            return seed >> 24;
+        };
+        for (auto& v : levels) {
+            v = static_cast<uint8_t>(next());
+        }
+        for (int c = 0; c < kOverviewColumns; ++c) {
+            // Every 50th column digital silence, the rest a varied extent.
+            const bool silent = c % 50 == 0;
+            const int extent = silent ? 0 : 1 + static_cast<int>(next() % kOverviewCenterRow);
+            for (int r = kOverviewCenterRow - extent; r <= kOverviewCenterRow + extent - 1; ++r) {
+                density[static_cast<size_t>(c) * kOverviewRows + r] =
+                        static_cast<uint8_t>(1 + next() % 255);
+            }
+            if (silent) {
+                levels[c * 3] = levels[c * 3 + 1] = levels[c * 3 + 2] = 0;
+                density[static_cast<size_t>(c) * kOverviewRows + kOverviewCenterRow] = 255;
+            }
+        }
+    }
+    OverviewColumnsView view(int columnsDone) const {
+        OverviewColumnsView v;
+        v.levels = levels.data();
+        v.density = density.data();
+        v.samplesPerColumn = 6000;
+        v.columnsDone = columnsDone;
+        return v;
+    }
+};
+
+// Issue #84: drawn tick by tick as the analyzer progresses, the display image
+// is the one drawn at once.
+TEST_F(PhosphorOverviewTest, DrawColumnsProgressivelyMatchesTheFullImage) {
+    const LoudColumns loud;
+    const PhosphorOverviewSettings settings;
+    constexpr int kHeight = 2 * 255;
+    QImage image;
+    int drawn = 0;
+    for (int done : {19, 38, 700, 701, 1500, kOverviewColumns}) {
+        drawOverviewColumns(&image, loud.view(done), settings, kHeight, drawn);
+        drawn = done;
+        const QImage want = overviewDisplayImage(overviewImage(loud.view(done), settings, kHeight));
+        ASSERT_EQ(want.size(), image.size()) << done;
+        ASSERT_EQ(want.format(), image.format()) << done;
+        EXPECT_TRUE(want == image) << done;
+    }
+}
+
+// Issue #84: a tick draws only the new columns. Redrawing the columns already
+// drawn on every analyzer tick made the GUI thread drop frames.
+TEST_F(PhosphorOverviewTest, DrawColumnsLeavesTheColumnsAlreadyDrawn) {
+    const LoudColumns loud;
+    const PhosphorOverviewSettings settings;
+    constexpr int kHeight = 2 * 255;
+    QImage image;
+    drawOverviewColumns(&image, loud.view(1000), settings, kHeight, 0);
+    // Mark the columns already drawn; the next tick must not touch them.
+    constexpr QRgb kMark = 0x12345678;
+    for (int y = 0; y < kHeight; ++y) {
+        QRgb* line = reinterpret_cast<QRgb*>(image.scanLine(y));
+        std::fill(line, line + 1000, kMark);
+    }
+    drawOverviewColumns(&image, loud.view(1019), settings, kHeight, 1000);
+    const QImage want = overviewDisplayImage(overviewImage(loud.view(1019), settings, kHeight));
+    ASSERT_EQ(want.size(), image.size());
+    for (int y = 0; y < kHeight; ++y) {
+        const QRgb* got = reinterpret_cast<const QRgb*>(image.constScanLine(y));
+        const QRgb* ref = reinterpret_cast<const QRgb*>(want.constScanLine(y));
+        for (int x = 0; x < kOverviewColumns; ++x) {
+            ASSERT_EQ(x < 1000 ? kMark : ref[x], got[x]) << x << "," << y;
+        }
+    }
+}
+
+// A null or wrongly sized image is drawn in full, whatever the first column.
+TEST_F(PhosphorOverviewTest, DrawColumnsStartsOverOnANewImage) {
+    const LoudColumns loud;
+    const PhosphorOverviewSettings settings;
+    QImage image(10, 10, QImage::Format_ARGB32_Premultiplied);
+    drawOverviewColumns(&image, loud.view(800), settings, 100, 500);
+    EXPECT_TRUE(overviewDisplayImage(overviewImage(loud.view(800), settings, 100)) == image);
+}
+
 } // namespace
