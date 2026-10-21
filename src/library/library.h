@@ -18,7 +18,7 @@
 class AnalysisFeature;
 class BrowseFeature;
 class ControlObject;
-class CoverLookup;
+class CoverLookup; // DJNote
 class CrateFeature;
 class LibraryControl;
 class LibraryFeature;
@@ -170,7 +170,7 @@ class Library: public QObject {
 
     parented_ptr<SidebarModel> m_pSidebarModel;
     parented_ptr<LibraryControl> m_pLibraryControl;
-    parented_ptr<CoverLookup> m_pCoverLookup;
+    parented_ptr<CoverLookup> m_pCoverLookup; // DJNote
 
     QList<LibraryFeature*> m_features;
     const static QString m_sTrackViewName;

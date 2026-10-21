@@ -48,7 +48,7 @@ BrowseFeature::BrowseFeature(
           m_browseModel(this,
                   pLibrary->trackCollectionManager(),
                   pRecordingManager,
-                  pLibrary->coverLookup()),
+                  pLibrary->coverLookup()), // DJNote
           m_proxyModel(&m_browseModel, true),
           m_pSidebarModel(new FolderTreeModel(this)) {
     connect(&m_browseModel,

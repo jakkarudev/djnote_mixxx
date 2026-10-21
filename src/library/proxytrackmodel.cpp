@@ -148,9 +148,9 @@ QAbstractItemDelegate* ProxyTrackModel::delegateForColumn(const int i, QObject* 
     return m_pTrackModel ? m_pTrackModel->delegateForColumn(i, pParent) : nullptr;
 }
 
+// DJNote: columns map one to one, so the composed model's field indexes
+// hold here too (the cover delegate needs its column).
 int ProxyTrackModel::fieldIndex(const QString& fieldName) const {
-    // DJNote: columns map one to one, so the composed model's field indexes
-    // hold here too (the cover delegate needs its column).
     return m_pTrackModel ? m_pTrackModel->fieldIndex(fieldName) : -1;
 }
 

@@ -25,7 +25,7 @@ DlgRecording::DlgRecording(
           m_browseModel(this,
                   pLibrary->trackCollectionManager(),
                   pRecordingManager,
-                  pLibrary->coverLookup()),
+                  pLibrary->coverLookup()), // DJNote
           m_proxyModel(&m_browseModel, true),
           m_bytesRecordedStr("--"),
           m_durationRecordedStr("--:--"),
