@@ -1014,6 +1014,7 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/library/recording/recordingfeature.cpp
   src/library/rekordbox/rekordboxfeature.cpp
   src/library/rhythmbox/rhythmboxfeature.cpp
+  src/library/savedheaderstate.cpp
   src/library/scanner/importfilestask.cpp
   src/library/scanner/libraryscanner.cpp
   src/library/scanner/libraryscannerdlg.cpp
@@ -2183,6 +2184,7 @@ if(BUILD_TESTING)
     src/test/bpmcontrol_test.cpp
     src/test/broadcastprofile_test.cpp
     src/test/broadcastsettings_test.cpp
+    src/test/browsecovercolumn_test.cpp
     src/test/cache_test.cpp
     src/test/channelhandle_test.cpp
     src/test/chrono_clock_resolution_test.cpp

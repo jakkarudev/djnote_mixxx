@@ -16,7 +16,6 @@ class QAbstractItemDelegate;
 class QModelIndex;
 class QSortFilterProxyModel;
 class RecordingManager;
-class TrackModel;
 
 /// DJNote: the cover column of Computer (including Quick Links) and
 /// Recording, which share BrowseTableModel.
@@ -49,14 +48,15 @@ class BrowseCoverColumn : public QObject {
     /// to sort now; sorting by cover may first have to read covers.
     bool sortRequested(QSortFilterProxyModel* pProxy, int column, Qt::SortOrder order);
 
-    /// Header states saved before the cover column existed get it inserted
-    /// right after the preview column, visible, as in Tracks. Without this
-    /// the restored header would hide the new column.
-    static void addToSavedHeaderState(
-            TrackModel* pTrackModel,
-            int column,
-            int columnCount,
-            int width);
+    /// To call once the model has its header labels: the column's header
+    /// width and name, and its place in the saved header layout.
+    ///
+    /// The column comes after the upstream columns but is shown right after
+    /// the preview column, as in Tracks: in new layouts, and in layouts
+    /// saved before it existed or by earlier builds, which had it at 1.
+    /// A layout saved with it is restored by its name, wherever the DJ put
+    /// it, shown or hidden.
+    void addToHeader();
 
   private slots:
     void slotCoverInfoChanged(const QString& location);
@@ -69,6 +69,7 @@ class BrowseCoverColumn : public QObject {
     QStringList coverLocations() const;
     /// Writes every row's sort key, all at once.
     void writeSortKeys();
+    void addToSavedHeaderState(int width);
 
     BrowseTableModel* const m_pModel;
     const int m_column;

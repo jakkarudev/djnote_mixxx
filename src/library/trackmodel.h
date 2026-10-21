@@ -10,6 +10,8 @@
 #include "track/track_decl.h"
 #include "track/trackref.h"
 
+class QSortFilterProxyModel; // DJNote
+
 /// Pure virtual (abstract) class that provides an interface for data models
 /// which display track lists.
 class TrackModel {
@@ -238,6 +240,17 @@ class TrackModel {
     virtual int fieldIndex(const QString& fieldName) const {
         Q_UNUSED(fieldName);
         return -1;
+    }
+
+    /// DJNote: asked by the sort proxy in front of the model (`pProxy`)
+    /// before it sorts the rows by `column` in `order`. Returning false keeps
+    /// the current order, e.g. while the covers of a cover sort are read.
+    virtual bool prepareProxySort(
+            QSortFilterProxyModel* pProxy, int column, Qt::SortOrder order) {
+        Q_UNUSED(pProxy);
+        Q_UNUSED(column);
+        Q_UNUSED(order);
+        return true;
     }
 
     virtual void select() {

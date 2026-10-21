@@ -1,22 +1,28 @@
 #include "library/browse/browsecovercolumn.h"
 
+#include <QApplication>
 #include <QDir>
 #include <QSignalBlocker>
 #include <QSortFilterProxyModel>
+#include <QStyle>
 
 #include "library/browse/browsetablemodel.h"
+#include "library/columncache.h"
 #include "library/covercolumnsort.h"
 #include "library/coverlookup.h"
+#include "library/dao/trackschema.h"
+#include "library/savedheaderstate.h"
 #include "library/tabledelegates/coverartdelegate.h"
 #include "moc_browsecovercolumn.cpp"
-#include "proto/headers.pb.h"
 #include "recording/recordingmanager.h"
 #include "widget/wlibrarytableview.h"
 
 namespace {
 
-// Same setting as WTrackTableViewHeader.
-const QString kHeaderStateSetting = QStringLiteral("header_state_pb");
+// Earlier builds had the cover column at 1, right after Preview, and the
+// upstream columns from Filename on one to the right.
+constexpr int kEarlierBuildsCoverColumn = 1;
+constexpr int kEarlierBuildsColumnCount = 22;
 
 } // namespace
 
@@ -191,59 +197,57 @@ void BrowseCoverColumn::slotCoverInfoChanged(const QString& location) {
     emit m_pModel->dataChanged(index, index);
 }
 
-// static
-void BrowseCoverColumn::addToSavedHeaderState(
-        TrackModel* pTrackModel,
-        int column,
-        int columnCount,
-        int width) {
-    const QString saved = pTrackModel->getModelSetting(kHeaderStateSetting);
-    if (saved.isEmpty()) {
-        // Nothing saved yet: the default header shows the column.
-        return;
-    }
-    const QByteArray array = QByteArray::fromBase64(saved.toLatin1());
-    mixxx::library::HeaderViewState state;
-    if (!state.ParseFromArray(array.constData(), static_cast<int>(array.size()))) {
-        return;
-    }
-    const int savedColumnCount = state.header_state_size();
-    if (savedColumnCount != columnCount - 1) {
-        // Already has the cover column, or a layout we don't know.
-        return;
-    }
+void BrowseCoverColumn::addToHeader() {
+    // Same default width as the cover column in Tracks.
+    const int width = ColumnCache::defaultColumnWidth() / 2;
+    m_pModel->setHeaderData(m_column, Qt::Horizontal, width, TrackModel::kHeaderWidthRole);
+    // The header restores a named column by its name, the others (unnamed in
+    // Computer) by their index.
+    m_pModel->setHeaderData(m_column,
+            Qt::Horizontal,
+            LIBRARYTABLE_COVERART,
+            TrackModel::kHeaderNameRole);
+    addToSavedHeaderState(width);
+}
 
-    // Columns from the cover column on moved one to the right, and the
-    // cover column goes right after the column before it (Preview).
-    int coverVisualIndex = savedColumnCount;
-    for (int vi = 0; vi < savedColumnCount; ++vi) {
-        auto* pHeader = state.mutable_header_state(vi);
-        if (pHeader->logical_index() == column - 1) {
-            coverVisualIndex = vi + 1;
-        } else if (pHeader->logical_index() >= column) {
-            pHeader->set_logical_index(pHeader->logical_index() + 1);
+void BrowseCoverColumn::addToSavedHeaderState(int width) {
+    SavedHeaderState header(m_pModel);
+    if (header.visualIndexOfName(LIBRARYTABLE_COVERART) >= 0) {
+        // Saved with the cover column, shown or hidden by the DJ.
+        return;
+    }
+    if (!header.isSaved()) {
+        // Nothing saved yet: the header as Mixxx shows it by default, which
+        // hides some columns but lists all of them in the model's order.
+        const int defaultWidth = QApplication::style()->pixelMetric(
+                QStyle::PM_HeaderDefaultSectionSizeHorizontal);
+        for (int column = 0; column < m_pModel->columnCount(); ++column) {
+            if (column == m_column) {
+                continue;
+            }
+            const int columnWidth =
+                    m_pModel->headerData(column, Qt::Horizontal, TrackModel::kHeaderWidthRole)
+                            .toInt();
+            header.appendColumn(column,
+                    columnWidth > 0 ? columnWidth : defaultWidth,
+                    m_pModel->isColumnHiddenByDefault(column));
         }
+    } else if (header.columnCount() == kEarlierBuildsColumnCount) {
+        // Saved by an earlier build: the same layout with the columns'
+        // current indexes.
+        header.moveColumn(kEarlierBuildsCoverColumn, m_column);
+        header.setName(header.visualIndexOfLogicalIndex(m_column), LIBRARYTABLE_COVERART);
+        header.save();
+        return;
+    } else if (header.columnCount() > m_column) {
+        // A layout we don't know.
+        return;
     }
-    auto* pCoverHeader = state.add_header_state();
-    pCoverHeader->set_hidden(false);
-    pCoverHeader->set_size(width);
-    pCoverHeader->set_logical_index(column);
-    for (int vi = savedColumnCount; vi > coverVisualIndex; --vi) {
-        state.mutable_header_state()->SwapElements(vi, vi - 1);
-    }
-    for (int vi = 0; vi < state.header_state_size(); ++vi) {
-        state.mutable_header_state(vi)->set_visual_index(vi);
-    }
-    if (state.sort_indicator_shown() && state.sort_indicator_section() >= column) {
-        state.set_sort_indicator_section(state.sort_indicator_section() + 1);
-    }
-
-#if GOOGLE_PROTOBUF_VERSION >= 3001000
-    const int size = static_cast<int>(state.ByteSizeLong());
-#else
-    const int size = state.ByteSize();
-#endif
-    QByteArray migrated(size, '\0');
-    state.SerializeToArray(migrated.data(), size);
-    pTrackModel->setModelSetting(kHeaderStateSetting, QString(migrated.toBase64()));
+    // Saved before the cover column existed (or nothing saved): add it right
+    // after Preview.
+    header.insertColumn(header.visualIndexOfLogicalIndex(COLUMN_PREVIEW) + 1,
+            m_column,
+            width,
+            LIBRARYTABLE_COVERART);
+    header.save();
 }

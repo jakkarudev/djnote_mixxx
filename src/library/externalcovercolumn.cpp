@@ -8,15 +8,12 @@
 #include "library/coverlookup.h"
 #include "library/dao/trackschema.h"
 #include "library/queryutil.h"
+#include "library/savedheaderstate.h"
 #include "moc_externalcovercolumn.cpp"
-#include "proto/headers.pb.h"
 #include "util/assert.h"
 #include "util/db/sqltransaction.h"
 
 namespace {
-
-// Same setting as WTrackTableViewHeader.
-const QString kHeaderStateSetting = QStringLiteral("header_state_pb");
 
 // Session-only (temporary) table: track location -> cover sort key
 // (CoverColumnSort::sortKey(), empty for no cover).
@@ -269,61 +266,25 @@ void ExternalCoverColumn::addToSavedHeaderState() {
     VERIFY_OR_DEBUG_ASSERT(column >= 0) {
         return;
     }
-    const QString saved = m_pModel->getModelSetting(kHeaderStateSetting);
-    if (saved.isEmpty()) {
+    SavedHeaderState header(m_pModel);
+    if (!header.isSaved()) {
         // Nothing saved yet: the default header shows the column.
         return;
     }
-    const QByteArray array = QByteArray::fromBase64(saved.toLatin1());
-    mixxx::library::HeaderViewState state;
-    if (!state.ParseFromArray(array.constData(), static_cast<int>(array.size()))) {
+    if (header.visualIndexOfName(LIBRARYTABLE_COVERART) >= 0) {
+        // Already has the column, shown or hidden by the DJ.
         return;
     }
-    // The header restores columns by name.
-    const std::string coverName = LIBRARYTABLE_COVERART.toStdString();
-    const std::string previewName = LIBRARYTABLE_PREVIEW.toStdString();
-    const int savedColumnCount = state.header_state_size();
-    int coverVisualIndex = -1;
-    for (int vi = 0; vi < savedColumnCount; ++vi) {
-        const auto& header = state.header_state(vi);
-        if (header.column_name() == coverName) {
-            // Already has the column, shown or hidden by the DJ.
-            return;
-        }
-        if (header.column_name() == previewName) {
-            coverVisualIndex = vi + 1;
-        }
-    }
-    if (coverVisualIndex < 0) {
+    // The header restores these columns by name.
+    const int previewVisualIndex = header.visualIndexOfName(LIBRARYTABLE_PREVIEW);
+    if (previewVisualIndex < 0) {
         // A layout we don't know.
         return;
     }
-
-    // Columns from the cover column on moved one to the right.
-    for (int vi = 0; vi < savedColumnCount; ++vi) {
-        auto* pHeader = state.mutable_header_state(vi);
-        if (pHeader->logical_index() >= column) {
-            pHeader->set_logical_index(pHeader->logical_index() + 1);
-        }
-    }
-    auto* pCoverHeader = state.add_header_state();
-    pCoverHeader->set_hidden(false);
-    pCoverHeader->set_size(
+    header.insertColumn(previewVisualIndex + 1,
+            column,
             m_pModel->headerData(column, Qt::Horizontal, TrackModel::kHeaderWidthRole)
-                    .toInt());
-    pCoverHeader->set_logical_index(column);
-    pCoverHeader->set_column_name(coverName);
-    for (int vi = savedColumnCount; vi > coverVisualIndex; --vi) {
-        state.mutable_header_state()->SwapElements(vi, vi - 1);
-    }
-    for (int vi = 0; vi < state.header_state_size(); ++vi) {
-        state.mutable_header_state(vi)->set_visual_index(vi);
-    }
-    if (state.sort_indicator_shown() && state.sort_indicator_section() >= column) {
-        state.set_sort_indicator_section(state.sort_indicator_section() + 1);
-    }
-
-    const std::string bytes = state.SerializeAsString();
-    m_pModel->setModelSetting(kHeaderStateSetting,
-            QString(QByteArray(bytes.data(), static_cast<int>(bytes.size())).toBase64()));
+                    .toInt(),
+            LIBRARYTABLE_COVERART);
+    header.save();
 }

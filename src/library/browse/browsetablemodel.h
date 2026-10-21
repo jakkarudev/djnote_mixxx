@@ -6,36 +6,39 @@
 #include "library/browse/browsethread.h"
 
 //constants
-// DJNote: the cover column sits right after Preview, as in Tracks.
 constexpr int COLUMN_PREVIEW = 0;
-constexpr int COLUMN_COVERART = 1;
-constexpr int COLUMN_FILENAME = 2;
-constexpr int COLUMN_ARTIST = 3;
-constexpr int COLUMN_TITLE = 4;
-constexpr int COLUMN_ALBUM = 5;
-constexpr int COLUMN_TRACK_NUMBER = 6;
-constexpr int COLUMN_YEAR = 7;
-constexpr int COLUMN_GENRE = 8;
-constexpr int COLUMN_COMPOSER = 9;
-constexpr int COLUMN_COMMENT = 10;
-constexpr int COLUMN_DURATION = 11;
-constexpr int COLUMN_BPM = 12;
-constexpr int COLUMN_KEY = 13;
-constexpr int COLUMN_TYPE = 14;
-constexpr int COLUMN_BITRATE = 15;
-constexpr int COLUMN_NATIVELOCATION = 16;
-constexpr int COLUMN_ALBUMARTIST = 17;
-constexpr int COLUMN_GROUPING = 18;
-constexpr int COLUMN_FILE_MODIFIED_TIME = 19;
-constexpr int COLUMN_FILE_CREATION_TIME = 20;
-constexpr int COLUMN_REPLAYGAIN = 21;
-constexpr int NUM_COLUMNS = 22;
+constexpr int COLUMN_FILENAME = 1;
+constexpr int COLUMN_ARTIST = 2;
+constexpr int COLUMN_TITLE = 3;
+constexpr int COLUMN_ALBUM = 4;
+constexpr int COLUMN_TRACK_NUMBER = 5;
+constexpr int COLUMN_YEAR = 6;
+constexpr int COLUMN_GENRE = 7;
+constexpr int COLUMN_COMPOSER = 8;
+constexpr int COLUMN_COMMENT = 9;
+constexpr int COLUMN_DURATION = 10;
+constexpr int COLUMN_BPM = 11;
+constexpr int COLUMN_KEY = 12;
+constexpr int COLUMN_TYPE = 13;
+constexpr int COLUMN_BITRATE = 14;
+constexpr int COLUMN_NATIVELOCATION = 15;
+constexpr int COLUMN_ALBUMARTIST = 16;
+constexpr int COLUMN_GROUPING = 17;
+constexpr int COLUMN_FILE_MODIFIED_TIME = 18;
+constexpr int COLUMN_FILE_CREATION_TIME = 19;
+constexpr int COLUMN_REPLAYGAIN = 20;
+constexpr int NUM_COLUMNS = 21;
+// DJNote: the cover column, after the upstream columns (NUM_COLUMNS counts
+// those). The header shows it right after Preview, as in Tracks.
+constexpr int COLUMN_COVERART = NUM_COLUMNS;
 
+// DJNote
 class BrowseCoverColumn;
 class CoverLookup;
+class QSortFilterProxyModel;
+
 class TrackCollectionManager;
 class QMimeData;
-class QSortFilterProxyModel;
 class RecordingManager;
 
 namespace mixxx {
@@ -58,7 +61,7 @@ class BrowseTableModel final : public QStandardItemModel, public virtual TrackMo
     BrowseTableModel(QObject* parent,
             TrackCollectionManager* pTrackCollectionManager,
             RecordingManager* pRec,
-            CoverLookup* pCoverLookup);
+            CoverLookup* pCoverLookup); // DJNote: pCoverLookup
     virtual ~BrowseTableModel();
 
     // initiate table population, store path
@@ -98,11 +101,11 @@ class BrowseTableModel final : public QStandardItemModel, public virtual TrackMo
     TrackModel::SortColumnId sortColumnIdFromColumnIndex(int index) const override;
     int columnIndexFromSortColumnId(TrackModel::SortColumnId sortColumn) const override;
     QString modelKey(bool noSearch) const override;
-    int fieldIndex(const QString& fieldName) const override;
-
-    /// DJNote: called when `pProxy` is asked to sort. Returns whether to
-    /// sort now; the cover column first reads the covers not known yet.
-    bool prepareSort(QSortFilterProxyModel* pProxy, int column, Qt::SortOrder order);
+    int fieldIndex(const QString& fieldName) const override; // DJNote
+    // DJNote: the cover column first reads the covers not known yet.
+    bool prepareProxySort(QSortFilterProxyModel* pProxy,
+            int column,
+            Qt::SortOrder order) override;
 
     bool updateTrackGenre(
             Track* pTrack,
@@ -134,6 +137,6 @@ class BrowseTableModel final : public QStandardItemModel, public virtual TrackMo
     QString m_previewDeckGroup;
     int m_columnIndexBySortColumnId[static_cast<int>(TrackModel::SortColumnId::IdMax)];
     QMap<int, TrackModel::SortColumnId> m_sortColumnIdByColumnIndex;
-    BrowseCoverColumn* m_pCoverColumn;
+    BrowseCoverColumn* m_pCoverColumn; // DJNote
 
 };
