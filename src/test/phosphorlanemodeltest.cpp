@@ -210,11 +210,12 @@ TEST(PhosphorLaneModelPlainTest, FramesPerColumnUsesBarsAndFallsBackToBpm120) {
 TEST(PhosphorLaneModelPlainTest, PixelsPerBarFollowTheZoomValue) {
     EXPECT_NEAR(217.4, pxPerBarForZoom(4.0), 1e-9);
     EXPECT_NEAR(86.96, pxPerBarForZoom(10.0), 1e-9);
+    EXPECT_NEAR(43.48, pxPerBarForZoom(20.0), 1e-9);
     EXPECT_NEAR(869.6, pxPerBarForZoom(1.0), 1e-9);
 }
 
-TEST(PhosphorLaneModelPlainTest, ZoomedOutLimitIsTenAndDeepestIsAboutOneFramePerColumn) {
-    EXPECT_DOUBLE_EQ(10.0, kPhosphorMaxZoom);
+TEST(PhosphorLaneModelPlainTest, ZoomedOutLimitIsTwentyAndDeepestIsAboutOneFramePerColumn) {
+    EXPECT_DOUBLE_EQ(20.0, kPhosphorMaxZoom);
     // 120 BPM (the fallback) at 44.1 kHz: the deepest zoom is at most one
     // audio frame per physical column, and not absurdly deeper.
     const double fpc = framesPerColumn(44100, pxPerBarForZoom(kPhosphorMinZoom), 0.0);
@@ -238,6 +239,24 @@ TEST(PhosphorLaneModelPlainTest, ZoomButtonsAreInverseBelowOne) {
     EXPECT_DOUBLE_EQ(2.0, zoomUpFrom(1.0));
     EXPECT_DOUBLE_EQ(5.0, zoomUpFrom(4.0));
     for (const double z : {2.0, 1.0, 0.5, 0.25, 0.0625, 0.01}) {
+        EXPECT_DOUBLE_EQ(z, zoomUpFrom(zoomDownFrom(z))) << z;
+    }
+}
+
+TEST(PhosphorLaneModelPlainTest, ZoomButtonsStopAtTheLimitAboveTen) {
+    // Between 1 and 10 the buttons step by 1; from 10 up they jump to the
+    // limit (20) and back.
+    EXPECT_DOUBLE_EQ(10.0, zoomUpFrom(9.0));
+    EXPECT_DOUBLE_EQ(20.0, zoomUpFrom(10.0));
+    EXPECT_DOUBLE_EQ(10.0, zoomDownFrom(20.0));
+    EXPECT_DOUBLE_EQ(9.0, zoomDownFrom(10.0));
+    // Off the ladder, down snaps to 10 (like up snaps to 1 below 1) and up to
+    // the limit.
+    EXPECT_DOUBLE_EQ(10.0, zoomDownFrom(13.0));
+    EXPECT_DOUBLE_EQ(20.0, zoomUpFrom(13.0));
+    // Up at the limit stays there.
+    EXPECT_DOUBLE_EQ(kPhosphorMaxZoom, zoomUpFrom(kPhosphorMaxZoom));
+    for (const double z : {9.0, 10.0, 20.0}) {
         EXPECT_DOUBLE_EQ(z, zoomUpFrom(zoomDownFrom(z))) << z;
     }
 }

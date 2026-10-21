@@ -1,6 +1,7 @@
 #include "waveform/scrollinglinelayout.h"
 
 #include <cmath>
+#include <limits>
 #include <utility>
 
 #include "util/assert.h"
@@ -40,6 +41,23 @@ void addSteps(std::vector<Line>* pLines,
         line.color = settings.stepColor.value_or(skinColor);
         pLines->push_back(line);
     }
+}
+
+// The on-screen distance from the beat at 'it' to its neighbour: the next
+// beat, or the previous one for the last beat of the grid.
+double beatSpacingPxAt(const Beats& beats,
+        Beats::ConstIterator it,
+        const std::function<double(audio::FramePos)>& frameToX) {
+    auto neighbour = it;
+    ++neighbour;
+    if (neighbour == beats.cend()) {
+        neighbour = it;
+        if (neighbour == beats.cbegin()) {
+            return std::numeric_limits<double>::infinity();
+        }
+        --neighbour;
+    }
+    return std::abs(frameToX(*neighbour) - frameToX(*it));
 }
 
 } // namespace
@@ -84,7 +102,11 @@ std::vector<Line> layoutLines(const Beats* pBeats,
             line.widthPx = settings.beatWidth.px();
             line.color = settings.beatColor.value_or(skinColor);
         }
-        if (line.opacityPercent > 0) {
+        // Too dense to read when zoomed far out: only the bar lines stay. The
+        // steps of the beat's interval are still up to addSteps().
+        const bool tooDense = settings.enabled && line.kind == LineKind::Beat &&
+                beatSpacingPxAt(*pBeats, it, frameToX) < settings.beatMinSpacing.px();
+        if (line.opacityPercent > 0 && !tooDense) {
             lines.push_back(line);
         }
         if (showSteps) {

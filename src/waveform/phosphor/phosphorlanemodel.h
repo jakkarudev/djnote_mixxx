@@ -15,17 +15,24 @@ namespace mixxx::phosphor {
 constexpr double kFallbackBpm = 120.0;
 
 /// Zoom, like Traktor's: the deck's zoom control value z gives 869.6 / z
-/// pixels per bar (z = 4 is 217.4). Zoomed out at z = 10, as in Mixxx; zoomed
-/// in until a column is under one audio frame (about one frame at 120 BPM).
+/// pixels per bar (z = 4 is 217.4). Zoomed out at z = 20 (43.5 px per bar);
+/// zoomed in until a column is under one audio frame (about one frame at 120
+/// BPM).
 constexpr double kPhosphorMinZoom = 0.005;
-constexpr double kPhosphorMaxZoom = 10.0;
+constexpr double kPhosphorMaxZoom = 20.0;
+/// The zoom up to which the buttons step by 1 (from 1); above it they double
+/// and halve.
+constexpr double kPhosphorStepMaxZoom = 10.0;
 /// The mouse wheel step of this type (the other types use 1.05).
 constexpr double kPhosphorWheelStep = 1.15;
 
 double pxPerBarForZoom(double zoom);
 
-/// What the zoom out (up) and zoom in (down) buttons do: from 1 on they step
-/// by 1, below 1 they double (up, stopping at 1) and halve (down).
+/// What the zoom out (up) and zoom in (down) buttons do: from 1 to
+/// kPhosphorStepMaxZoom they step by 1. Below 1 they double (up, stopping at 1)
+/// and halve (down). Above kPhosphorStepMaxZoom they double (up, stopping at
+/// kPhosphorMaxZoom) and halve (down, stopping at kPhosphorStepMaxZoom); with
+/// limits of 10 and 20, a zoom of 13 goes up to 20 and down to 10.
 double zoomDownFrom(double zoom);
 double zoomUpFrom(double zoom);
 

@@ -107,6 +107,7 @@ TEST_F(ScrollingLineSettingsTest, EmptyConfigYieldsStepDefaults) {
     const LineSettings loaded = loadLineSettings(config());
     EXPECT_FALSE(loaded.stepsEnabled);
     EXPECT_EQ(8, loaded.stepMinSpacing.px());
+    EXPECT_EQ(12, loaded.beatMinSpacing.px());
     EXPECT_EQ(45, loaded.stepOpacity.percent());
     EXPECT_EQ(1, loaded.stepWidth.px());
     EXPECT_FALSE(loaded.stepColor.has_value());
@@ -146,4 +147,15 @@ TEST_F(ScrollingLineSettingsTest, OutOfRangeStepValuesAreClamped) {
     setInt(QStringLiteral("scrollingStepLineMinSpacing"), 99);
     loaded = loadLineSettings(config());
     EXPECT_EQ(30, loaded.stepMinSpacing.px());
+}
+
+TEST_F(ScrollingLineSettingsTest, BeatMinSpacingRoundTripsAndIsClamped) {
+    LineSettings saved;
+    saved.beatMinSpacing = BeatSpacingPx(17);
+    saveLineSettings(config(), saved);
+    EXPECT_EQ(17, loadLineSettings(config()).beatMinSpacing.px());
+    setInt(QStringLiteral("scrollingBeatLineMinSpacing"), 0);
+    EXPECT_EQ(1, loadLineSettings(config()).beatMinSpacing.px());
+    setInt(QStringLiteral("scrollingBeatLineMinSpacing"), 99);
+    EXPECT_EQ(30, loadLineSettings(config()).beatMinSpacing.px());
 }

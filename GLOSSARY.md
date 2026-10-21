@@ -65,7 +65,7 @@ Preferences that decide whether the deck's gain (the gain knob and ReplayGain), 
 _Avoid_: Traktor mode, Mixxx mode
 
 **Beat line** / **Bar line** / **Phrase line**:
-A vertical line drawn on a waveform at the start of a beat, bar or phrase. They are drawn from the beat grid but are not the beat grid.
+A vertical line drawn on a waveform at the start of a beat, bar or phrase. They are drawn from the beat grid but are not the beat grid. On a scrolling waveform zoomed out so far that beats crowd together, the beat lines are hidden and the bar lines remain.
 _Avoid_: bar grid, phrase grid, grid lines
 
 **Step line**:

@@ -903,9 +903,9 @@ void BaseTrackPlayerImpl::setupEqControls() {
 }
 
 void BaseTrackPlayerImpl::slotWaveformZoomValueChangeRequest(double v) {
-    // The widest range of any waveform type (Phosphor zooms deeper); the
-    // waveform widget clamps to the range of its own type.
-    if (v <= WaveformWidgetRenderer::s_waveformMaxZoom
+    // The widest range of any waveform type (Phosphor zooms deeper and
+    // further out); the waveform widget clamps to the range of its own type.
+    if (v <= mixxx::phosphor::kPhosphorMaxZoom
             && v >= mixxx::phosphor::kPhosphorMinZoom) {
         m_pWaveformZoom->setAndConfirm(v);
     }

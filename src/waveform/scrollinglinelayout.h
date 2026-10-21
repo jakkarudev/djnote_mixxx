@@ -69,6 +69,26 @@ class StepSpacingPx {
     int m_px;
 };
 
+// The minimum on-screen distance between adjacent beats for the beat lines
+// (not the bar lines) to be drawn, in pixels. Always within 1..30: out-of-range
+// values are clamped on construction. 1 effectively never hides them.
+class BeatSpacingPx {
+  public:
+    static constexpr int kMin = 1;
+    static constexpr int kMax = 30;
+    static constexpr int kDefault = 12;
+
+    constexpr explicit BeatSpacingPx(int px = kDefault)
+            : m_px(std::clamp(px, kMin, kMax)) {
+    }
+    constexpr int px() const {
+        return m_px;
+    }
+
+  private:
+    int m_px;
+};
+
 struct LineSettings {
     static constexpr int kDefaultBarOpacity = 100;
     static constexpr int kDefaultBeatOpacity = 80;
@@ -87,6 +107,9 @@ struct LineSettings {
     // A custom colour, or none for the skin's beat colour.
     std::optional<QColor> barColor;
     std::optional<QColor> beatColor;
+    // Beat lines closer than this on screen are not drawn (bar lines always
+    // are), so zoomed far out they do not make a wash.
+    BeatSpacingPx beatMinSpacing;
 
     // Step lines: three per beat, at a quarter, half and three quarters of
     // the frame gap between two beats of the grid. Between two beats they are

@@ -93,11 +93,17 @@ double visualSamplePerPixelForZoom(double zoom, double bpm) {
 }
 
 double zoomDownFrom(double zoom) {
+    if (zoom > kPhosphorStepMaxZoom) {
+        return std::max(zoom / 2.0, kPhosphorStepMaxZoom);
+    }
     return zoom - 1.0 >= 1.0 ? zoom - 1.0 : zoom / 2.0;
 }
 
 double zoomUpFrom(double zoom) {
-    return zoom < 1.0 ? std::min(zoom * 2.0, 1.0) : zoom + 1.0;
+    if (zoom < 1.0) {
+        return std::min(zoom * 2.0, 1.0);
+    }
+    return zoom >= kPhosphorStepMaxZoom ? std::min(zoom * 2.0, kPhosphorMaxZoom) : zoom + 1.0;
 }
 
 double framesPerColumn(double sampleRate, double pxPerBar, double bpm) {

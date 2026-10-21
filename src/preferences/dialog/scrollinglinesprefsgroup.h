@@ -81,6 +81,7 @@ class ScrollingLinesPrefsGroup : public QGroupBox {
     OpacityControls m_beatOpacity;
     QSpinBox* m_pBarWidthSpinBox = nullptr;
     QSpinBox* m_pBeatWidthSpinBox = nullptr;
+    QSpinBox* m_pBeatMinSpacingSpinBox = nullptr;
     ColorControls m_barColor;
     ColorControls m_beatColor;
     QCheckBox* m_pStepsEnabledCheckBox = nullptr;

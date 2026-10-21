@@ -17,6 +17,8 @@ const ConfigKey kBeatWidthCfgKey(kWaveformGroup, QStringLiteral("scrollingBeatLi
 // "#rrggbb", or empty for the skin's beat colour.
 const ConfigKey kBarColorCfgKey(kWaveformGroup, QStringLiteral("scrollingBarLineColor"));
 const ConfigKey kBeatColorCfgKey(kWaveformGroup, QStringLiteral("scrollingBeatLineColor"));
+const ConfigKey kBeatMinSpacingCfgKey(
+        kWaveformGroup, QStringLiteral("scrollingBeatLineMinSpacing"));
 const ConfigKey kStepsEnabledCfgKey(kWaveformGroup, QStringLiteral("scrollingStepLinesEnabled"));
 const ConfigKey kStepMinSpacingCfgKey(
         kWaveformGroup, QStringLiteral("scrollingStepLineMinSpacing"));
@@ -51,6 +53,8 @@ LineSettings loadLineSettings(const UserSettingsPointer& pConfig) {
     settings.beatWidth = LineWidthPx(pConfig->getValue(kBeatWidthCfgKey, settings.beatWidth.px()));
     settings.barColor = loadColor(pConfig, kBarColorCfgKey);
     settings.beatColor = loadColor(pConfig, kBeatColorCfgKey);
+    settings.beatMinSpacing = BeatSpacingPx(
+            pConfig->getValue(kBeatMinSpacingCfgKey, settings.beatMinSpacing.px()));
     settings.stepsEnabled = pConfig->getValue(kStepsEnabledCfgKey, settings.stepsEnabled);
     settings.stepMinSpacing = StepSpacingPx(
             pConfig->getValue(kStepMinSpacingCfgKey, settings.stepMinSpacing.px()));
@@ -69,6 +73,7 @@ void saveLineSettings(const UserSettingsPointer& pConfig, const LineSettings& se
     pConfig->setValue(kBeatWidthCfgKey, settings.beatWidth.px());
     saveColor(pConfig, kBarColorCfgKey, settings.barColor);
     saveColor(pConfig, kBeatColorCfgKey, settings.beatColor);
+    pConfig->setValue(kBeatMinSpacingCfgKey, settings.beatMinSpacing.px());
     pConfig->setValue(kStepsEnabledCfgKey, settings.stepsEnabled);
     pConfig->setValue(kStepMinSpacingCfgKey, settings.stepMinSpacing.px());
     pConfig->setValue(kStepOpacityCfgKey, settings.stepOpacity.percent());

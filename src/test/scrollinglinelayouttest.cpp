@@ -491,3 +491,123 @@ TEST(ScrollingLineBatchesTest, BatchColourCarriesTheOpacity) {
     EXPECT_EQ(50, batches[0].color.blue());
     EXPECT_NEAR(0.4, batches[0].color.alphaF(), 0.01);
 }
+
+namespace {
+
+// 1 px per 'framesPerPx' frames, as a zoomed-out view would map.
+std::vector<Line> linesAtScale(const Beats& beats,
+        double framesPerPx,
+        const LineSettings& settings,
+        double endFrame = 8 * kBeatFrames) {
+    return layoutLines(&beats,
+            audio::FramePos(0),
+            audio::FramePos(endFrame),
+            [framesPerPx](audio::FramePos pos) { return pos.value() / framesPerPx; },
+            settings,
+            90,
+            kSkinColor);
+}
+
+} // namespace
+
+TEST(ScrollingLineLayoutTest, BeatLinesAreHiddenBelowTheMinimumSpacingButBarLinesStay) {
+    const Beats beats = constBeats(0);
+    // 11 px per beat, below the default 12: beats hidden, the bar lines
+    // (every 4th beat) stay.
+    const auto dense = linesAtScale(beats, kBeatFrames / 11.0, LineSettings());
+    ASSERT_EQ(3u, dense.size()); // beats 0, 4, 8
+    for (const Line& line : dense) {
+        EXPECT_EQ(LineKind::Bar, line.kind);
+    }
+    // 12 px per beat: shown.
+    const auto sparse = linesAtScale(beats, kBeatFrames / 12.0, LineSettings());
+    EXPECT_EQ(9u, sparse.size());
+}
+
+TEST(ScrollingLineLayoutTest, BeatSpacingFollowsTheSetting) {
+    const Beats beats = constBeats(0);
+    // Phosphor at its zoom limit: 10.87 px per beat.
+    const double framesPerPx = kBeatFrames / 10.87;
+    EXPECT_EQ(3u, linesAtScale(beats, framesPerPx, LineSettings()).size());
+    LineSettings settings;
+    settings.beatMinSpacing = BeatSpacingPx(10);
+    EXPECT_EQ(9u, linesAtScale(beats, framesPerPx, settings).size());
+    settings.beatMinSpacing = BeatSpacingPx(1);
+    EXPECT_EQ(9u, linesAtScale(beats, kBeatFrames / 2.0, settings).size());
+}
+
+TEST(ScrollingLineLayoutTest, BeatSpacingIsClampedTo1To30) {
+    EXPECT_EQ(12, BeatSpacingPx().px());
+    EXPECT_EQ(1, BeatSpacingPx(0).px());
+    EXPECT_EQ(30, BeatSpacingPx(100).px());
+}
+
+TEST(ScrollingLineLayoutTest, BeatLinesAreKeptAtAnyZoomWhenTheMasterSwitchIsOff) {
+    const Beats beats = constBeats(0);
+    LineSettings settings;
+    settings.enabled = false;
+    const auto dense = linesAtScale(beats, kBeatFrames / 3.0, settings);
+    EXPECT_EQ(9u, dense.size());
+}
+
+TEST(ScrollingLineLayoutTest, BeatSpacingIsJudgedPerBeatWithVariableTempo) {
+    // 8 beats at 120 BPM (24000 frames), then 16 at 60 BPM (48000 frames).
+    // At 4000 frames per px: 6 px per beat in the first part, 12 px after.
+    const auto result = layoutLines(&kTempoChangeBeats,
+            audio::FramePos(0),
+            audio::FramePos(400 + 8 * 24000 + 8 * 48000),
+            [](audio::FramePos pos) { return pos.value() / 4000.0; },
+            LineSettings(),
+            90,
+            kSkinColor);
+    int beatLines = 0;
+    for (const Line& line : result) {
+        if (line.kind == LineKind::Beat) {
+            ++beatLines;
+            EXPECT_GE(line.x, 8 * 24000 / 4000.0);
+        }
+    }
+    EXPECT_GT(beatLines, 0);
+}
+
+TEST(ScrollingLineLayoutTest, TheLastBeatOfTheGridUsesThePreviousSpacing) {
+    // A grid of 3 beats; the last has no next beat.
+    const Beats beats(
+            std::vector<BeatMarker>{BeatMarker{audio::FramePos(0), 2}},
+            audio::FramePos(2 * kBeatFrames),
+            kBpm,
+            kSampleRate,
+            QString());
+    const auto shown = linesAtScale(beats, kBeatFrames / 14.0, LineSettings(), 3 * kBeatFrames);
+    const auto hidden = linesAtScale(beats, kBeatFrames / 6.0, LineSettings(), 3 * kBeatFrames);
+    int shownBeats = 0;
+    for (const Line& line : shown) {
+        shownBeats += line.kind == LineKind::Beat;
+    }
+    int hiddenBeats = 0;
+    for (const Line& line : hidden) {
+        hiddenBeats += line.kind == LineKind::Beat;
+    }
+    EXPECT_GT(shownBeats, 0);
+    EXPECT_EQ(0, hiddenBeats);
+}
+
+TEST(ScrollingLineLayoutTest, StepLinesAreDrawnInEveryBeatIntervalWhileBeatLinesAreHidden) {
+    const Beats beats = constBeats(0);
+    LineSettings settings = stepSettings();
+    settings.stepMinSpacing = StepSpacingPx(4);
+    settings.beatMinSpacing = BeatSpacingPx(30);
+    // 20 px per beat: beat lines hidden, steps 5 px apart are drawn.
+    const auto result = linesAtScale(beats, kBeatFrames / 20.0, settings, 4 * kBeatFrames);
+    int bars = 0;
+    int beatLines = 0;
+    int steps = 0;
+    for (const Line& line : result) {
+        bars += line.kind == LineKind::Bar;
+        beatLines += line.kind == LineKind::Beat;
+        steps += line.kind == LineKind::Step;
+    }
+    EXPECT_EQ(2, bars); // beats 0 and 4
+    EXPECT_EQ(0, beatLines);
+    EXPECT_EQ(3 * 4, steps); // 3 per beat interval, 4 intervals
+}

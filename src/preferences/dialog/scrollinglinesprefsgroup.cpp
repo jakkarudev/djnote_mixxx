@@ -14,6 +14,7 @@
 #include "moc_scrollinglinesprefsgroup.cpp"
 #include "util/assert.h"
 
+using mixxx::scrollinglinelayout::BeatSpacingPx;
 using mixxx::scrollinglinelayout::LineSettings;
 using mixxx::scrollinglinelayout::LineWidthPx;
 using mixxx::scrollinglinelayout::OpacityPercent;
@@ -86,6 +87,24 @@ ScrollingLinesPrefsGroup::ScrollingLinesPrefsGroup(
             tr("Colour of the beat lines: the skin's beat colour, or a colour "
                "of your choice."),
             &LineSettings::beatColor);
+    {
+        const QString explanation =
+                tr("Beat lines are not drawn when adjacent beats are closer "
+                   "than this on screen, so they do not clutter the waveform "
+                   "when zoomed far out. Bar lines are always drawn.");
+        m_pBeatMinSpacingSpinBox = new QSpinBox();
+        m_pBeatMinSpacingSpinBox->setObjectName(
+                QStringLiteral("scrollingBeatLineMinSpacingSpinBox"));
+        m_pBeatMinSpacingSpinBox->setRange(BeatSpacingPx::kMin, BeatSpacingPx::kMax);
+        m_pBeatMinSpacingSpinBox->setSuffix(tr(" px"));
+        m_pBeatMinSpacingSpinBox->setToolTip(explanation);
+        auto* pLabel = new QLabel(tr("Hide beat lines closer than"));
+        pLabel->setBuddy(m_pBeatMinSpacingSpinBox);
+        pLabel->setToolTip(explanation);
+        pGrid->addWidget(pLabel, row, 0);
+        pGrid->addWidget(m_pBeatMinSpacingSpinBox, row, 1, Qt::AlignLeft);
+        ++row;
+    }
 
     m_pStepsEnabledCheckBox = new QCheckBox(tr("Show step lines"));
     m_pStepsEnabledCheckBox->setObjectName(QStringLiteral("scrollingStepLinesEnabledCheckBox"));
@@ -157,7 +176,11 @@ ScrollingLinesPrefsGroup::ScrollingLinesPrefsGroup(
                 &ScrollingLinesPrefsGroup::slotControlChanged);
     }
     for (QSpinBox* pSpinBox :
-            {m_pBarWidthSpinBox, m_pBeatWidthSpinBox, m_pStepWidthSpinBox, m_pStepMinSpacingSpinBox}) {
+            {m_pBarWidthSpinBox,
+                    m_pBeatWidthSpinBox,
+                    m_pBeatMinSpacingSpinBox,
+                    m_pStepWidthSpinBox,
+                    m_pStepMinSpacingSpinBox}) {
         connect(pSpinBox,
                 QOverload<int>::of(&QSpinBox::valueChanged),
                 this,
@@ -321,6 +344,7 @@ void ScrollingLinesPrefsGroup::showSettings(const LineSettings& settings) {
     show(m_stepOpacity, settings.stepOpacity);
     for (const auto& [pSpinBox, px] : {std::pair{m_pBarWidthSpinBox, settings.barWidth.px()},
                  std::pair{m_pBeatWidthSpinBox, settings.beatWidth.px()},
+                 std::pair{m_pBeatMinSpacingSpinBox, settings.beatMinSpacing.px()},
                  std::pair{m_pStepWidthSpinBox, settings.stepWidth.px()},
                  std::pair{m_pStepMinSpacingSpinBox, settings.stepMinSpacing.px()}}) {
         const QSignalBlocker blockSpinBox(pSpinBox);
@@ -338,6 +362,7 @@ void ScrollingLinesPrefsGroup::slotControlChanged() {
     m_settings.beatOpacity = OpacityPercent(m_beatOpacity.pSpinBox->value());
     m_settings.barWidth = LineWidthPx(m_pBarWidthSpinBox->value());
     m_settings.beatWidth = LineWidthPx(m_pBeatWidthSpinBox->value());
+    m_settings.beatMinSpacing = BeatSpacingPx(m_pBeatMinSpacingSpinBox->value());
     m_settings.stepsEnabled = m_pStepsEnabledCheckBox->isChecked();
     m_settings.stepMinSpacing = StepSpacingPx(m_pStepMinSpacingSpinBox->value());
     m_settings.stepOpacity = OpacityPercent(m_stepOpacity.pSpinBox->value());

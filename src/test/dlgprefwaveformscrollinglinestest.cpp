@@ -364,3 +364,22 @@ TEST_F(DlgPrefWaveformScrollingLinesTest, StepRowsAreGreyedOutWhileStepLinesAreO
     // The bar and beat rows are not affected.
     EXPECT_TRUE(control<QSpinBox>(pDialog.get(), "scrollingBeatLineWidthSpinBox")->isEnabled());
 }
+
+TEST_F(DlgPrefWaveformScrollingLinesTest, BeatMinSpacingShowsDefaultAppliesLiveAndResets) {
+    auto pDialog = openPage();
+    auto* pSpacing = control<QSpinBox>(pDialog.get(), "scrollingBeatLineMinSpacingSpinBox");
+    ASSERT_TRUE(pSpacing);
+    EXPECT_EQ(12, pSpacing->value());
+    EXPECT_EQ(1, pSpacing->minimum());
+    EXPECT_EQ(30, pSpacing->maximum());
+    EXPECT_EQ(QStringLiteral(" px"), pSpacing->suffix());
+
+    pSpacing->setValue(20);
+    EXPECT_EQ(20, factorySettings().beatMinSpacing.px());
+    EXPECT_EQ(20, mixxx::scrollinglinelayout::loadLineSettings(config()).beatMinSpacing.px());
+
+    pDialog->slotResetToDefaults();
+    EXPECT_EQ(12, pSpacing->value());
+    EXPECT_EQ(12, factorySettings().beatMinSpacing.px());
+    EXPECT_EQ(12, mixxx::scrollinglinelayout::loadLineSettings(config()).beatMinSpacing.px());
+}
