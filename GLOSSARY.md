@@ -129,6 +129,14 @@ _Avoid_: pin, pinned folder, favorite, shortcut
 A library section that shows another app's collection (Rekordbox, Serato, Traktor, iTunes, Rhythmbox, Banshee), read from that app's own files. Its tracks are not in the library until one is selected or loaded.
 _Avoid_: external source, third-party library, import
 
+**History session**:
+One stretch of play recorded by History: the tracks played, in the order they were played, listed under History and named after its date unless renamed. A session is still growing until a new one starts. Older sessions are grouped under their year.
+_Avoid_: setlog, set log, history playlist
+
+**Playlist**:
+An ordered list of tracks that the DJ made, listed under Playlists. A History session is not a Playlist. A track's cues, beat grid and other preparation belong to the track, so they are the same in every Playlist and History session it appears in.
+_Avoid_: set, crate (a crate is unordered)
+
 **Cover column**:
 The track list column that shows a small cover art thumbnail on each track's row.
 _Avoid_: cover art (on its own), thumbnail column, artwork column

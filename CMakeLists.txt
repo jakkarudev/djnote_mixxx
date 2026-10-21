@@ -1048,6 +1048,7 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/library/trackset/crate/cratefeaturehelper.cpp
   src/library/trackset/crate/cratestorage.cpp
   src/library/trackset/crate/cratetablemodel.cpp
+  src/library/trackset/historysessionplaylist.cpp
   src/library/trackset/playlistfeature.cpp
   src/library/trackset/setlogfeature.cpp
   src/library/trackset/tracksettablemodel.cpp
@@ -2239,6 +2240,7 @@ if(BUILD_TESTING)
     src/test/frametest.cpp
     src/test/globaltrackcache_test.cpp
     src/test/hotcuecontrol_test.cpp
+    src/test/historysessionplaylist_test.cpp
     src/test/imageutils_test.cpp
     src/test/indexrange_test.cpp
     src/test/itunesxmlimportertest.cpp

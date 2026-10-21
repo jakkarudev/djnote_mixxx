@@ -10,6 +10,7 @@
 #include "library/queryutil.h"
 #include "library/trackcollection.h"
 #include "library/trackcollectionmanager.h"
+#include "library/trackset/historysessionplaylist.h" // DJNote
 #include "library/treeitem.h"
 #include "mixer/playerinfo.h"
 #include "moc_setlogfeature.cpp"
@@ -198,6 +199,7 @@ void SetlogFeature::onRightClickChild(const QPoint& globalPos, const QModelIndex
 
         menu.addAction(m_pAddToAutoDJAction);
         menu.addAction(m_pAddToAutoDJTopAction);
+        addSaveSessionAsPlaylistAction(&menu, &m_playlistDao, playlistId); // DJNote
         menu.addSeparator();
         menu.addAction(m_pRenamePlaylistAction);
         if (playlistId != m_currentPlaylistId) {
