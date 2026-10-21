@@ -20,7 +20,7 @@
               <!-- Nocturne: deck header + overview row + rate fader (#76) -->
               <Template src="skins:Nocturne/decks/nocturne_deck_top.xml"/>
 
-              <Template src="skins:Nocturne/decks/row_5_transportLoopJump.xml" />
+              <Template src="skins:Nocturne/decks/nocturne_deck_rows.xml"/>
 
             </Children>
           </WidgetGroup><!-- DeckRows12345 -->

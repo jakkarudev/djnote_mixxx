@@ -3657,3 +3657,69 @@ WSearchLineEdit {
   border-radius: 0px;
 }
 /* === end Nocturne: library === */
+
+/* === Nocturne: deck rows ================================================ */
+/* Ticket #77. Template: decks/nocturne_deck_rows.xml (transport, loop, hotcue, MOVE, GRID). */
+#NocturneDeckRows {
+  background-color: #181818;
+  padding: 4px 0px 4px 6px;
+}
+#NocturneDeckTransportRow,
+#NocturneDeckHotcueRow,
+#NocturneDeckMoveGridRow {
+  background-color: transparent;
+  padding: 0px;
+  margin: 0px;
+}
+#NocturneDeckHotcueRow {
+  padding: 3px 0px 0px 0px;
+}
+#NocturneDeckMoveGridRow {
+  padding: 3px 0px 0px 0px;
+}
+#NocturneDeckRows WPushButton#NocturneBtnFlat {
+  font-size: 15px;
+  padding: 0px;
+}
+#NocturneDeckRows WPushButton#NocturneBtnCell {
+  font-size: 14px;
+  border-left: none;
+}
+WPushButton#NocturneHotcue {
+  background-color: #1f1f1f;
+  border: 1px solid #323232;
+  border-radius: 0px;
+  margin: 0px 1px 0px 0px;
+  padding: 0px 0px 0px 4px;
+  color: #6d6d6d;
+  font-size: 13px;
+  outline: none;
+}
+WPushButton#NocturneHotcue:hover {
+  background-color: #323232;
+}
+WPushButton#NocturneHotcue[displayValue="1"],
+WPushButton#NocturneHotcue[displayValue="2"] {
+  color: #000000;
+  border-color: #000000;
+}
+WPushButton#NocturneHotcue[displayValue="1"][dark="true"],
+WPushButton#NocturneHotcue[displayValue="2"][dark="true"] {
+  color: #fefefe;
+}
+WLabel#NocturneRowLabel {
+  color: #6d6d6d;
+  font-size: 12px;
+  qproperty-alignment: AlignRight;
+  padding-right: 6px;
+}
+WBeatSpinBox#NocturneSpinbox {
+  background-color: #1f1f1f;
+  color: #afafaf;
+  border: 1px solid #323232;
+  font-size: 13px;
+}
+#NocturneIntroOutro {
+  margin-left: 6px;
+}
+/* === /Nocturne: deck rows =============================================== */
