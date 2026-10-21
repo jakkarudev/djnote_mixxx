@@ -106,9 +106,12 @@ void CoverColumnSort::showProgress(int done, int total) {
     }
     if (m_headerLabel.isNull()) {
         m_headerLabel = m_pModel->headerData(m_column, Qt::Horizontal).toString();
+        m_headerToolTip = m_pModel->headerData(m_column, Qt::Horizontal, Qt::ToolTipRole);
     }
     const QString progress = tr("%1 (reading %2/%3)").arg(m_headerLabel).arg(done).arg(total);
-    m_pModel->setHeaderData(m_column, Qt::Horizontal, progress);
+    // DisplayRole, not setHeaderData()'s default EditRole: track table models
+    // show a DisplayRole header before an EditRole one.
+    m_pModel->setHeaderData(m_column, Qt::Horizontal, progress, Qt::DisplayRole);
     // The column is narrow: the whole text shows in the tooltip.
     m_pModel->setHeaderData(m_column, Qt::Horizontal, progress, Qt::ToolTipRole);
 }
@@ -117,7 +120,8 @@ void CoverColumnSort::restoreHeader() {
     if (!m_pModel || m_headerLabel.isNull()) {
         return;
     }
-    m_pModel->setHeaderData(m_column, Qt::Horizontal, m_headerLabel);
-    m_pModel->setHeaderData(m_column, Qt::Horizontal, QVariant(), Qt::ToolTipRole);
+    m_pModel->setHeaderData(m_column, Qt::Horizontal, m_headerLabel, Qt::DisplayRole);
+    m_pModel->setHeaderData(m_column, Qt::Horizontal, m_headerToolTip, Qt::ToolTipRole);
     m_headerLabel = QString();
+    m_headerToolTip = QVariant();
 }

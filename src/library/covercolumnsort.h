@@ -4,6 +4,7 @@
 #include <QPointer>
 #include <QString>
 #include <QStringList>
+#include <QVariant>
 #include <memory>
 
 class CoverBatch;
@@ -11,7 +12,7 @@ class CoverLookup;
 class QAbstractItemModel;
 
 /// DJNote: sorting a track list by a cover column whose covers come from the
-/// cover lookup (Computer and Recording, later the external libraries).
+/// cover lookup (Computer, Recording and the external libraries).
 ///
 /// Sorting by cover needs the cover of every row. Covers not known yet are
 /// read in the background first, with the progress shown in the column's
@@ -84,8 +85,9 @@ class CoverColumnSort : public QObject {
     const int m_column;
     const QPointer<CoverLookup> m_pCoverLookup;
     std::unique_ptr<CoverBatch> m_pBatch;
-    // The header label while the progress is shown.
+    // The header label and tooltip while the progress is shown.
     QString m_headerLabel;
+    QVariant m_headerToolTip;
     bool m_sortedByCover;
     Qt::SortOrder m_order;
 };
