@@ -39,6 +39,11 @@ DlgRecording::DlgRecording(
             &WTrackTableView::loadTrackToPlayer,
             this,
             &DlgRecording::loadTrackToPlayer);
+    // DJNote: forward selection to the cover panel
+    connect(m_pTrackTableView,
+            &WTrackTableView::trackSelected,
+            this,
+            &DlgRecording::trackSelected);
     connect(pLibrary,
             &Library::setTrackTableFont,
             m_pTrackTableView,
