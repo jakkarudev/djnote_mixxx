@@ -1,0 +1,182 @@
+<!DOCTYPE template>
+<!-- Nocturne2: mixer. Outer column of a channel (60 px), Traktor rows:
+    GAIN knob, caption + clip light
+    FLTR knob, quick-effect selector pill ("FLTR" chain picker, Traktor's "v FLTR") + quick effect on/off dot
+    FX 1 / FX 2 assign buttons, "FX" caption
+    KEY knob, caption + key lock dot
+  Knobs sit 12 px from the left edge; captions use the same pad, dots follow the caption.
+  Variable: ChanNum -->
+<Template>
+  <SetVariable name="Group">[Channel<Variable name="ChanNum"/>]</SetVariable>
+  <SetVariable name="QuickGroup">[QuickEffectRack1_[Channel<Variable name="ChanNum"/>]]</SetVariable>
+  <WidgetGroup>
+    <ObjectName>NocturneMixOuter</ObjectName>
+    <Layout>vertical</Layout>
+    <Size>60f,0me</Size>
+    <Children>
+
+      <WidgetGroup><Size>1f,8f</Size></WidgetGroup>
+
+      <!-- GAIN + clip light -->
+      <Template src="skins:Nocturne2/mixer/nocturne_knob.xml">
+        <SetVariable name="ColW">60</SetVariable>
+        <SetVariable name="KnobPad">12</SetVariable>
+        <SetVariable name="Control">pregain</SetVariable>
+        <SetVariable name="TooltipId">pregain</SetVariable>
+        <SetVariable name="ArcColor"><Variable name="ArcColorGain"/></SetVariable>
+      </Template>
+      <WidgetGroup>
+        <Layout>horizontal</Layout>
+        <Size>60f,14f</Size>
+        <Children>
+          <WidgetGroup><Size>12f,1f</Size></WidgetGroup>
+          <Label>
+            <ObjectName>NocturneMixLabel</ObjectName>
+            <Size>35f,14f</Size>
+            <Text>GAIN</Text>
+            <Alignment>center</Alignment>
+          </Label>
+          <WidgetGroup><Size>2f,1f</Size></WidgetGroup>
+          <WidgetGroup>
+            <ObjectName>NocturneClipLight</ObjectName>
+            <TooltipId>channel_peak_indicator</TooltipId>
+            <Size>8f,8f</Size>
+            <Connection>
+              <ConfigKey><Variable name="Group"/>,peak_indicator</ConfigKey>
+              <BindProperty>highlight</BindProperty>
+            </Connection>
+          </WidgetGroup>
+          <WidgetGroup><Size>0me,1f</Size></WidgetGroup>
+        </Children>
+      </WidgetGroup>
+
+      <WidgetGroup><Size>1f,6f</Size></WidgetGroup>
+
+      <!-- FLTR (quick effect), part of the EQ knob setting -->
+      <WidgetGroup>
+        <Layout>vertical</Layout>
+        <SizePolicy>min,min</SizePolicy>
+        <Children>
+          <Template src="skins:Nocturne2/mixer/nocturne_knob.xml">
+            <SetVariable name="ColW">60</SetVariable>
+            <SetVariable name="KnobPad">12</SetVariable>
+            <SetVariable name="Group"><Variable name="QuickGroup"/></SetVariable>
+            <SetVariable name="Control">super1</SetVariable>
+            <SetVariable name="TooltipId">QuickEffectRack_super1</SetVariable>
+            <SetVariable name="ArcColor"><Variable name="ArcColorFx12Quick"/></SetVariable>
+          </Template>
+          <WidgetGroup>
+            <Layout>horizontal</Layout>
+            <Size>60f,14f</Size>
+            <Children>
+              <WidgetGroup><Size>3f,1f</Size></WidgetGroup>
+              <EffectChainPresetSelector>
+                <ObjectName>NocturneFltrSelector</ObjectName>
+                <Size>47f,14f</Size>
+                <EffectUnitGroup><Variable name="QuickGroup"/></EffectUnitGroup>
+              </EffectChainPresetSelector>
+              <WidgetGroup><Size>1f,1f</Size></WidgetGroup>
+              <Template src="skins:Nocturne2/mixer/nocturne_dot.xml">
+                <SetVariable name="DotGroup"><Variable name="QuickGroup"/></SetVariable>
+                <SetVariable name="DotControl">enabled</SetVariable>
+                <SetVariable name="DotTooltipId">QuickEffectRack_enabled</SetVariable>
+                <SetVariable name="DotVisKey">[Nocturne2],show_eq_kill_buttons</SetVariable>
+              </Template>
+              <WidgetGroup><Size>0me,1f</Size></WidgetGroup>
+            </Children>
+          </WidgetGroup>
+        </Children>
+        <Connection>
+          <ConfigKey persist="true">[Nocturne2],show_eq_knobs</ConfigKey>
+          <BindProperty>visible</BindProperty>
+        </Connection>
+      </WidgetGroup>
+
+      <WidgetGroup><Size>1f,15f</Size></WidgetGroup>
+
+      <!-- FX 1 / FX 2 -->
+      <WidgetGroup>
+        <Layout>horizontal</Layout>
+        <Size>60f,18f</Size>
+        <Children>
+          <WidgetGroup><Size>7f,1f</Size></WidgetGroup>
+          <Template src="skins:Nocturne2/controls/button_flat_text.xml">
+            <SetVariable name="ObjectName">NocturneMixFxBtn</SetVariable>
+            <SetVariable name="TooltipId">EffectUnit_deck_enabled</SetVariable>
+            <SetVariable name="Size">21f,18f</SetVariable>
+            <SetVariable name="Text">1</SetVariable>
+            <SetVariable name="ConfigKey">[EffectRack1_EffectUnit1],group_<Variable name="Group"/>_enable</SetVariable>
+          </Template>
+          <WidgetGroup><Size>2f,1f</Size></WidgetGroup>
+          <Template src="skins:Nocturne2/controls/button_flat_text.xml">
+            <SetVariable name="ObjectName">NocturneMixFxBtn</SetVariable>
+            <SetVariable name="TooltipId">EffectUnit_deck_enabled</SetVariable>
+            <SetVariable name="Size">21f,18f</SetVariable>
+            <SetVariable name="Text">2</SetVariable>
+            <SetVariable name="ConfigKey">[EffectRack1_EffectUnit2],group_<Variable name="Group"/>_enable</SetVariable>
+          </Template>
+          <WidgetGroup><Size>0me,1f</Size></WidgetGroup>
+        </Children>
+      </WidgetGroup>
+      <WidgetGroup><Size>1f,6f</Size></WidgetGroup>
+      <WidgetGroup>
+        <Layout>horizontal</Layout>
+        <Size>60f,14f</Size>
+        <Children>
+          <WidgetGroup><Size>7f,1f</Size></WidgetGroup>
+          <Label>
+            <ObjectName>NocturneMixLabelFx</ObjectName>
+            <Size>44f,14f</Size>
+            <Text>FX</Text>
+            <Alignment>center</Alignment>
+          </Label>
+          <WidgetGroup><Size>0me,1f</Size></WidgetGroup>
+        </Children>
+      </WidgetGroup>
+
+      <WidgetGroup><Size>1f,10f</Size></WidgetGroup>
+
+      <!-- KEY (key shift) + key lock dot, gated by the Key Controls setting -->
+      <WidgetGroup>
+        <Layout>vertical</Layout>
+        <SizePolicy>min,min</SizePolicy>
+        <Children>
+          <Template src="skins:Nocturne2/mixer/nocturne_knob.xml">
+            <SetVariable name="ColW">60</SetVariable>
+            <SetVariable name="KnobPad">12</SetVariable>
+            <SetVariable name="Control">pitch_adjust</SetVariable>
+            <SetVariable name="TooltipId">pitch_adjust</SetVariable>
+            <SetVariable name="ArcColor"><Variable name="ArcColorGain"/></SetVariable>
+          </Template>
+          <WidgetGroup>
+            <Layout>horizontal</Layout>
+            <Size>60f,14f</Size>
+            <Children>
+              <WidgetGroup><Size>12f,1f</Size></WidgetGroup>
+              <Label>
+                <ObjectName>NocturneMixLabel</ObjectName>
+                <Size>35f,14f</Size>
+                <Text>KEY</Text>
+                <Alignment>center</Alignment>
+              </Label>
+              <WidgetGroup><Size>2f,1f</Size></WidgetGroup>
+              <Template src="skins:Nocturne2/mixer/nocturne_dot.xml">
+                <SetVariable name="DotGroup"><Variable name="Group"/></SetVariable>
+                <SetVariable name="DotControl">keylock</SetVariable>
+                <SetVariable name="DotTooltipId">keylock</SetVariable>
+                <SetVariable name="DotVisKey">[Nocturne2],show_key_lock_dot</SetVariable>
+              </Template>
+              <WidgetGroup><Size>0me,1f</Size></WidgetGroup>
+            </Children>
+          </WidgetGroup>
+        </Children>
+        <Connection>
+          <ConfigKey persist="true">[Nocturne2],show_key_controls</ConfigKey>
+          <BindProperty>visible</BindProperty>
+        </Connection>
+      </WidgetGroup>
+
+      <WidgetGroup><Size>1f,0me</Size></WidgetGroup>
+    </Children>
+  </WidgetGroup>
+</Template>

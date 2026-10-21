@@ -1,0 +1,360 @@
+<!--
+Description:
+  Nocturne deck lower rows, Traktor style (ticket #77):
+    transport row : play, CUE, CUP, FLX, REV | loop sizes < 1/4 .. 32 > | IN OUT loop
+    hotcue row    : 8 slots (number + cue colour, right-click clears) + intro/outro cues
+    move/grid row : MOVE beatjump size + back/forward, GRID earlier/later/slower/faster (no SET)
+  Styled by the "Nocturne: deck rows" block at the end of style_nocturne.qss.
+Variables:
+  ChanNum
+-->
+<Template>
+  <SetVariable name="Group">[Channel<Variable name="ChanNum"/>]</SetVariable>
+  <SetVariable name="BtnType"><Variable name="SubRegion_BtnType"/></SetVariable>
+  <WidgetGroup>
+    <ObjectName>NocturneDeckRows</ObjectName>
+    <Layout>vertical</Layout>
+    <SizePolicy>me,me</SizePolicy>
+    <Children>
+
+      <!-- Transport + loop row. Nocturne2: outlined cells on the grey lower deck panel, as Traktor:
+           [play] CUE CUP FLX REV  [< 1/4 .. 32 >]  [IN|OUT][loop] -->
+      <WidgetGroup>
+        <ObjectName>NocturneDeckTransportRow</ObjectName>
+        <Layout>horizontal</Layout>
+        <SizePolicy>me,min</SizePolicy>
+        <Children>
+              <Template src="skins:Nocturne2/controls/nocturne_btn_disp.xml">
+                <SetVariable name="TooltipId">play_cue_set</SetVariable>
+                <SetVariable name="ObjectName">NocturneBtnPlay</SetVariable>
+                <SetVariable name="Size">36me,30f</SetVariable>
+                <SetVariable name="Text"></SetVariable>
+                <SetVariable name="ConfigKey"><Variable name="Group"/>,play</SetVariable>
+                <SetVariable name="ConfigKeyDisp"><Variable name="Group"/>,play_latched</SetVariable>
+              </Template>
+              <WidgetGroup><Size>4f,1f</Size></WidgetGroup>
+              <Template src="skins:Nocturne2/controls/button_flat_text.xml">
+                <SetVariable name="TooltipId">cue_default_cue_gotoandstop</SetVariable>
+                <SetVariable name="ObjectName">NocturneBtnFlat</SetVariable>
+                <SetVariable name="Size">32me,30f</SetVariable>
+                <SetVariable name="Text">CUE</SetVariable>
+                <SetVariable name="ConfigKey"><Variable name="Group"/>,cue_default</SetVariable>
+              </Template>
+              <Template src="skins:Nocturne2/controls/button_flat_text.xml">
+                <SetVariable name="TooltipId">cue_gotoandplay_cue_default</SetVariable>
+                <SetVariable name="ObjectName">NocturneBtnFlat</SetVariable>
+                <SetVariable name="Size">34me,30f</SetVariable>
+                <SetVariable name="Text">CUP</SetVariable>
+                <SetVariable name="ConfigKey"><Variable name="Group"/>,cue_gotoandplay</SetVariable>
+              </Template>
+              <Template src="skins:Nocturne2/controls/button_flat_text.xml">
+                <SetVariable name="TooltipId">slip_mode</SetVariable>
+                <SetVariable name="ObjectName">NocturneBtnFlat</SetVariable>
+                <SetVariable name="Size">30me,30f</SetVariable>
+                <SetVariable name="Text">FLX</SetVariable>
+                <SetVariable name="ConfigKey"><Variable name="Group"/>,slip_enabled</SetVariable>
+              </Template>
+              <Template src="skins:Nocturne2/controls/button_flat_text.xml">
+                <SetVariable name="TooltipId">reverse</SetVariable>
+                <SetVariable name="ObjectName">NocturneBtnFlat</SetVariable>
+                <SetVariable name="Size">34me,30f</SetVariable>
+                <SetVariable name="Text">REV</SetVariable>
+                <SetVariable name="ConfigKey"><Variable name="Group"/>,reverse</SetVariable>
+              </Template>
+              <WidgetGroup><Size>2min,1f</Size></WidgetGroup>
+
+          <WidgetGroup>
+            <ObjectName>NocturneLoopSizes</ObjectName>
+            <Layout>horizontal</Layout>
+            <SizePolicy>me,min</SizePolicy>
+            <MaximumSize>352,30</MaximumSize>
+            <Children>
+              <Template src="skins:Nocturne2/controls/button_flat_text.xml">
+                <SetVariable name="TooltipId">loop_halve</SetVariable>
+                <SetVariable name="ObjectName">NocturneBtnArrowFirst</SetVariable>
+                <SetVariable name="Size">13f,30f</SetVariable>
+                <SetVariable name="Text">&#8249;</SetVariable>
+                <SetVariable name="ConfigKey"><Variable name="Group"/>,loop_halve</SetVariable>
+              </Template>
+              <Template src="skins:Nocturne2/controls/nocturne_loop_size.xml">
+                <SetVariable name="LoopSize">0.25</SetVariable>
+                <SetVariable name="Text">1/4</SetVariable>
+              </Template>
+              <Template src="skins:Nocturne2/controls/nocturne_loop_size.xml">
+                <SetVariable name="LoopSize">0.5</SetVariable>
+                <SetVariable name="Text">1/2</SetVariable>
+              </Template>
+              <Template src="skins:Nocturne2/controls/nocturne_loop_size.xml">
+                <SetVariable name="LoopSize">1</SetVariable>
+                <SetVariable name="Text">1</SetVariable>
+              </Template>
+              <Template src="skins:Nocturne2/controls/nocturne_loop_size.xml">
+                <SetVariable name="LoopSize">2</SetVariable>
+                <SetVariable name="Text">2</SetVariable>
+              </Template>
+              <Template src="skins:Nocturne2/controls/nocturne_loop_size.xml">
+                <SetVariable name="LoopSize">4</SetVariable>
+                <SetVariable name="Text">4</SetVariable>
+              </Template>
+              <Template src="skins:Nocturne2/controls/nocturne_loop_size.xml">
+                <SetVariable name="LoopSize">8</SetVariable>
+                <SetVariable name="Text">8</SetVariable>
+              </Template>
+              <Template src="skins:Nocturne2/controls/nocturne_loop_size.xml">
+                <SetVariable name="LoopSize">16</SetVariable>
+                <SetVariable name="Text">16</SetVariable>
+              </Template>
+              <Template src="skins:Nocturne2/controls/nocturne_loop_size.xml">
+                <SetVariable name="LoopSize">32</SetVariable>
+                <SetVariable name="Text">32</SetVariable>
+              </Template>
+              <Template src="skins:Nocturne2/controls/button_flat_text.xml">
+                <SetVariable name="TooltipId">loop_double</SetVariable>
+                <SetVariable name="ObjectName">NocturneBtnArrow</SetVariable>
+                <SetVariable name="Size">13f,30f</SetVariable>
+                <SetVariable name="Text">&#8250;</SetVariable>
+                <SetVariable name="ConfigKey"><Variable name="Group"/>,loop_double</SetVariable>
+              </Template>
+
+            </Children>
+            <Connection>
+              <ConfigKey>[Nocturne2],show_loop_controls</ConfigKey>
+              <BindProperty>visible</BindProperty>
+            </Connection>
+          </WidgetGroup>
+              <WidgetGroup><Size>2min,1f</Size></WidgetGroup>
+
+          <WidgetGroup>
+            <Layout>horizontal</Layout>
+            <SizePolicy>min,min</SizePolicy>
+            <MaximumSize>124,30</MaximumSize>
+            <Children>
+              <WidgetGroup>
+                <ObjectName>NocturneLoopInOut</ObjectName>
+                <MaximumSize>82,30</MaximumSize>
+                <Layout>horizontal</Layout>
+                <SizePolicy>min,min</SizePolicy>
+                <Children>
+                  <Template src="skins:Nocturne2/controls/button_flat_text.xml">
+                    <SetVariable name="TooltipId">loop_in</SetVariable>
+                    <SetVariable name="ObjectName">NocturneBtnArrowFirst</SetVariable>
+                    <SetVariable name="Size">28me,30f</SetVariable>
+                    <SetVariable name="Text">IN</SetVariable>
+                    <SetVariable name="ConfigKey"><Variable name="Group"/>,loop_in</SetVariable>
+                  </Template>
+                  <Template src="skins:Nocturne2/controls/button_flat_text.xml">
+                    <SetVariable name="TooltipId">loop_out</SetVariable>
+                    <SetVariable name="ObjectName">NocturneBtnArrow</SetVariable>
+                    <SetVariable name="Size">32me,30f</SetVariable>
+                    <SetVariable name="Text">OUT</SetVariable>
+                    <SetVariable name="ConfigKey"><Variable name="Group"/>,loop_out</SetVariable>
+                  </Template>
+                </Children>
+              </WidgetGroup>
+              <WidgetGroup><Size>2f,1f</Size></WidgetGroup>
+              <Template src="skins:Nocturne2/controls/nocturne_btn_disp.xml">
+                <SetVariable name="TooltipId">reloop_toggle</SetVariable>
+                <SetVariable name="ObjectName">NocturneBtnLoop</SetVariable>
+                <SetVariable name="Size">30me,30f</SetVariable>
+                <SetVariable name="Text"></SetVariable>
+                <SetVariable name="ConfigKey"><Variable name="Group"/>,reloop_toggle</SetVariable>
+                <SetVariable name="ConfigKeyDisp"><Variable name="Group"/>,loop_enabled</SetVariable>
+              </Template>
+
+            </Children>
+            <Connection>
+              <ConfigKey>[Nocturne2],show_loop_controls</ConfigKey>
+              <BindProperty>visible</BindProperty>
+            </Connection>
+          </WidgetGroup>
+        </Children>
+      </WidgetGroup>
+
+      <!-- Hotcue row -->
+      <WidgetGroup>
+        <ObjectName>NocturneDeckHotcueRow</ObjectName>
+        <Layout>horizontal</Layout>
+        <SizePolicy>me,min</SizePolicy>
+        <Children>
+          <WidgetGroup>
+            <ObjectName>NocturneHotcueSlots</ObjectName>
+            <Layout>horizontal</Layout>
+            <SizePolicy>me,min</SizePolicy>
+            <Children>
+              <WidgetGroup>
+                <Layout>horizontal</Layout>
+                <SizePolicy>me,min</SizePolicy>
+                <Children>
+              <Template src="skins:Nocturne2/controls/nocturne_hotcue.xml">
+                <SetVariable name="number">1</SetVariable>
+              </Template>
+              <Template src="skins:Nocturne2/controls/nocturne_hotcue.xml">
+                <SetVariable name="number">2</SetVariable>
+              </Template>
+              <Template src="skins:Nocturne2/controls/nocturne_hotcue.xml">
+                <SetVariable name="number">3</SetVariable>
+              </Template>
+              <Template src="skins:Nocturne2/controls/nocturne_hotcue.xml">
+                <SetVariable name="number">4</SetVariable>
+              </Template>
+                </Children>
+              </WidgetGroup>
+              <WidgetGroup>
+                <Layout>horizontal</Layout>
+                <SizePolicy>me,min</SizePolicy>
+                <Children>
+              <Template src="skins:Nocturne2/controls/nocturne_hotcue.xml">
+                <SetVariable name="number">5</SetVariable>
+              </Template>
+              <Template src="skins:Nocturne2/controls/nocturne_hotcue.xml">
+                <SetVariable name="number">6</SetVariable>
+              </Template>
+              <Template src="skins:Nocturne2/controls/nocturne_hotcue.xml">
+                <SetVariable name="number">7</SetVariable>
+              </Template>
+              <Template src="skins:Nocturne2/controls/nocturne_hotcue.xml">
+                <SetVariable name="number">8</SetVariable>
+              </Template>
+                </Children>
+                <Connection>
+                  <ConfigKey>[Nocturne2],show_8_hotcues</ConfigKey>
+                  <BindProperty>visible</BindProperty>
+                </Connection>
+              </WidgetGroup>
+            </Children>
+            <Connection>
+              <ConfigKey>[Nocturne2],show_hotcues</ConfigKey>
+              <BindProperty>visible</BindProperty>
+            </Connection>
+          </WidgetGroup>
+          <WidgetGroup>
+            <ObjectName>NocturneIntroOutro</ObjectName>
+            <Layout>horizontal</Layout>
+            <SizePolicy>min,min</SizePolicy>
+            <Children>
+              <Template src="skins:Nocturne2/controls/nocturne_special_cue.xml">
+                <SetVariable name="CueType">intro_start</SetVariable>
+                <SetVariable name="Text">IS</SetVariable>
+              </Template>
+              <Template src="skins:Nocturne2/controls/nocturne_special_cue.xml">
+                <SetVariable name="CueType">intro_end</SetVariable>
+                <SetVariable name="Text">IE</SetVariable>
+              </Template>
+              <Template src="skins:Nocturne2/controls/nocturne_special_cue.xml">
+                <SetVariable name="CueType">outro_start</SetVariable>
+                <SetVariable name="Text">OS</SetVariable>
+              </Template>
+              <Template src="skins:Nocturne2/controls/nocturne_special_cue.xml">
+                <SetVariable name="CueType">outro_end</SetVariable>
+                <SetVariable name="Text">OE</SetVariable>
+              </Template>
+            </Children>
+            <Connection>
+              <ConfigKey>[Nocturne2],show_intro_outro_cues</ConfigKey>
+              <BindProperty>visible</BindProperty>
+            </Connection>
+          </WidgetGroup>
+          <WidgetGroup><Size>6f,1f</Size></WidgetGroup>
+        </Children>
+      </WidgetGroup>
+
+      <!-- MOVE + GRID row -->
+      <WidgetGroup>
+        <ObjectName>NocturneDeckMoveGridRow</ObjectName>
+        <Layout>horizontal</Layout>
+        <SizePolicy>me,min</SizePolicy>
+        <Children>
+              <WidgetGroup><Size>0me,1f</Size></WidgetGroup>
+
+          <WidgetGroup>
+            <ObjectName>NocturneMoveBlock</ObjectName>
+            <Layout>horizontal</Layout>
+            <SizePolicy>min,min</SizePolicy>
+            <Children>
+              <Label>
+                <ObjectName>NocturneRowLabel</ObjectName>
+                <Size>40f,22f</Size>
+                <Text>MOVE</Text>
+              </Label>
+
+              <BeatSpinBox>
+                <TooltipId>beatjump_size</TooltipId>
+                <ObjectName>NocturneSpinbox</ObjectName>
+                <Size>48f,22f</Size>
+                <Value><Variable name="Group"/>,beatjump_size</Value>
+              </BeatSpinBox>
+              <Template src="skins:Nocturne2/controls/button_flat_text.xml">
+                <SetVariable name="TooltipId">beatjump_backward</SetVariable>
+                <SetVariable name="ObjectName">NocturneBtnSmall</SetVariable>
+                <SetVariable name="Size">26,22f</SetVariable>
+                <SetVariable name="Text">&#8249;</SetVariable>
+                <SetVariable name="ConfigKey"><Variable name="Group"/>,beatjump_backward</SetVariable>
+              </Template>
+              <Template src="skins:Nocturne2/controls/button_flat_text.xml">
+                <SetVariable name="TooltipId">beatjump_forward</SetVariable>
+                <SetVariable name="ObjectName">NocturneBtnSmall</SetVariable>
+                <SetVariable name="Size">26,22f</SetVariable>
+                <SetVariable name="Text">&#8250;</SetVariable>
+                <SetVariable name="ConfigKey"><Variable name="Group"/>,beatjump_forward</SetVariable>
+              </Template>
+
+            </Children>
+            <Connection>
+              <ConfigKey>[Nocturne2],show_beatjump_controls</ConfigKey>
+              <BindProperty>visible</BindProperty>
+            </Connection>
+          </WidgetGroup>
+          <WidgetGroup><Size>14f,1f</Size></WidgetGroup>
+          <WidgetGroup>
+            <ObjectName>NocturneGridBlock</ObjectName>
+            <Layout>horizontal</Layout>
+            <SizePolicy>min,min</SizePolicy>
+            <Children>
+              <Label>
+                <ObjectName>NocturneRowLabel</ObjectName>
+                <Size>40f,22f</Size>
+                <Text>GRID</Text>
+              </Label>
+              <Template src="skins:Nocturne2/controls/button_flat_text.xml">
+                <SetVariable name="TooltipId">beats_translate_earlier</SetVariable>
+                <SetVariable name="ObjectName">NocturneBtnSmall</SetVariable>
+                <SetVariable name="Size">26,22f</SetVariable>
+                <SetVariable name="Text">&#8249;</SetVariable>
+                <SetVariable name="ConfigKey"><Variable name="Group"/>,beats_translate_earlier</SetVariable>
+              </Template>
+              <Template src="skins:Nocturne2/controls/button_flat_text.xml">
+                <SetVariable name="TooltipId">beats_translate_later</SetVariable>
+                <SetVariable name="ObjectName">NocturneBtnSmall</SetVariable>
+                <SetVariable name="Size">26,22f</SetVariable>
+                <SetVariable name="Text">&#8250;</SetVariable>
+                <SetVariable name="ConfigKey"><Variable name="Group"/>,beats_translate_later</SetVariable>
+              </Template>
+              <Template src="skins:Nocturne2/controls/button_flat_text.xml">
+                <SetVariable name="TooltipId">beats_adjust_slower</SetVariable>
+                <SetVariable name="ObjectName">NocturneBtnSmall</SetVariable>
+                <SetVariable name="Size">26,22f</SetVariable>
+                <SetVariable name="Text">&#8722;</SetVariable>
+                <SetVariable name="ConfigKey"><Variable name="Group"/>,beats_adjust_slower</SetVariable>
+              </Template>
+              <Template src="skins:Nocturne2/controls/button_flat_text.xml">
+                <SetVariable name="TooltipId">beats_adjust_faster</SetVariable>
+                <SetVariable name="ObjectName">NocturneBtnSmall</SetVariable>
+                <SetVariable name="Size">26,22f</SetVariable>
+                <SetVariable name="Text">+</SetVariable>
+                <SetVariable name="ConfigKey"><Variable name="Group"/>,beats_adjust_faster</SetVariable>
+              </Template>
+
+            </Children>
+            <Connection>
+              <ConfigKey>[Nocturne2],show_beatgrid_controls</ConfigKey>
+              <BindProperty>visible</BindProperty>
+            </Connection>
+          </WidgetGroup>
+          <WidgetGroup><Size>6f,1f</Size></WidgetGroup>
+        </Children>
+      </WidgetGroup>
+
+      <WidgetGroup><Size>1f,0me</Size></WidgetGroup>
+    </Children>
+  </WidgetGroup>
+</Template>

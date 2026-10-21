@@ -1,0 +1,28 @@
+<!DOCTYPE template>
+<!-- Nocturne: mixer. Small round status dot that doubles as a toggle button (8 px, Traktor size).
+  Variables: DotGroup, DotControl, DotTooltipId, DotVisKey (config key; the dot is shown while it is 1) -->
+<Template>
+  <WidgetGroup>
+    <Layout>horizontal</Layout>
+    <Size>8f,8f</Size>
+    <Children>
+      <PushButton>
+        <TooltipId><Variable name="DotTooltipId"/></TooltipId>
+        <ObjectName>NocturneDot</ObjectName>
+        <Size>8f,8f</Size>
+        <NumberStates>2</NumberStates>
+        <RightClickIsPushButton>false</RightClickIsPushButton>
+        <State><Number>0</Number></State>
+        <State><Number>1</Number></State>
+        <Connection>
+          <ConfigKey><Variable name="DotGroup"/>,<Variable name="DotControl"/></ConfigKey>
+          <ButtonState>LeftButton</ButtonState>
+        </Connection>
+      </PushButton>
+    </Children>
+    <Connection>
+      <ConfigKey persist="true"><Variable name="DotVisKey"/></ConfigKey>
+      <BindProperty>visible</BindProperty>
+    </Connection>
+  </WidgetGroup>
+</Template>

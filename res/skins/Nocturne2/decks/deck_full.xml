@@ -1,0 +1,32 @@
+<Template>
+  <WidgetGroup>
+    <ObjectName>DeckContainer</ObjectName>
+    <Layout>horizontal</Layout>
+    <SizePolicy>me,min</SizePolicy>
+    <Children>
+
+      <WidgetGroup>
+        <ObjectName>Deck<Variable name="ChanNum"/></ObjectName>
+        <Layout>horizontal</Layout>
+        <SizePolicy>me,min</SizePolicy>
+        <Children>
+
+          <WidgetGroup>
+            <ObjectName>DeckRows12345</ObjectName>
+            <SizePolicy>me,min</SizePolicy>
+            <Layout>vertical</Layout>
+            <Children>
+
+              <!-- Nocturne: deck header + overview row + rate fader (#76) -->
+              <Template src="skins:Nocturne2/decks/nocturne_deck_top.xml"/>
+
+              <Template src="skins:Nocturne2/decks/nocturne_deck_rows.xml"/>
+
+            </Children>
+          </WidgetGroup><!-- DeckRows12345 -->
+
+        </Children>
+      </WidgetGroup><!-- DeckN -->
+    </Children>
+  </WidgetGroup>
+</Template>

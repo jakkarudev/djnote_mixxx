@@ -1,0 +1,66 @@
+<!DOCTYPE template>
+<!-- Nocturne2: mixer. One EQ band in the 56 px EQ column: 35x35 knob (same geometry as nocturne_knob.xml)
+  and a caption row with the kill dot right of the caption (the dot is shown while the
+  [Nocturne2],show_eq_kill_buttons setting is on). Variables: EqFxUnit, EqEffect, EqParameter, EqRange (High|Mid|Low), Label -->
+<Template>
+  <WidgetGroup>
+    <ObjectName>NocturneMixCell</ObjectName>
+    <Layout>vertical</Layout>
+    <Size>56f,49f</Size>
+    <Children>
+      <WidgetGroup>
+        <Layout>horizontal</Layout>
+        <Size>56f,35f</Size>
+        <Children>
+          <WidgetGroup><Size>10f,1f</Size></WidgetGroup>
+          <EffectParameterKnobComposed>
+            <TooltipId>filter<Variable name="EqRange"/></TooltipId>
+            <Size>35f,35f</Size>
+            <Knob>skins:Nocturne2/<Variable name="KnobScheme"/>/knobs/knob_indicator_mixer_grey.svg</Knob>
+            <BackPath>skins:Nocturne2/<Variable name="KnobScheme"/>/knobs/knob_bg_mixer.svg</BackPath>
+            <MinAngle><Variable name="PotiMinAngle"/></MinAngle>
+            <MaxAngle><Variable name="PotiMaxAngle"/></MaxAngle>
+            <ArcRadius>16</ArcRadius>
+            <ArcThickness>3</ArcThickness>
+            <ArcColor><Variable name="ArcColorEq"/></ArcColor>
+            <ArcBgThickness>3</ArcBgThickness>
+            <ArcBgColor><Variable name="ArcBgColor"/></ArcBgColor>
+            <ArcRoundCaps>false</ArcRoundCaps>
+            <EffectUnitGroup><Variable name="EqFxUnit"/></EffectUnitGroup>
+            <Effect>1</Effect>
+            <EffectParameter><Variable name="EqParameter"/></EffectParameter>
+            <Connection>
+              <ConfigKey><Variable name="EqEffect"/>,parameter<Variable name="EqParameter"/></ConfigKey>
+            </Connection>
+          </EffectParameterKnobComposed>
+          <WidgetGroup><Size>0me,1f</Size></WidgetGroup>
+        </Children>
+      </WidgetGroup>
+      <WidgetGroup>
+        <Layout>horizontal</Layout>
+        <Size>56f,14f</Size>
+        <Children>
+          <WidgetGroup><Size>10f,1f</Size></WidgetGroup>
+          <Label>
+            <ObjectName>NocturneMixLabel</ObjectName>
+            <Size>35f,14f</Size>
+            <Text><Variable name="Label"/></Text>
+            <Alignment>center</Alignment>
+          </Label>
+          <WidgetGroup><Size>2f,1f</Size></WidgetGroup>
+          <Template src="skins:Nocturne2/mixer/nocturne_dot.xml">
+            <SetVariable name="DotGroup"><Variable name="EqEffect"/></SetVariable>
+            <SetVariable name="DotControl">button_parameter<Variable name="EqParameter"/></SetVariable>
+            <SetVariable name="DotTooltipId">filter<Variable name="EqRange"/>Kill</SetVariable>
+            <SetVariable name="DotVisKey">[Nocturne2],show_eq_kill_buttons</SetVariable>
+          </Template>
+          <WidgetGroup><Size>0me,1f</Size></WidgetGroup>
+        </Children>
+      </WidgetGroup>
+    </Children>
+    <Connection>
+      <ConfigKey><Variable name="EqEffect"/>,parameter<Variable name="EqParameter"/>_loaded</ConfigKey>
+      <BindProperty>visible</BindProperty>
+    </Connection>
+  </WidgetGroup>
+</Template>

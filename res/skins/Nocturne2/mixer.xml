@@ -1,0 +1,83 @@
+<Template>
+  <SetVariable name="BtnType"><Variable name="TopRegion_BtnType"/></SetVariable>
+
+  <WidgetGroup>
+    <SizePolicy>max,me</SizePolicy>
+    <Layout>horizontal</Layout>
+    <Children>
+
+      <WidgetGroup>
+        <ObjectName>MixerContainer</ObjectName>
+        <SizePolicy>min,me</SizePolicy>
+        <Layout>horizontal</Layout>
+        <Children>
+
+          <WidgetGroup>
+            <ObjectName>MixerDecks</ObjectName>
+            <SizePolicy>max,min</SizePolicy>
+            <Layout>vertical</Layout>
+            <Children>
+              <Template src="skins:Nocturne2/mixer/mixer_2decks.xml"/>
+              <Template src="skins:Nocturne2/mixer/mixer_4decks.xml"/>
+            </Children>
+            <Connection>
+              <ConfigKey persist="true">[Nocturne2],show_main_head_mixer</ConfigKey>
+              <BindProperty>highlight</BindProperty>
+            </Connection>
+          </WidgetGroup>
+
+          <!-- Nocturne: strip. 2 decks: main/headphone knobs live in the strip (mixer/nocturne_strip.xml) -->
+          <WidgetGroup>
+            <Layout>horizontal</Layout>
+            <SizePolicy>max,me</SizePolicy>
+            <Children>
+              <Template src="skins:Nocturne2/mixer/mixer_main_headphone.xml"/>
+            </Children>
+            <Connection>
+              <ConfigKey persist="true">[Nocturne2],show_4decks</ConfigKey>
+              <BindProperty>visible</BindProperty>
+            </Connection>
+          </WidgetGroup>
+
+        </Children>
+      </WidgetGroup><!-- MixerContainer -->
+
+    </Children>
+    <Connection>
+      <ConfigKey persist="true">[Nocturne2],show_mixer</ConfigKey>
+      <BindProperty>visible</BindProperty>
+    </Connection>
+  </WidgetGroup>
+
+  <WidgetGroup>
+    <SizePolicy>max,me</SizePolicy>
+    <Layout>horizontal</Layout>
+    <Children>
+
+      <WidgetGroup>
+        <ObjectName></ObjectName>
+        <SizePolicy>min,me</SizePolicy>
+        <Layout>vertical</Layout>
+        <Children>
+
+          <WidgetGroup><!--  width set in qss  -->
+            <ObjectName>CompactDecksCenterSpacer</ObjectName>
+          </WidgetGroup>
+
+          <Template src="skins:Nocturne2/mixer/vumeters_compact.xml"/>
+
+        </Children>
+        <Connection>
+          <ConfigKey>[Nocturne2],show_compact_deck</ConfigKey>
+          <BindProperty>visible</BindProperty>
+        </Connection>
+      </WidgetGroup>
+
+    </Children>
+    <Connection>
+      <ConfigKey persist="true">[Nocturne2],show_mixer</ConfigKey>
+      <Transform><Not/></Transform>
+      <BindProperty>visible</BindProperty>
+    </Connection>
+  </WidgetGroup>
+</Template>

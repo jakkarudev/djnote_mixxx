@@ -1,0 +1,37 @@
+<!DOCTYPE template>
+<!-- Nocturne2: mixer. Channel level meter column (8 px): Traktor's segmented 4x165 meter, from the top of
+  the mixer down to the LO caption. The graphics are exactly widget-sized. Variable: ChanNum -->
+<Template>
+  <SetVariable name="Group">[Channel<Variable name="ChanNum"/>]</SetVariable>
+  <WidgetGroup>
+    <ObjectName>NocturneMixVu</ObjectName>
+    <Layout>vertical</Layout>
+    <Size>8f,0me</Size>
+    <Children>
+      <WidgetGroup><Size>1f,1f</Size></WidgetGroup>
+      <WidgetGroup>
+        <Layout>horizontal</Layout>
+        <Size>8f,165f</Size>
+        <Children>
+          <WidgetGroup><Size>2f,1f</Size></WidgetGroup>
+          <VuMeter>
+            <TooltipId>channel_VuMeter</TooltipId>
+            <Size>4f,165f</Size>
+            <PathBack scalemode="STRETCH">skins:Nocturne2/<Variable name="StyleScheme"/>/style/nocturne_vu_bg.png</PathBack>
+            <PathVu scalemode="STRETCH">skins:Nocturne2/<Variable name="StyleScheme"/>/style/nocturne_vu_on.png</PathVu>
+            <Horizontal>false</Horizontal>
+            <PeakHoldSize>5</PeakHoldSize>
+            <PeakHoldTime>500</PeakHoldTime>
+            <PeakFallTime>10</PeakFallTime>
+            <PeakFallStep>2</PeakFallStep>
+            <Connection>
+              <ConfigKey><Variable name="Group"/>,vu_meter</ConfigKey>
+            </Connection>
+          </VuMeter>
+          <WidgetGroup><Size>2f,1f</Size></WidgetGroup>
+        </Children>
+      </WidgetGroup>
+      <WidgetGroup><Size>1f,0me</Size></WidgetGroup>
+    </Children>
+  </WidgetGroup>
+</Template>
