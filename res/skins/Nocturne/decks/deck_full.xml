@@ -17,58 +17,14 @@
             <Layout>vertical</Layout>
             <Children>
 
-              <Template src="skins:Nocturne/decks/row_1_keyVinylFx.xml"/>
-
-              <WidgetGroup>
-                <ObjectName>DeckRows234</ObjectName>
-                <SizePolicy>me,min</SizePolicy>
-                <Layout>horizontal</Layout>
-                <Children>
-
-                  <WidgetGroup>
-                    <Layout>horizontal</Layout>
-                    <SizePolicy>min,min</SizePolicy>
-                    <Children>
-                      <Template src="skins:Nocturne/decks/spinny_cover_site.xml">
-                        <SetVariable name="ContainerName">SpinnyCoverContainer_Big</SetVariable>
-                      </Template>
-                    </Children>
-                    <Connection>
-                      <ConfigKey>[Nocturne],select_big_spinny_or_cover</ConfigKey>
-                      <BindProperty>visible</BindProperty>
-                    </Connection>
-                  </WidgetGroup>
-
-                  <WidgetGroup>
-                    <SizePolicy>me,min</SizePolicy>
-                    <Layout>vertical</Layout>
-                    <Children>
-                      <Template src="skins:Nocturne/decks/row_2_3_TitleArtistTime.xml" />
-                      <Template src="skins:Nocturne/decks/row_4_overviewSpinny.xml" />
-                    </Children>
-                  </WidgetGroup>
-
-                </Children>
-              </WidgetGroup><!-- DeckRows234 -->
+              <!-- Nocturne: deck header + overview row + rate fader (#76) -->
+              <Template src="skins:Nocturne/decks/nocturne_deck_top.xml"/>
 
               <Template src="skins:Nocturne/decks/row_5_transportLoopJump.xml" />
 
             </Children>
           </WidgetGroup><!-- DeckRows12345 -->
 
-          <WidgetGroup>
-            <ObjectName>DeckRateSpacer</ObjectName>
-            <SizePolicy>min,min</SizePolicy>
-            <Children/>
-            <!-- this is sized and styled in css -->
-            <Connection>
-              <ConfigKey persist="true">[Nocturne],show_rate_controls</ConfigKey>
-              <Transform><Not/></Transform>
-              <BindProperty>visible</BindProperty>
-            </Connection>
-          </WidgetGroup>
-
-          <Template src="skins:Nocturne/decks/rate_controls.xml"/>
         </Children>
       </WidgetGroup><!-- DeckN -->
     </Children>
