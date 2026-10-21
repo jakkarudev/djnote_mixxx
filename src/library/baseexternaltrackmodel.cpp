@@ -4,6 +4,7 @@
 #include <QSqlQuery>
 
 #include "library/dao/trackschema.h"
+#include "library/externalcovercolumn.h"
 #include "library/queryutil.h"
 #include "library/trackcollectionmanager.h"
 #include "mixer/playerinfo.h"
@@ -16,11 +17,13 @@ BaseExternalTrackModel::BaseExternalTrackModel(QObject* parent,
         const char* settingsNamespace,
         const QString& trackTable,
         QSharedPointer<BaseTrackCache> trackSource)
-        : BaseSqlTableModel(parent, pTrackCollectionManager, settingsNamespace) {
+        : BaseSqlTableModel(parent, pTrackCollectionManager, settingsNamespace),
+          m_pCoverColumn(new ExternalCoverColumn(this)) {
     QString viewTable = trackTable + "_view";
     QStringList columns;
     columns << "id";
     columns << "'' AS " + LIBRARYTABLE_PREVIEW;
+    columns << ExternalCoverColumn::viewColumn(); // DJNote
 
     QSqlQuery query(m_database);
     FieldEscaper f(m_database);
@@ -38,11 +41,17 @@ BaseExternalTrackModel::BaseExternalTrackModel(QObject* parent,
     }
 
     columns[1] = LIBRARYTABLE_PREVIEW;
+    columns[2] = LIBRARYTABLE_COVERART; // DJNote
     setTable(viewTable, columns[0], columns, trackSource);
+    m_pCoverColumn->addToSavedHeaderState(); // DJNote
     setDefaultSort(fieldIndex(ColumnCache::COLUMN_LIBRARYTABLE_ARTIST), Qt::AscendingOrder);
 }
 
 BaseExternalTrackModel::~BaseExternalTrackModel() {
+}
+
+CoverInfo BaseExternalTrackModel::getCoverInfo(const QModelIndex& index) const {
+    return m_pCoverColumn->coverInfo(index);
 }
 
 TrackPointer BaseExternalTrackModel::getTrack(const QModelIndex& index) const {

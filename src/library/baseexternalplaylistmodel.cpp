@@ -1,6 +1,7 @@
 #include "library/baseexternalplaylistmodel.h"
 
 #include "library/dao/trackschema.h"
+#include "library/externalcovercolumn.h"
 #include "library/queryutil.h"
 #include "library/trackcollection.h"
 #include "library/trackcollectionmanager.h"
@@ -26,10 +27,15 @@ BaseExternalPlaylistModel::BaseExternalPlaylistModel(QObject* parent,
           m_playlistsTable(playlistsTable),
           m_playlistTracksTable(playlistTracksTable),
           m_trackSource(trackSource),
-          m_currentPlaylistId(kInvalidPlaylistId) {
+          m_currentPlaylistId(kInvalidPlaylistId),
+          m_pCoverColumn(new ExternalCoverColumn(this)) {
 }
 
 BaseExternalPlaylistModel::~BaseExternalPlaylistModel() {
+}
+
+CoverInfo BaseExternalPlaylistModel::getCoverInfo(const QModelIndex& index) const {
+    return m_pCoverColumn->coverInfo(index);
 }
 
 TrackPointer BaseExternalPlaylistModel::getTrack(const QModelIndex& index) const {
@@ -142,7 +148,8 @@ void BaseExternalPlaylistModel::setPlaylistById(int playlistId) {
     auto playlistViewColumns = QStringList{
             PLAYLISTTRACKSTABLE_TRACKID,
             PLAYLISTTRACKSTABLE_POSITION,
-            QStringLiteral("'' AS ") + LIBRARYTABLE_PREVIEW};
+            QStringLiteral("'' AS ") + LIBRARYTABLE_PREVIEW,
+            ExternalCoverColumn::viewColumn()}; // DJNote
     const auto queryString =
             QStringLiteral(
                     "CREATE TEMPORARY VIEW IF NOT EXISTS %1 AS "
@@ -162,8 +169,10 @@ void BaseExternalPlaylistModel::setPlaylistById(int playlistId) {
     }
 
     m_currentPlaylistId = playlistId;
-    playlistViewColumns.last() = LIBRARYTABLE_PREVIEW;
+    playlistViewColumns[2] = LIBRARYTABLE_PREVIEW;
+    playlistViewColumns[3] = LIBRARYTABLE_COVERART; // DJNote
     setTable(playlistViewTable, playlistViewColumns.first(), playlistViewColumns, m_trackSource);
+    m_pCoverColumn->addToSavedHeaderState(); // DJNote
     setDefaultSort(fieldIndex(ColumnCache::COLUMN_PLAYLISTTRACKSTABLE_POSITION),
             Qt::AscendingOrder);
     // Restore search text

@@ -11,6 +11,7 @@
 #include "library/banshee/bansheefeature.h"
 #include "library/browse/browsefeature.h"
 #include "library/coverlookup.h"
+#include "library/externalcovercolumn.h"
 #ifdef __ENGINEPRIME__
 #include "library/export/libraryexporter.h"
 #endif
@@ -540,6 +541,8 @@ void Library::slotShowTrackModel(QAbstractItemModel* model) {
     VERIFY_OR_DEBUG_ASSERT(trackModel) {
         return;
     }
+    // DJNote: the external libraries' cover column answers covers by location.
+    ExternalCoverColumn::attachCoverLookup(model, m_pCoverLookup.get());
     emit showTrackModel(model);
     emit switchToView(m_sTrackViewName);
     emit restoreSearch(trackModel->currentSearch());

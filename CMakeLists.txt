@@ -983,6 +983,7 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/library/export/trackexportdlg.cpp
   src/library/export/trackexportwizard.cpp
   src/library/export/trackexportworker.cpp
+  src/library/externalcovercolumn.cpp
   src/library/externaltrackcollection.cpp
   src/library/itunes/itunesdao.cpp
   src/library/itunes/itunesfeature.cpp
@@ -2230,6 +2231,7 @@ if(BUILD_TESTING)
     src/test/enginemixertest.cpp
     src/test/enginemicrophonetest.cpp
     src/test/enginesynctest.cpp
+    src/test/externalcovercolumn_test.cpp
     src/test/fileinfo_test.cpp
     src/test/frametest.cpp
     src/test/globaltrackcache_test.cpp
