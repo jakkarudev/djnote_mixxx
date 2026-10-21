@@ -1,9 +1,14 @@
 #include "library/covercolumnsort.h"
 
 #include <QAbstractItemModel>
+#include <QApplication>
+#include <QHeaderView>
+#include <QTableView>
+#include <QTimer>
 #include <QVariant>
 
 #include "library/coverlookup.h"
+#include "library/trackmodel.h"
 #include "moc_covercolumnsort.cpp"
 #include "util/assert.h"
 
@@ -17,7 +22,9 @@ CoverColumnSort::CoverColumnSort(
           m_column(column),
           m_pCoverLookup(pCoverLookup),
           m_sortedByCover(false),
-          m_order(Qt::AscendingOrder) {
+          m_order(Qt::AscendingOrder),
+          m_otherColumn(-1),
+          m_otherOrder(Qt::AscendingOrder) {
 }
 
 CoverColumnSort::~CoverColumnSort() {
@@ -29,6 +36,7 @@ bool CoverColumnSort::sortByCover(Qt::SortOrder order, const QStringList& locati
         // The cover header clicked again while reading.
         cancelReading();
         m_sortedByCover = false;
+        emit sortCancelled(m_otherColumn, m_otherOrder);
         return false;
     }
     m_sortedByCover = true;
@@ -36,9 +44,11 @@ bool CoverColumnSort::sortByCover(Qt::SortOrder order, const QStringList& locati
     return read(locations);
 }
 
-void CoverColumnSort::sortByOtherColumn() {
+void CoverColumnSort::sortByOtherColumn(int column, Qt::SortOrder order) {
     cancelReading();
     m_sortedByCover = false;
+    m_otherColumn = column;
+    m_otherOrder = order;
 }
 
 bool CoverColumnSort::rowsChanged(const QStringList& locations) {
@@ -55,6 +65,30 @@ void CoverColumnSort::rowsCleared() {
 // static
 QString CoverColumnSort::sortKey(const QByteArray& imageDigest) {
     return QString::fromLatin1(imageDigest.toHex());
+}
+
+// static
+void CoverColumnSort::showSortInViews(
+        QAbstractItemModel* pViewModel, int column, Qt::SortOrder order) {
+    // Not while the view that asked to sort is still sorting.
+    QTimer::singleShot(0, pViewModel, [pViewModel, column, order] {
+        int sortColumn = column;
+        Qt::SortOrder sortOrder = order;
+        if (sortColumn < 0) {
+            if (auto* pTrackModel = dynamic_cast<TrackModel*>(pViewModel)) {
+                sortColumn = pTrackModel->defaultSortColumn();
+                sortOrder = pTrackModel->defaultSortOrder();
+            }
+        }
+        // Views don't tell their models about themselves: look for them.
+        const auto widgets = QApplication::allWidgets();
+        for (QWidget* pWidget : widgets) {
+            auto* pView = qobject_cast<QTableView*>(pWidget);
+            if (pView && pView->model() == pViewModel) {
+                pView->horizontalHeader()->setSortIndicator(sortColumn, sortOrder);
+            }
+        }
+    });
 }
 
 bool CoverColumnSort::read(const QStringList& locations) {

@@ -156,18 +156,23 @@ bool ExternalCoverColumn::sortRequested(int column, Qt::SortOrder order) {
     if (!m_pCoverLookup) {
         return true;
     }
-    if (column != this->column()) {
-        if (m_pSort) {
-            m_pSort->sortByOtherColumn();
-        }
-        return true;
-    }
     if (!m_pSort) {
-        m_pSort = new CoverColumnSort(m_pModel, column, m_pCoverLookup, this);
+        // Once the model has its table, so the cover column is known.
+        m_pSort = new CoverColumnSort(m_pModel, this->column(), m_pCoverLookup, this);
         connect(m_pSort,
                 &CoverColumnSort::readyToSort,
                 this,
                 &ExternalCoverColumn::slotReadyToSort);
+        connect(m_pSort,
+                &CoverColumnSort::sortCancelled,
+                this,
+                [this](int column, Qt::SortOrder order) {
+                    CoverColumnSort::showSortInViews(m_pModel, column, order);
+                });
+    }
+    if (column != this->column()) {
+        m_pSort->sortByOtherColumn(column, order);
+        return true;
     }
     if (m_rowsOfPreviousTable) {
         // Another playlist: its rows, in its default order, while its covers

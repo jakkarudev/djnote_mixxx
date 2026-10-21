@@ -47,6 +47,14 @@ BrowseCoverColumn::BrowseCoverColumn(
             &CoverColumnSort::readyToSort,
             this,
             &BrowseCoverColumn::slotReadyToSort);
+    connect(m_pSort,
+            &CoverColumnSort::sortCancelled,
+            this,
+            [this](int column, Qt::SortOrder order) {
+                if (m_pProxy) {
+                    CoverColumnSort::showSortInViews(m_pProxy, column, order);
+                }
+            });
     m_rowsInsertedTimer.setSingleShot(true);
     m_rowsInsertedTimer.setInterval(0);
     connect(&m_rowsInsertedTimer,
@@ -132,7 +140,7 @@ bool BrowseCoverColumn::sortRequested(
         QSortFilterProxyModel* pProxy, int column, Qt::SortOrder order) {
     m_pProxy = pProxy;
     if (column != m_column) {
-        m_pSort->sortByOtherColumn();
+        m_pSort->sortByOtherColumn(column, order);
         return true;
     }
     m_rowsInsertedTimer.stop();

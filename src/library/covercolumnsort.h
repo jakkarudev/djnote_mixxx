@@ -19,7 +19,10 @@ class QAbstractItemModel;
 /// header ("Cover Art (reading 340/2000)"). The list keeps its order while
 /// they are read and is sorted once at the end: readyToSort() asks for it.
 /// Asking to sort by the cover column again with the other order (its header
-/// clicked again) or by another column cancels the read.
+/// clicked again) or by another column cancels the read. When the header
+/// click cancels it, the list keeps the sort it had, and the views showing it
+/// must show that sort again (sortCancelled()): left on the cover column,
+/// re-applying their sort (e.g. on the next folder) would read again.
 ///
 /// The list itself writes the sort keys (the covers' image digests, as in
 /// Tracks) and sorts; this class only decides when.
@@ -41,7 +44,7 @@ class CoverColumnSort : public QObject {
 
     /// To call when the list is asked to sort by another column. Cancels the
     /// read, if any.
-    void sortByOtherColumn();
+    void sortByOtherColumn(int column, Qt::SortOrder order);
 
     /// To call when the rows changed while sorted by cover, with the
     /// locations of all rows. Returns whether to sort now, as sortByCover().
@@ -66,9 +69,22 @@ class CoverColumnSort : public QObject {
     /// share it, rows without a cover come first in ascending order.
     static QString sortKey(const QByteArray& imageDigest);
 
+    /// Puts the sort indicator of the table views showing `pViewModel` on
+    /// `column` in `order`, once the current event is handled. Each view
+    /// then sorts by it as if the DJ had clicked that header. -1 = the
+    /// model's default sort.
+    static void showSortInViews(QAbstractItemModel* pViewModel,
+            int column,
+            Qt::SortOrder order);
+
   signals:
     /// All covers are read: sort the list by cover now.
     void readyToSort(Qt::SortOrder order);
+
+    /// The cover header was clicked again while reading: the list keeps
+    /// its sort, by `column` in `order` (the last other column asked for,
+    /// -1 if none). Show it in the views (showSortInViews()).
+    void sortCancelled(int column, Qt::SortOrder order);
 
   private slots:
     void slotProgress(int done, int total);
@@ -90,4 +106,7 @@ class CoverColumnSort : public QObject {
     QVariant m_headerToolTip;
     bool m_sortedByCover;
     Qt::SortOrder m_order;
+    // The last other column the list was asked to sort by.
+    int m_otherColumn;
+    Qt::SortOrder m_otherOrder;
 };

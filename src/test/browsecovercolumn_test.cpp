@@ -2,16 +2,23 @@
 
 #include <gtest/gtest.h>
 
+#include <QFile>
+#include <QHeaderView>
+#include <QSignalSpy>
 #include <QStringList>
+#include <QTableView>
+#include <QTemporaryDir>
 #include <memory>
 #include <string>
 
 #include "library/browse/browsetablemodel.h"
 #include "library/coverlookup.h"
 #include "library/dao/settingsdao.h"
+#include "library/proxytrackmodel.h"
 #include "mixer/playerinfo.h"
 #include "proto/headers.pb.h"
 #include "test/librarytest.h"
+#include "util/fileaccess.h"
 #include "widget/wtracktableviewheader.h"
 
 namespace {
@@ -118,6 +125,38 @@ class BrowseCoverColumnTest : public LibraryTest {
                 header.sortIndicatorOrder()};
     }
 
+    /// Shows `folder`, which has `fileCount` files, in `pModel` (as Computer
+    /// does) and waits until all its files are listed.
+    static void showFolder(BrowseTableModel* pModel, const QTemporaryDir& folder, int fileCount) {
+        QSignalSpy rowsInserted(pModel, &QAbstractItemModel::rowsInserted);
+        pModel->setPath(mixxx::FileAccess(mixxx::FileInfo(folder.path())));
+        while (pModel->rowCount() < fileCount) {
+            if (!rowsInserted.wait(kTimeoutMillis)) {
+                ADD_FAILURE() << "Folder not listed";
+                return;
+            }
+        }
+    }
+
+    /// Sorts as WTrackTableView does when the DJ clicks a header: the
+    /// header shows the new sort, then the model is asked to sort.
+    static void clickToSort(QTableView* pView, int column, Qt::SortOrder order) {
+        pView->horizontalHeader()->setSortIndicator(column, order);
+        pView->model()->sort(column, order);
+    }
+
+    static bool headerShowsReading(const BrowseTableModel& model) {
+        return model.headerData(COLUMN_COVERART, Qt::Horizontal)
+                .toString()
+                .contains(QStringLiteral("reading"));
+    }
+
+    QString testFile(const QString& relativePath) const {
+        return getTestDir().filePath(relativePath);
+    }
+
+    static constexpr int kTimeoutMillis = 5000;
+
     CoverLookup m_coverLookup;
 };
 
@@ -182,6 +221,38 @@ TEST_F(BrowseCoverColumnTest, layoutSavedWithCoverColumnIsRestored) {
               "Comment|Duration|BPM|Key|Type|Bitrate|File Modified|"
               "ReplayGain|Cover Art",
             header(pModel.get()).visibleColumns);
+}
+
+TEST_F(BrowseCoverColumnTest, cancellingCoverSortPutsSortIndicatorBackOnTheListsSort) {
+    QTemporaryDir folder;
+    ASSERT_TRUE(folder.isValid());
+    for (const QString& name : {QStringLiteral("a.mp3"), QStringLiteral("b.mp3")}) {
+        ASSERT_TRUE(QFile::copy(testFile(QStringLiteral("id3-test-data/cover-test-png.mp3")),
+                folder.filePath(name)));
+    }
+    const auto pModel = browseModel();
+    // As Computer shows it.
+    ProxyTrackModel proxy(pModel.get(), true);
+    proxy.setSortRole(Qt::UserRole);
+    QTableView view;
+    view.setModel(&proxy);
+    showFolder(pModel.get(), folder, 2);
+    clickToSort(&view, COLUMN_FILENAME, Qt::DescendingOrder);
+
+    clickToSort(&view, COLUMN_COVERART, Qt::AscendingOrder);
+    ASSERT_TRUE(headerShowsReading(*pModel));
+    clickToSort(&view, COLUMN_COVERART, Qt::DescendingOrder);
+    QCoreApplication::processEvents();
+
+    // The list is still sorted by file name, and the header says so.
+    EXPECT_EQ(COLUMN_FILENAME, view.horizontalHeader()->sortIndicatorSection());
+    EXPECT_EQ(Qt::DescendingOrder, view.horizontalHeader()->sortIndicatorOrder());
+    EXPECT_EQ(QStringLiteral("b.mp3"),
+            proxy.index(0, COLUMN_FILENAME).data().toString());
+    // Re-applying the header's sort (e.g. on the next folder) reads nothing.
+    proxy.sort(view.horizontalHeader()->sortIndicatorSection(),
+            view.horizontalHeader()->sortIndicatorOrder());
+    EXPECT_FALSE(headerShowsReading(*pModel));
 }
 
 TEST_F(BrowseCoverColumnTest, upstreamColumnsKeepTheirIndexes) {

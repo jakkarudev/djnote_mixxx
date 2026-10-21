@@ -8,6 +8,8 @@
 #include <QSet>
 #include <QSqlQuery>
 #include <QSqlRecord>
+#include <QHeaderView>
+#include <QTableView>
 #include <QTemporaryDir>
 
 #include "library/baseexternalplaylistmodel.h"
@@ -314,6 +316,13 @@ class ExternalCoverColumnTest : public LibraryTest {
         QCoreApplication::processEvents();
     }
 
+    /// Sorts as WTrackTableView does when the DJ clicks a header: the
+    /// header shows the new sort, then the model is asked to sort.
+    static void clickToSort(QTableView* pView, int column, Qt::SortOrder order) {
+        pView->horizontalHeader()->setSortIndicator(column, order);
+        pView->model()->sort(column, order);
+    }
+
     /// Waits until the covers of `locations` are read (by another batch), so
     /// a cancelled cover sort would have finished too, and lets queued work
     /// run.
@@ -571,6 +580,34 @@ TEST_F(ExternalCoverColumnTest, clickingCoverHeaderAgainWhileReadingCancels) {
     EXPECT_EQ(label, pModel->headerData(coverColumn(*pModel), Qt::Horizontal).toString());
     waitUntilCoversRead(orderBefore);
     EXPECT_EQ(orderBefore, rowLocations(*pModel));
+}
+
+TEST_F(ExternalCoverColumnTest, cancellingCoverSortPutsSortIndicatorBackOnTheListsSort) {
+    QTemporaryDir withFolderImage;
+    QTemporaryDir withoutFolderImage;
+    ASSERT_TRUE(withFolderImage.isValid() && withoutFolderImage.isValid());
+    addCoverSortFiles(withFolderImage, withoutFolderImage);
+    const auto pModel = trackListModel();
+    QTableView view;
+    view.setModel(pModel.get());
+    const int title = pModel->fieldIndex(ColumnCache::COLUMN_LIBRARYTABLE_TITLE);
+    clickToSort(&view, title, Qt::DescendingOrder);
+    const QStringList byTitle = rowLocations(*pModel);
+
+    clickToSort(&view, coverColumn(*pModel), Qt::AscendingOrder);
+    ASSERT_TRUE(headerShowsReading(*pModel));
+    clickToSort(&view, coverColumn(*pModel), Qt::DescendingOrder);
+    QCoreApplication::processEvents();
+
+    // The list is still sorted by title, and the header says so.
+    EXPECT_EQ(byTitle, rowLocations(*pModel));
+    EXPECT_EQ(title, view.horizontalHeader()->sortIndicatorSection());
+    EXPECT_EQ(Qt::DescendingOrder, view.horizontalHeader()->sortIndicatorOrder());
+    // Re-applying the header's sort (e.g. when the view shows the list
+    // again) reads nothing.
+    pModel->sort(view.horizontalHeader()->sortIndicatorSection(),
+            view.horizontalHeader()->sortIndicatorOrder());
+    EXPECT_FALSE(headerShowsReading(*pModel));
 }
 
 TEST_F(ExternalCoverColumnTest, sortingByAnotherColumnWhileReadingCancels) {
