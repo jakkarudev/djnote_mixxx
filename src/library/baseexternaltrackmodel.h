@@ -5,6 +5,7 @@
 #include "library/trackmodel.h"
 #include "library/basesqltablemodel.h"
 
+class ExternalCoverColumn;
 class TrackCollection;
 class QModelIndex;
 class QString;
@@ -24,7 +25,11 @@ class BaseExternalTrackModel : public BaseSqlTableModel {
     TrackPointer getTrack(const QModelIndex& index) const override;
     bool isColumnInternal(int column) override;
     Qt::ItemFlags flags(const QModelIndex& index) const override;
+    CoverInfo getCoverInfo(const QModelIndex& index) const override;
 
   private:
     TrackId doGetTrackId(const TrackPointer& pTrack) const override;
+
+    // DJNote
+    ExternalCoverColumn* const m_pCoverColumn;
 };
