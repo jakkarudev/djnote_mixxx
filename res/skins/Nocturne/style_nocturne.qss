@@ -3344,3 +3344,126 @@ WTrackTableViewHeader::section {
   color: #6d6d6d;
   font-size: 11px;
 }
+
+/* === Nocturne: deck header ============================================== */
+/* Ticket #76. Template: decks/nocturne_deck_top.xml. Palette: see base look. */
+
+#NocturneDeckTop {
+  background-color: #181818;
+  padding: 0px;
+}
+#NocturneDeckTopMain {
+  padding: 6px 0px 0px 6px;
+}
+#NocturneDeckHeader {
+  padding: 0px;
+}
+#NocturneDeckCover {
+  min-width: 56px;
+  max-width: 56px;
+  min-height: 56px;
+  max-height: 56px;
+  margin: 0px 10px 0px 0px;
+}
+#NocturneDeckInfo {
+  padding: 0px;
+}
+WTrackProperty#NocturneDeckTitle,
+WTrackProperty#NocturneDeckArtist,
+WTrackProperty#NocturneDeckAlbum,
+WNumberPos#NocturneDeckElapsed,
+WTrackProperty#NocturneDeckDuration,
+WNumber#NocturneDeckBpmText,
+WNumberRate#NocturneDeckRateText {
+  color: #afafaf;
+  background-color: transparent;
+  padding: 0px;
+  margin: 0px;
+  font-size: 15px;
+}
+WTrackProperty#NocturneDeckTitle {
+  color: #cfcfcf;
+  font-size: 19px;
+}
+WNumberPos#NocturneDeckElapsed,
+WNumber#NocturneDeckBpmText {
+  font-size: 18px;
+}
+WNumberPos#NocturneDeckElapsed:hover {
+  color: #fefefe;
+}
+
+#NocturneDeckSyncRow {
+  padding: 3px 0px 3px 0px;
+}
+#NocturneDeckOverviewRow {
+  background-color: #1f1f1f;
+}
+#NocturneDeckOverviewBox {
+  background-color: #1f1f1f;
+  padding: 0px;
+  margin: 0px;
+}
+
+/* tempo bend (hold) */
+WPushButton#NocturneDeckBendDown,
+WPushButton#NocturneDeckBendUp {
+  background-color: #262626;
+  border: 1px solid #323232;
+  margin: 0px;
+  padding: 0px;
+}
+WPushButton#NocturneDeckBendDown {
+  image: url(skins:Nocturne/nocturne/buttons/nocturne_bend_down.svg) no-repeat center center;
+}
+WPushButton#NocturneDeckBendUp {
+  image: url(skins:Nocturne/nocturne/buttons/nocturne_bend_up.svg) no-repeat center center;
+}
+WPushButton#NocturneDeckBendDown:hover,
+WPushButton#NocturneDeckBendUp:hover {
+  background-color: #323232;
+}
+WPushButton#NocturneDeckBendDown[pressed="true"] {
+  image: url(skins:Nocturne/nocturne/buttons/nocturne_bend_down_pressed.svg) no-repeat center center;
+}
+WPushButton#NocturneDeckBendUp[pressed="true"] {
+  image: url(skins:Nocturne/nocturne/buttons/nocturne_bend_up_pressed.svg) no-repeat center center;
+}
+
+/* key lock: the note */
+WPushButton#NocturneDeckKeylock {
+  background-color: #1f1f1f;
+  border: none;
+  margin: 0px;
+  padding: 0px;
+  image: url(skins:Nocturne/nocturne/buttons/nocturne_note.svg) no-repeat center center;
+}
+WPushButton#NocturneDeckKeylock:hover {
+  background-color: #262626;
+}
+WPushButton#NocturneDeckKeylock[displayValue="1"] {
+  image: url(skins:Nocturne/nocturne/buttons/nocturne_note_active.svg) no-repeat center center;
+}
+
+/* deck letter + rate fader, deck's outer edge */
+#NocturneDeckEdge {
+  padding: 6px 2px 0px 4px;
+}
+WLabel#NocturneDeckLetter1,
+WLabel#NocturneDeckLetter3,
+WLabel#NocturneDeckLetter2,
+WLabel#NocturneDeckLetter4 {
+  font-size: 34px;
+  background-color: transparent;
+  padding: 0px;
+  margin: 0px;
+}
+WLabel#NocturneDeckLetter1,
+WLabel#NocturneDeckLetter3 {
+  color: #fefefe;
+}
+WLabel#NocturneDeckLetter2,
+WLabel#NocturneDeckLetter4 {
+  color: #fa7242;
+}
+/* === /Nocturne: deck header ============================================= */

@@ -304,6 +304,7 @@
       <Children>
       <Template src="skins:Nocturne/decks/deck.xml">
         <SetVariable name="ChanNum">1</SetVariable>
+        <SetVariable name="DeckLetter">A</SetVariable>
         <SetVariable name="DeckGroup">12</SetVariable>
         <SetVariable name="SignalColor"><Variable name="SignalColor_12"/></SetVariable>
         <SetVariable name="BgColor"><Variable name="BgColorOverview_12"/></SetVariable>
@@ -316,6 +317,7 @@
       <Children>
         <Template src="skins:Nocturne/decks/deck.xml">
           <SetVariable name="ChanNum">2</SetVariable>
+        <SetVariable name="DeckLetter">B</SetVariable>
           <SetVariable name="DeckGroup">12</SetVariable>
           <SetVariable name="SignalColor"><Variable name="SignalColor_12"/></SetVariable>
           <SetVariable name="BgColor"><Variable name="BgColorOverview_12"/></SetVariable>
@@ -328,6 +330,7 @@
       <Children>
       <Template src="skins:Nocturne/decks/deck.xml">
         <SetVariable name="ChanNum">3</SetVariable>
+        <SetVariable name="DeckLetter">C</SetVariable>
         <SetVariable name="DeckGroup">34</SetVariable>
         <SetVariable name="SignalColor"><Variable name="SignalColor_34"/></SetVariable>
         <SetVariable name="BgColor"><Variable name="BgColorOverview_34"/></SetVariable>
@@ -340,6 +343,7 @@
       <Children>
       <Template src="skins:Nocturne/decks/deck.xml">
         <SetVariable name="ChanNum">4</SetVariable>
+        <SetVariable name="DeckLetter">D</SetVariable>
         <SetVariable name="DeckGroup">34</SetVariable>
         <SetVariable name="SignalColor"><Variable name="SignalColor_34"/></SetVariable>
         <SetVariable name="BgColor"><Variable name="BgColorOverview_34"/></SetVariable>
