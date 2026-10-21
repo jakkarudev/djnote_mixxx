@@ -114,3 +114,13 @@ _Avoid_: Traktor skin, Traktor theme, DJNote skin
 **Skin settings**:
 The options a skin offers for showing or hiding parts of its layout (for example the mixer, effect units, samplers or hotcues), set from the skin's own settings panel rather than from Preferences.
 _Avoid_: skin options, layout toggles
+
+## Library
+
+**Computer**:
+The library section that browses folders on disk directly, whether or not their tracks are in the library.
+_Avoid_: browser, file browser, explorer
+
+**Quick Link**:
+A folder from Computer that the DJ has added, by right-clicking it, to the Quick Links list at the top of Computer, so it can be opened without browsing the whole folder tree. It comes from Mixxx.
+_Avoid_: pin, pinned folder, favorite, shortcut
