@@ -166,7 +166,7 @@ void ITunesFeature::bindSidebarWidget(WLibrarySidebar* pSidebarWidget) {
 
 void ITunesFeature::activate() {
     activate(false);
-    emit enableCoverArtDisplay(false);
+    emit enableCoverArtDisplay(true); // DJNote: cover panel
 }
 
 void ITunesFeature::activate(bool forceReload) {
@@ -231,7 +231,7 @@ void ITunesFeature::activate(bool forceReload) {
     } else {
         emit showTrackModel(m_pITunesTrackModel);
     }
-    emit enableCoverArtDisplay(false);
+    emit enableCoverArtDisplay(true); // DJNote: cover panel
 }
 
 void ITunesFeature::activateChild(const QModelIndex& index) {
@@ -242,7 +242,7 @@ void ITunesFeature::activateChild(const QModelIndex& index) {
     qDebug() << "Activating playlist" << playlistName << "with id" << playlistId;
     m_pITunesPlaylistModel->setPlaylistById(playlistId);
     emit showTrackModel(m_pITunesPlaylistModel);
-    emit enableCoverArtDisplay(false);
+    emit enableCoverArtDisplay(true); // DJNote: cover panel
 }
 
 TreeItemModel* ITunesFeature::sidebarModel() const {

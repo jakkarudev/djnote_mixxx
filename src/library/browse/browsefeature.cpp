@@ -331,7 +331,7 @@ void BrowseFeature::activateChild(const QModelIndex& index) {
     if (path == QUICK_LINK_NODE || path == DEVICE_NODE) {
         emit disableSearch();
     }
-    emit enableCoverArtDisplay(false);
+    emit enableCoverArtDisplay(true); // DJNote: cover panel in Computer
 }
 
 void BrowseFeature::onRightClickChild(const QPoint& globalPos, const QModelIndex& index) {

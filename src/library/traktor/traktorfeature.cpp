@@ -184,7 +184,7 @@ void TraktorFeature::activate() {
     }
     emit saveModelState();
     emit showTrackModel(m_pTraktorTableModel);
-    emit enableCoverArtDisplay(false);
+    emit enableCoverArtDisplay(true); // DJNote: cover panel
 }
 
 void TraktorFeature::activateChild(const QModelIndex& index) {
@@ -200,7 +200,7 @@ void TraktorFeature::activateChild(const QModelIndex& index) {
         emit saveModelState();
         m_pTraktorPlaylistModel->setPlaylist(item->getData().toString());
         emit showTrackModel(m_pTraktorPlaylistModel);
-        emit enableCoverArtDisplay(false);
+        emit enableCoverArtDisplay(true); // DJNote: cover panel
     }
 }
 

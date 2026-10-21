@@ -47,6 +47,11 @@ void RecordingFeature::bindLibraryWidget(WLibrary* pLibraryWidget,
             &DlgRecording::loadTrackToPlayer,
             this,
             &RecordingFeature::loadTrackToPlayer);
+    // DJNote: feed the selected track to the cover panel
+    connect(pRecordingView,
+            &DlgRecording::trackSelected,
+            this,
+            &RecordingFeature::trackSelected);
     connect(this,
             &RecordingFeature::refreshBrowseModel,
             pRecordingView,
@@ -69,5 +74,5 @@ void RecordingFeature::activate() {
     emit refreshBrowseModel();
     emit switchToView(kViewName);
     emit requestRestoreSearch();
-    emit enableCoverArtDisplay(false);
+    emit enableCoverArtDisplay(true); // DJNote: cover panel
 }
