@@ -26,7 +26,18 @@
             </Connection>
           </WidgetGroup>
 
-          <Template src="skins:Nocturne/mixer/mixer_main_headphone.xml"/>
+          <!-- Nocturne: strip. 2 decks: main/headphone knobs live in the strip (mixer/nocturne_strip.xml) -->
+          <WidgetGroup>
+            <Layout>horizontal</Layout>
+            <SizePolicy>max,me</SizePolicy>
+            <Children>
+              <Template src="skins:Nocturne/mixer/mixer_main_headphone.xml"/>
+            </Children>
+            <Connection>
+              <ConfigKey persist="true">[Nocturne],show_4decks</ConfigKey>
+              <BindProperty>visible</BindProperty>
+            </Connection>
+          </WidgetGroup>
 
         </Children>
       </WidgetGroup><!-- MixerContainer -->

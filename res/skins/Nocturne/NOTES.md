@@ -69,3 +69,7 @@ Some `[Skin]` controls are created and used by C++ and have no Nocturne equivale
   `show_coverart` and not `show_spinnies`, wrapped by `select_big_spinny_or_cover` where needed),
   `helpers/skin_settings_cover_no_spinny_no_cover.xml`, and `[App],num_microphones` for the ducking controls.
 - C++ still creates its `[Skin],...` controls and may save them in `mixxx.cfg`; Nocturne never touches them.
+
+## Strip (#79)
+- 2 decks: crossfader, headphone MIX/VOL and main gain live in mixer/nocturne_strip.xml (row between decks and library, skin.xml DecksMixerContainer); mic/aux rack is the strip left part (hidden by default). 4 decks: strip hidden, old mixer crossfader + main/headphone column and the mic/aux row as before.
+- Dropped in the 2-deck mixer: per-channel crossfader assign switches, quick-effect preset selectors, headphone split button, booth gain, balance, main/headphone FX assign buttons.

@@ -3534,3 +3534,49 @@ WSearchLineEdit {
   border-radius: 0px;
 }
 /* === end Nocturne: library === */
+
+/* === Nocturne: strip === */
+/* Row under the decks: mic/aux | crossfader | headphone MIX, VOL and main gain (mixer/nocturne_strip*.xml) */
+#NocturneStrip {
+  background-color: #181818;
+  border-top: 1px solid #000000;
+  border-bottom: 1px solid #000000;
+  min-height: 40px;
+}
+#NocturneStrip #CrossfaderContainer {
+  background-color: transparent;
+  border: none;
+}
+#NocturneStrip #CrossfaderContainer[highlight="1"] {
+  border: 1px solid #448bf6;
+}
+#NocturneStripKnob {
+  background-color: transparent;
+}
+WLabel#NocturneStripLabel {
+  color: #6d6d6d;
+  font-family: "Barlow Semi Condensed";
+  font-size: 12px;
+  padding: 0px 0px 0px 2px;
+  margin: 0px;
+  background: transparent;
+}
+WLabel#NocturneStripDeckA,
+WLabel#NocturneStripDeckB {
+  font-family: "Barlow Semi Condensed SemiBold", "Barlow Semi Condensed";
+  font-size: 14px;
+  background: transparent;
+  margin: 0px;
+  padding: 0px;
+}
+WLabel#NocturneStripDeckA {
+  color: #fefefe;
+}
+WLabel#NocturneStripDeckB {
+  color: #fa7242;
+}
+#NocturneStripHeadIcon {
+  background: transparent;
+  image: url(skins:Nocturne/nocturne/style/headphones.svg) no-repeat center center;
+}
+/* === /Nocturne: strip === */
