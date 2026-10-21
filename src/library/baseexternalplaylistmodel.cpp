@@ -28,7 +28,7 @@ BaseExternalPlaylistModel::BaseExternalPlaylistModel(QObject* parent,
           m_playlistTracksTable(playlistTracksTable),
           m_trackSource(trackSource),
           m_currentPlaylistId(kInvalidPlaylistId),
-          m_pCoverColumn(new ExternalCoverColumn(this)) {
+          m_pCoverColumn(new ExternalCoverColumn(this, m_database)) {
 }
 
 BaseExternalPlaylistModel::~BaseExternalPlaylistModel() {
@@ -36,6 +36,10 @@ BaseExternalPlaylistModel::~BaseExternalPlaylistModel() {
 
 CoverInfo BaseExternalPlaylistModel::getCoverInfo(const QModelIndex& index) const {
     return m_pCoverColumn->coverInfo(index);
+}
+
+bool BaseExternalPlaylistModel::prepareSort(int column, Qt::SortOrder order) {
+    return m_pCoverColumn->sortRequested(column, order);
 }
 
 TrackPointer BaseExternalPlaylistModel::getTrack(const QModelIndex& index) const {
@@ -149,7 +153,12 @@ void BaseExternalPlaylistModel::setPlaylistById(int playlistId) {
             PLAYLISTTRACKSTABLE_TRACKID,
             PLAYLISTTRACKSTABLE_POSITION,
             QStringLiteral("'' AS ") + LIBRARYTABLE_PREVIEW,
-            ExternalCoverColumn::viewColumn()}; // DJNote
+            // DJNote
+            m_pCoverColumn->viewColumn(
+                    QStringLiteral("(SELECT location FROM %1 WHERE %1.id = %2.%3)")
+                            .arg(m_trackSource->tableName(),
+                                    m_playlistTracksTable,
+                                    PLAYLISTTRACKSTABLE_TRACKID))};
     const auto queryString =
             QStringLiteral(
                     "CREATE TEMPORARY VIEW IF NOT EXISTS %1 AS "
@@ -172,7 +181,9 @@ void BaseExternalPlaylistModel::setPlaylistById(int playlistId) {
     playlistViewColumns[2] = LIBRARYTABLE_PREVIEW;
     playlistViewColumns[3] = LIBRARYTABLE_COVERART; // DJNote
     setTable(playlistViewTable, playlistViewColumns.first(), playlistViewColumns, m_trackSource);
-    m_pCoverColumn->addToSavedHeaderState(); // DJNote
+    // DJNote: the order of the previous playlist's view, until sorted again.
+    m_tableOrderBy.clear();
+    m_pCoverColumn->tableSet();
     setDefaultSort(fieldIndex(ColumnCache::COLUMN_PLAYLISTTRACKSTABLE_POSITION),
             Qt::AscendingOrder);
     // Restore search text

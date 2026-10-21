@@ -18,12 +18,12 @@ BaseExternalTrackModel::BaseExternalTrackModel(QObject* parent,
         const QString& trackTable,
         QSharedPointer<BaseTrackCache> trackSource)
         : BaseSqlTableModel(parent, pTrackCollectionManager, settingsNamespace),
-          m_pCoverColumn(new ExternalCoverColumn(this)) {
+          m_pCoverColumn(new ExternalCoverColumn(this, m_database)) {
     QString viewTable = trackTable + "_view";
     QStringList columns;
     columns << "id";
     columns << "'' AS " + LIBRARYTABLE_PREVIEW;
-    columns << ExternalCoverColumn::viewColumn(); // DJNote
+    columns << m_pCoverColumn->viewColumn(trackTable + QStringLiteral(".location")); // DJNote
 
     QSqlQuery query(m_database);
     FieldEscaper f(m_database);
@@ -43,7 +43,7 @@ BaseExternalTrackModel::BaseExternalTrackModel(QObject* parent,
     columns[1] = LIBRARYTABLE_PREVIEW;
     columns[2] = LIBRARYTABLE_COVERART; // DJNote
     setTable(viewTable, columns[0], columns, trackSource);
-    m_pCoverColumn->addToSavedHeaderState(); // DJNote
+    m_pCoverColumn->tableSet(); // DJNote
     setDefaultSort(fieldIndex(ColumnCache::COLUMN_LIBRARYTABLE_ARTIST), Qt::AscendingOrder);
 }
 
@@ -52,6 +52,10 @@ BaseExternalTrackModel::~BaseExternalTrackModel() {
 
 CoverInfo BaseExternalTrackModel::getCoverInfo(const QModelIndex& index) const {
     return m_pCoverColumn->coverInfo(index);
+}
+
+bool BaseExternalTrackModel::prepareSort(int column, Qt::SortOrder order) {
+    return m_pCoverColumn->sortRequested(column, order);
 }
 
 TrackPointer BaseExternalTrackModel::getTrack(const QModelIndex& index) const {

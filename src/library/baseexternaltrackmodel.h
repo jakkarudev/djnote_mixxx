@@ -31,5 +31,6 @@ class BaseExternalTrackModel : public BaseSqlTableModel {
     TrackId doGetTrackId(const TrackPointer& pTrack) const override;
 
     // DJNote
+    bool prepareSort(int column, Qt::SortOrder order) override;
     ExternalCoverColumn* const m_pCoverColumn;
 };

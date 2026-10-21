@@ -65,6 +65,10 @@ class BaseTrackCache : public QObject {
     QString columnSortForFieldIndex(int index) const;
     int fieldIndex(ColumnCache::Column column) const;
     int endFieldIndex() const;
+    // DJNote: the cached table, e.g. for the external libraries' cover sort.
+    const QString& tableName() const {
+        return m_tableName;
+    }
     virtual void filterAndSort(const QSet<TrackId>& trackIds,
                                const QString& query,
                                const QString& extraFilter,

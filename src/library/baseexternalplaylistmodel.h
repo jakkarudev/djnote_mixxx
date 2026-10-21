@@ -39,5 +39,6 @@ class BaseExternalPlaylistModel : public BaseSqlTableModel {
     QHash<int, QString> m_searchTexts;
 
     // DJNote
+    bool prepareSort(int column, Qt::SortOrder order) override;
     ExternalCoverColumn* const m_pCoverColumn;
 };
