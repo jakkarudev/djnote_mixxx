@@ -28,6 +28,7 @@ QString nmlImportSummary(const QString& playlistName,
         int newLibraryTracks,
         const QStringList& skipped,
         const QStringList& missingTracks,
+        const QStringList& matchedLibraryTracks,
         int droppedCues) {
     QString text = tr("Imported %1 tracks into the playlist \"%2\" (%3 new in the library).")
                            .arg(QString::number(tracksInPlaylist),
@@ -39,6 +40,12 @@ QString nmlImportSummary(const QString& playlistName,
                    "(re-read the .nml once the files are back):")
                         .arg(QString::number(missingTracks.size())) +
                 QStringLiteral("\n") + missingTracks.join(QLatin1Char('\n'));
+    }
+    if (!matchedLibraryTracks.isEmpty()) {
+        text += QStringLiteral("\n\n") +
+                tr("%1 tracks were matched to tracks already in the library:")
+                        .arg(QString::number(matchedLibraryTracks.size())) +
+                QStringLiteral("\n") + matchedLibraryTracks.join(QLatin1Char('\n'));
     }
     if (droppedCues > 0) {
         text += QStringLiteral("\n\n") +
@@ -81,12 +88,12 @@ int runNmlImportFlow(QWidget* pParent,
     // #113: a file with several playlists gets the tick-box review instead.
     const QList<NmlPlaylistChoice> choices = nmlPlaylistChoices(plan, dao);
     if (choices.size() > 1) {
-        DlgNmlImportPlaylists multiDialog(choices, pParent);
+        DlgNmlImportPlaylists multiDialog(choices, plan, pTrackCollectionManager, pParent);
         if (multiDialog.exec() != QDialog::Accepted) {
             return kInvalidPlaylistId;
         }
         const NmlMultiImportResult multi = applyNmlImportPlaylists(
-                plan, multiDialog.choices(), pTrackCollectionManager);
+                multiDialog.plans(), multiDialog.choices(), pTrackCollectionManager);
         QStringList lines;
         int lastPlaylistId = kInvalidPlaylistId;
         for (int i = 0; i < multi.results.size(); ++i) {
@@ -100,6 +107,7 @@ int runNmlImportFlow(QWidget* pParent,
                     r.newLibraryTracks,
                     r.skipped,
                     r.missingTracks,
+                    r.matchedLibraryLabels,
                     r.droppedCues));
             lastPlaylistId = r.playlistId;
         }
@@ -109,13 +117,13 @@ int runNmlImportFlow(QWidget* pParent,
         return lastPlaylistId;
     }
 
-    DlgNmlImport dialog(plan, dao, pParent);
+    DlgNmlImport dialog(plan, dao, pParent, pTrackCollectionManager);
     if (dialog.exec() != QDialog::Accepted) {
         return kInvalidPlaylistId;
     }
 
     const NmlImportResult result =
-            applyNmlImport(plan, dialog.playlistName(), pTrackCollectionManager);
+            applyNmlImport(dialog.plan(), dialog.playlistName(), pTrackCollectionManager);
     if (!result.error.isEmpty() && result.playlistId == kInvalidPlaylistId) {
         QMessageBox::warning(pParent, tr("Import Traktor Playlist"), result.error);
         return kInvalidPlaylistId;
@@ -127,6 +135,7 @@ int runNmlImportFlow(QWidget* pParent,
                     result.newLibraryTracks,
                     result.skipped,
                     result.missingTracks,
+                    result.matchedLibraryLabels,
                     result.droppedCues));
     return result.playlistId;
 }

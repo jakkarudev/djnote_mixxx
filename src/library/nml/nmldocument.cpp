@@ -147,6 +147,8 @@ bool NmlDocument::read(QIODevice* pDevice, QString* pError) {
                 entry.keyText = str(a, "KEY");
                 entry.ranking = optInt(a, "RANKING");
                 entry.color = optInt(a, "COLOR");
+                entry.playtimeSeconds = optDouble(a, "PLAYTIME_FLOAT")
+                                                .value_or(optDouble(a, "PLAYTIME").value_or(0.0));
             } else if (name == QLatin1String("TEMPO") && parent == QLatin1String("ENTRY")) {
                 entry.bpm = optDouble(a, "BPM");
             } else if (name == QLatin1String("MUSICAL_KEY") && parent == QLatin1String("ENTRY")) {

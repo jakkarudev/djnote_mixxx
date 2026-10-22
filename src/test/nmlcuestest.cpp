@@ -147,7 +147,7 @@ TEST_F(NmlCuesTest, ExtraButtonlessCuesAndLoopsAreDroppedAndCounted) {
     // Connected: a buttonless cue and a buttonless loop beyond the Load marker.
     // Bumpy: a second buttonless cue.
     EXPECT_EQ(3, m_result.droppedCues);
-    const QString text = nmlImportSummary(QStringLiteral("Set"), 2, 2, {}, {}, 3);
+    const QString text = nmlImportSummary(QStringLiteral("Set"), 2, 2, {}, {}, {}, 3);
     EXPECT_TRUE(text.contains(QStringLiteral("3")));
     EXPECT_TRUE(text.contains(QStringLiteral("cue"), Qt::CaseInsensitive));
     EXPECT_FALSE(nmlImportSummary(QStringLiteral("Set"), 2, 2, {})

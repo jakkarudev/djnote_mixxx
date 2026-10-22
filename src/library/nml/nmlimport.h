@@ -5,6 +5,7 @@
 #include <QStringList>
 
 #include "library/nml/nmldocument.h"
+#include "track/trackid.h"
 
 class PlaylistDAO;
 class TrackCollectionManager;
@@ -24,6 +25,9 @@ enum class NmlTrackStatus {
     Found,          // at the recorded path
     FoundNextToNml, // FILE sits next to the .nml (ADR 0009)
     NotFound,
+    // DJNote (#111): set by nmlfindmissing.h on rows that were NotFound.
+    FoundInBrowsedFolder, // file name found in the folder the DJ browsed to
+    MatchedInLibrary,     // proposal: an existing library track (see accepted)
 };
 
 struct NmlPlanTrack {
@@ -34,6 +38,10 @@ struct NmlPlanTrack {
     QString resolvedPath; // empty when NotFound
     QString recordedPath; // where the NML says the file was (used for missing tracks)
     NmlTrackStatus status = NmlTrackStatus::NotFound;
+    // #111: MatchedInLibrary only. The proposed library track and whether the
+    // DJ keeps it (tick box). An unticked proposal is applied as missing.
+    TrackId libraryTrackId;
+    bool accepted = true;
 };
 
 struct NmlImportPlan {
@@ -55,6 +63,8 @@ struct NmlImportResult {
     QStringList missingTracks;
     // #108: buttonless cues beyond the main cue and buttonless loops, not imported.
     int droppedCues = 0;
+    QStringList matchedLibraryLabels; // #111: one line per accepted library match
+    int matchedLibraryTracks = 0; // #111: accepted library matches put into the Playlist
 };
 
 /// First free Playlist name: `base`, then `base 1`, `base 2` (upstream's
@@ -106,6 +116,16 @@ struct NmlMultiImportResult {
     QList<NmlImportResult> results;
     QStringList playlistNames; // final names, parallel to results
 };
+
+/// #111: one plan per choice (parallel to `choices`), so the find-missing
+/// operations can update each playlist's rows before Apply.
+QList<NmlImportPlan> nmlPlansForChoices(
+        const NmlImportPlan& plan, const QList<NmlPlaylistChoice>& choices);
+
+/// Like the overload below but applies the given (edited) per-choice plans.
+NmlMultiImportResult applyNmlImportPlaylists(const QList<NmlImportPlan>& plans,
+        const QList<NmlPlaylistChoice>& choices,
+        TrackCollectionManager* pTrackCollectionManager);
 
 NmlMultiImportResult applyNmlImportPlaylists(const NmlImportPlan& plan,
         const QList<NmlPlaylistChoice>& choices,
