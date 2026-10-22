@@ -23,7 +23,9 @@ QString nmlImportSummary(const QString& playlistName, int tracksInPlaylist,
         int newLibraryTracks, const QStringList& skipped,
         const QStringList& missingTracks = {},
         const QStringList& matchedLibraryTracks = {}, int droppedCues = 0,
-        const QStringList& lockedGridTracks = {}); // #109
+        const QStringList& lockedGridTracks = {}, // #109
+        const QStringList& reusedTracks = {},     // #112
+        const QStringList& keptSeparateTracks = {}); // #112
 
 } // namespace nml
 } // namespace mixxx

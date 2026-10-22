@@ -12,6 +12,7 @@
 #include "library/nml/nmlfindmissing.h"
 #include "library/nml/nmlfindmissingpanel.h"
 #include "library/nml/nmlkeepreplacepanel.h"
+#include "library/nml/nmlreuse.h" // #112
 
 
 namespace mixxx {
@@ -67,6 +68,11 @@ void DlgNmlImportPlaylists::init(TrackCollectionManager* pManager) {
     }
     pLayout->addWidget(m_pTable, 1);
 
+    if (pManager) { // DJNote (#112)
+        for (NmlImportPlan& plan : m_plans) {
+            proposeNmlReuse(&plan, pManager);
+        }
+    }
     if (!m_plans.isEmpty()) {
         // DJNote (#111): missing / matched rows of the ticked playlists.
         m_pRows = new QTableWidget(0, 4, this);
@@ -150,8 +156,9 @@ void DlgNmlImportPlaylists::refreshRows() {
         const NmlImportPlan& plan = m_plans.at(i);
         for (int t = 0; t < plan.tracks.size(); ++t) {
             const NmlPlanTrack& track = plan.tracks.at(t);
-            if (track.status == NmlTrackStatus::Found ||
-                    track.status == NmlTrackStatus::FoundNextToNml) {
+            if ((track.status == NmlTrackStatus::Found ||
+                        track.status == NmlTrackStatus::FoundNextToNml) &&
+                    !nmlRowIsReuse(track) && !track.keptSeparate) {
                 continue;
             }
             const int row = m_pRows->rowCount();
@@ -161,8 +168,11 @@ void DlgNmlImportPlaylists::refreshRows() {
             m_pRows->setItem(row, 1,
                     new QTableWidgetItem(track.title.isEmpty() ? track.primaryKey : track.title));
             m_pRows->setItem(row, 2, new QTableWidgetItem(track.artist));
-            auto* pStatus = new QTableWidgetItem(DlgNmlImport::statusText(track.status));
-            if (track.status == NmlTrackStatus::MatchedInLibrary) {
+            auto* pStatus = new QTableWidgetItem(DlgNmlImport::rowStatusText(track));
+            if (nmlRowIsReuse(track)) { // DJNote (#112)
+                pStatus->setFlags(pStatus->flags() | Qt::ItemIsUserCheckable);
+                pStatus->setCheckState(track.reuseAccepted ? Qt::Checked : Qt::Unchecked);
+            } else if (track.status == NmlTrackStatus::MatchedInLibrary) {
                 pStatus->setFlags(pStatus->flags() | Qt::ItemIsUserCheckable);
                 pStatus->setCheckState(track.accepted ? Qt::Checked : Qt::Unchecked);
             }
@@ -178,7 +188,9 @@ void DlgNmlImportPlaylists::onRowChanged(QTableWidgetItem* pItem) {
         return;
     }
     const RowRef ref = m_rowRefs.at(pItem->row());
-    setNmlMatchAccepted(&m_plans[ref.plan], ref.track, pItem->checkState() == Qt::Checked);
+    const bool ticked = pItem->checkState() == Qt::Checked;
+    setNmlMatchAccepted(&m_plans[ref.plan], ref.track, ticked);
+    setNmlReuseAccepted(&m_plans[ref.plan], ref.track, ticked); // #112
 }
 
 QList<NmlPlaylistChoice> DlgNmlImportPlaylists::choices() const {

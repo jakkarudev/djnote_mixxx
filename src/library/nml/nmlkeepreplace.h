@@ -69,8 +69,21 @@ struct NmlPreparationComparison {
     }
 };
 
+/// DJNote (#112): tolerances of a comparison. The defaults (negative) keep the
+/// keep/replace behaviour: positions within 1.5 frames, BPM not compared on its own.
+struct NmlCompareTolerance {
+    double bpm = -1.0;            // >= 0: grid BPMs must also be within this
+    double positionMillis = -1.0; // >= 0: beats and cues within this instead of 1.5 frames
+};
+
+/// DJNote (#112): "identical" for reusing a library track: BPM within 0.01,
+/// beats and cues within 10 ms.
+constexpr NmlCompareTolerance kNmlIdenticalTolerance{0.01, 10.0};
+
 /// Compares a library track with an NML entry. Writes nothing.
-NmlPreparationComparison compareNmlPreparation(const Track& track, const NmlEntry& entry);
+NmlPreparationComparison compareNmlPreparation(const Track& track,
+        const NmlEntry& entry,
+        const NmlCompareTolerance& tolerance = NmlCompareTolerance());
 
 struct NmlKeepReplaceOutcome {
     bool changed = false;          // at least one part was written
