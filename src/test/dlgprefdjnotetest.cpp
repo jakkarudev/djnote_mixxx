@@ -4,6 +4,7 @@
 #include <QComboBox>
 #include <QGroupBox>
 #include <QListWidget>
+#include <QPushButton>
 #include <set>
 #include <memory>
 
@@ -636,3 +637,110 @@ TEST_F(DlgPrefDJNoteTest, ShiftedKeySettingRoundTrips) {
     EXPECT_FALSE(mixxx::keymatch::loadSettings(config()).matchShiftedKey);
 }
 
+
+// Colour pickers (ticket #98).
+namespace {
+
+QPushButton* colourButton(DlgPrefDJNote* pPage, const QString& name) {
+    auto* pButton = pPage->findChild<QPushButton*>(name);
+    EXPECT_NE(nullptr, pButton) << name.toStdString();
+    return pButton;
+}
+
+QColor shownColour(DlgPrefDJNote* pPage, const QString& name) {
+    return colourButton(pPage, name)->property("keyMatchColor").value<QColor>();
+}
+
+const QString kStrictButton = QStringLiteral("keyMatchingStrictColorButton");
+const QString kFuzzyButton = QStringLiteral("keyMatchingFuzzyColorButton");
+const QString kShiftedStrictButton = QStringLiteral("keyMatchingShiftedStrictColorButton");
+const QString kShiftedFuzzyButton = QStringLiteral("keyMatchingShiftedFuzzyColorButton");
+const QString kResetButton = QStringLiteral("keyMatchingResetColorsButton");
+
+QList<bool> pickersEnabled(DlgPrefDJNote* pPage) {
+    QList<bool> enabled;
+    for (const auto& name : {kStrictButton, kFuzzyButton, kShiftedStrictButton, kShiftedFuzzyButton}) {
+        enabled << colourButton(pPage, name)->isEnabled();
+    }
+    return enabled;
+}
+
+} // namespace
+
+TEST_F(DlgPrefDJNoteTest, ColourPickersShowTheDefaultColours) {
+    auto pPage = openPage();
+    EXPECT_EQ(QColor(QStringLiteral("#4ade80")), shownColour(pPage.get(), kStrictButton));
+    EXPECT_EQ(QColor(QStringLiteral("#facc15")), shownColour(pPage.get(), kFuzzyButton));
+    EXPECT_EQ(QColor(QStringLiteral("#c084fc")), shownColour(pPage.get(), kShiftedStrictButton));
+    EXPECT_EQ(QColor(QStringLiteral("#e9d5ff")), shownColour(pPage.get(), kShiftedFuzzyButton));
+}
+
+TEST_F(DlgPrefDJNoteTest, PickingAColourStoresItAndTellsTheMatcher) {
+    mixxx::keymatch::KeyMatcher matcher(config());
+    auto pPage = openPage();
+    pPage->pickKeyMatchingColor(
+            mixxx::keymatch::ColourSlot::ShiftedStrict, QColor(QStringLiteral("#112233")));
+    EXPECT_EQ(QColor(QStringLiteral("#112233")),
+            mixxx::keymatch::loadSettings(config()).shiftedStrictColor);
+    EXPECT_EQ(QColor(QStringLiteral("#112233")), matcher.settings().shiftedStrictColor);
+    EXPECT_EQ(QColor(QStringLiteral("#112233")), shownColour(pPage.get(), kShiftedStrictButton));
+}
+
+TEST_F(DlgPrefDJNoteTest, ColourPickersShowTheStoredColours) {
+    mixxx::keymatch::Settings settings;
+    settings.fuzzyColor = QColor(QStringLiteral("#010203"));
+    mixxx::keymatch::saveSettings(config(), settings);
+    auto pPage = openPage();
+    EXPECT_EQ(QColor(QStringLiteral("#010203")), shownColour(pPage.get(), kFuzzyButton));
+}
+
+TEST_F(DlgPrefDJNoteTest, ResetColoursRestoresTheFourDefaultsOnly) {
+    auto pPage = openPage();
+    pPage->pickKeyMatchingColor(
+            mixxx::keymatch::ColourSlot::Strict, QColor(QStringLiteral("#112233")));
+    pPage->pickKeyMatchingColor(
+            mixxx::keymatch::ColourSlot::ShiftedFuzzy, QColor(QStringLiteral("#445566")));
+    boldCheckBox(pPage.get())->setChecked(false);
+    colourButton(pPage.get(), kResetButton)->click();
+    const auto settings = mixxx::keymatch::loadSettings(config());
+    EXPECT_EQ(QColor(QStringLiteral("#4ade80")), settings.strictColor);
+    EXPECT_EQ(QColor(QStringLiteral("#e9d5ff")), settings.shiftedFuzzyColor);
+    EXPECT_FALSE(settings.boldMatchedText);
+    EXPECT_EQ(QColor(QStringLiteral("#4ade80")), shownColour(pPage.get(), kStrictButton));
+}
+
+TEST_F(DlgPrefDJNoteTest, ResetToDefaultsRestoresTheColours) {
+    auto pPage = openPage();
+    pPage->pickKeyMatchingColor(
+            mixxx::keymatch::ColourSlot::Fuzzy, QColor(QStringLiteral("#112233")));
+    pPage->slotResetToDefaults();
+    EXPECT_EQ(QColor(QStringLiteral("#facc15")),
+            mixxx::keymatch::loadSettings(config()).fuzzyColor);
+    EXPECT_EQ(QColor(QStringLiteral("#facc15")), shownColour(pPage.get(), kFuzzyButton));
+}
+
+TEST_F(DlgPrefDJNoteTest, ColourPickersGreyOutWithHighlightAndShiftedMatching) {
+    auto pPage = openPage();
+    auto* pHighlight = highlightComboBox(pPage.get());
+    EXPECT_EQ((QList<bool>{true, true, true, true}), pickersEnabled(pPage.get()));
+    pHighlight->setCurrentIndex(pHighlight->findText(QStringLiteral("Strict only")));
+    EXPECT_EQ((QList<bool>{true, false, true, false}), pickersEnabled(pPage.get()));
+    shiftedKeyCheckBox(pPage.get())->setChecked(false);
+    EXPECT_EQ((QList<bool>{true, false, false, false}), pickersEnabled(pPage.get()));
+    pHighlight->setCurrentIndex(pHighlight->findText(QStringLiteral("Strict and fuzzy")));
+    EXPECT_EQ((QList<bool>{true, true, false, false}), pickersEnabled(pPage.get()));
+    pHighlight->setCurrentIndex(pHighlight->findText(QStringLiteral("Off")));
+    EXPECT_EQ((QList<bool>{false, false, false, false}), pickersEnabled(pPage.get()));
+    EXPECT_FALSE(colourButton(pPage.get(), kResetButton)->isEnabled());
+}
+
+TEST_F(DlgPrefDJNoteTest, ColourSettingsRoundTripAndFallBack) {
+    mixxx::keymatch::Settings settings;
+    settings.strictColor = QColor(QStringLiteral("#0a0b0c"));
+    mixxx::keymatch::saveSettings(config(), settings);
+    EXPECT_EQ(QColor(QStringLiteral("#0a0b0c")),
+            mixxx::keymatch::loadSettings(config()).strictColor);
+    config()->setValue(ConfigKey("[DJNote]", "KeyMatchingStrictColor"), QStringLiteral("bogus"));
+    EXPECT_EQ(QColor(QStringLiteral("#4ade80")),
+            mixxx::keymatch::loadSettings(config()).strictColor);
+}

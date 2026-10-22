@@ -528,6 +528,26 @@ TEST_F(KeyMatchCellTest, TurningShiftedMatchingOffDropsPurpleAndRepaints) {
     EXPECT_FALSE(keyColor().isValid());
 }
 
+TEST_F(KeyMatchCellTest, CustomColoursReachTheCellAndRepaint) {
+    referenceIsShifted(QStringLiteral("8A"), QStringLiteral("3A"));
+    mixxx::keymatch::Settings settings = mixxx::keymatch::loadSettings(config());
+    settings.strictColor = QColor(QStringLiteral("#010101"));
+    settings.fuzzyColor = QColor(QStringLiteral("#020202"));
+    settings.shiftedStrictColor = QColor(QStringLiteral("#030303"));
+    settings.shiftedFuzzyColor = QColor(QStringLiteral("#040404"));
+    QSignalSpy repainted(m_pModel.get(), &QAbstractItemModel::dataChanged);
+    storeSettings(settings);
+    EXPECT_GE(repainted.count(), 1);
+    EXPECT_EQ(QVariant::fromValue(QColor(QStringLiteral("#010101"))),
+            keyColorFor(QStringLiteral("9A")));
+    EXPECT_EQ(QVariant::fromValue(QColor(QStringLiteral("#020202"))),
+            keyColorFor(QStringLiteral("10A")));
+    EXPECT_EQ(QVariant::fromValue(QColor(QStringLiteral("#030303"))),
+            keyColorFor(QStringLiteral("2A")));
+    EXPECT_EQ(QVariant::fromValue(QColor(QStringLiteral("#040404"))),
+            keyColorFor(QStringLiteral("5A")));
+}
+
 TEST_F(KeyMatchCellTest, ChangingTheShiftedKeyRepaints) {
     referenceIs(QStringLiteral("8A"));
     trackKeyIs(QStringLiteral("2A"));
