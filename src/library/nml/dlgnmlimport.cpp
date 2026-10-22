@@ -15,6 +15,7 @@
 #include "library/dao/playlistdao.h"
 #include "library/nml/nmlfindmissing.h"
 #include "library/nml/nmlfindmissingpanel.h"
+#include "library/nml/nmlkeepreplacepanel.h"
 
 namespace mixxx {
 namespace nml {
@@ -71,6 +72,11 @@ DlgNmlImport::DlgNmlImport(const NmlImportPlan& plan,
             this);
     connect(pFindPanel, &NmlFindMissingPanel::changed, this, &DlgNmlImport::refreshRows);
     pLayout->addWidget(pFindPanel);
+    // DJNote (#109): keep/replace choice, shown only when a row hits an existing prepared track.
+    auto* pKeepReplace = new NmlKeepReplacePanel(
+            [this]() { return QList<NmlImportPlan*>{&m_plan}; }, m_pManager, this);
+    connect(pFindPanel, &NmlFindMissingPanel::changed, pKeepReplace, &NmlKeepReplacePanel::refresh);
+    pLayout->addWidget(pKeepReplace);
     refreshRows();
 
     m_pButtons = new QDialogButtonBox(
