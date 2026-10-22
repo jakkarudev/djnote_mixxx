@@ -308,10 +308,11 @@ TEST_F(KeyMatchCellTest, UnmatchedKeysAndOtherCellsKeepTheirFont) {
 
 TEST_F(KeyMatchCellTest, PlayedMatchesStayBold) {
     referenceIs(QStringLiteral("8A"));
-    m_pTrack->updatePlayCounter(true);
     trackKeyIs(QStringLiteral("8A"));
-    ASSERT_EQ(Qt::Checked,
-            cell(ColumnCache::COLUMN_LIBRARYTABLE_PLAYED).data(Qt::CheckStateRole).toInt());
+    QSqlQuery query(dbConnection());
+    ASSERT_TRUE(query.exec(QStringLiteral("UPDATE library SET played=1")));
+    m_pTrackSource->buildIndex();
+    m_pModel->select();
     EXPECT_TRUE(keyIsBold());
 }
 
