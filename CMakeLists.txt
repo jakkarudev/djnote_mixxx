@@ -1017,6 +1017,7 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/library/nml/nmlplaylistmenu.cpp
   src/library/nml/nmlreviewwidgets.cpp
   src/library/nml/nmlsupport.cpp
+  src/library/nml/nmlsummarydialog.cpp
   src/library/nml/sourcenml.cpp
   src/library/library_prefs.cpp
   src/library/library.cpp
@@ -2280,6 +2281,7 @@ if(BUILD_TESTING)
     src/test/nmlexportpreparationtest.cpp
     src/test/nmlroundtriptest.cpp
     src/test/nmlexporttest.cpp
+    src/test/nmlsummarytest.cpp
     src/test/nmlfindmissingtest.cpp
     src/test/nmlimporttest.cpp
     src/test/nmlkeepreplacetest.cpp
