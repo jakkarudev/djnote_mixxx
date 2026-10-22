@@ -7,6 +7,8 @@
 #include <QLabel>
 #include <QVBoxLayout>
 
+#include "library/keymatch/keymatcher.h"
+
 #include "moc_dlgprefdjnote.cpp"
 
 DlgPrefDJNote::DlgPrefDJNote(QWidget* pParent, UserSettingsPointer pConfig)
@@ -16,10 +18,12 @@ DlgPrefDJNote::DlgPrefDJNote(QWidget* pParent, UserSettingsPointer pConfig)
           m_pKnobReadoutModeLabel(nullptr),
           m_pKnobReadoutMode(nullptr),
           m_pKnobReadoutStyleLabel(nullptr),
-          m_pKnobReadoutStyle(nullptr) {
+          m_pKnobReadoutStyle(nullptr),
+          m_pKeyMatchingHighlight(nullptr) {
     auto* pPageLayout = new QVBoxLayout(this);
     pPageLayout->setContentsMargins(0, 0, 0, 0);
     createKnobReadoutGroup();
+    createKeyMatchingGroup();
     pPageLayout->addStretch(1);
     setScrollSafeGuardForAllInputWidgets(this);
 }
@@ -102,16 +106,20 @@ void DlgPrefDJNote::setKnobReadoutDetailsEnabled(bool enabled) {
 
 void DlgPrefDJNote::slotUpdate() {
     showKnobReadoutSettings(mixxx::knobreadout::loadSettings(m_pConfig));
+    showKeyMatchingSettings(mixxx::keymatch::loadSettings(m_pConfig));
 }
 
 void DlgPrefDJNote::slotApply() {
     // Changes are already stored as they are made; this only makes sure.
     mixxx::knobreadout::saveSettings(m_pConfig, knobReadoutSettingsFromControls());
+    mixxx::keymatch::saveSettings(m_pConfig, keyMatchingSettingsFromControls());
 }
 
 void DlgPrefDJNote::slotResetToDefaults() {
     showKnobReadoutSettings(mixxx::knobreadout::Settings());
     slotKnobReadoutControlChanged();
+    showKeyMatchingSettings(mixxx::keymatch::Settings());
+    slotKeyMatchingControlChanged();
 }
 
 void DlgPrefDJNote::slotKnobReadoutControlChanged() {
@@ -142,5 +150,65 @@ mixxx::knobreadout::Settings DlgPrefDJNote::knobReadoutSettingsFromControls() co
             m_pKnobReadoutMode->currentData().toInt());
     settings.style = static_cast<mixxx::knobreadout::Style>(
             m_pKnobReadoutStyle->currentData().toInt());
+    return settings;
+}
+
+void DlgPrefDJNote::createKeyMatchingGroup() {
+    auto* pGroup = new QGroupBox(tr("Key matching"), this);
+    pGroup->setObjectName(QStringLiteral("keyMatchingGroupBox"));
+    // Two columns (label, control), so later settings can add labelled rows.
+    auto* pGrid = new QGridLayout(pGroup);
+
+    m_pKeyMatchingHighlight = new QComboBox(pGroup);
+    m_pKeyMatchingHighlight->setObjectName(QStringLiteral("keyMatchingHighlightComboBox"));
+    m_pKeyMatchingHighlight->addItem(tr("Off"),
+            static_cast<int>(mixxx::keymatch::Highlight::Off));
+    m_pKeyMatchingHighlight->addItem(tr("Strict only"),
+            static_cast<int>(mixxx::keymatch::Highlight::StrictOnly));
+    m_pKeyMatchingHighlight->addItem(tr("Strict and fuzzy"),
+            static_cast<int>(mixxx::keymatch::Highlight::StrictAndFuzzy));
+    m_pKeyMatchingHighlight->setToolTip(
+            tr("Colour the key of library tracks that fit the key of the deck "
+               "you are mixing from. Strict matches (same key, one hour away "
+               "or the relative major/minor) are green; fuzzy matches (two "
+               "hours or a semitone away) are yellow."));
+    auto* pHighlightLabel = new QLabel(tr("Highlight"), pGroup);
+    pHighlightLabel->setBuddy(m_pKeyMatchingHighlight);
+    const int row = pGrid->rowCount();
+    pGrid->addWidget(pHighlightLabel, row, 0);
+    pGrid->addWidget(m_pKeyMatchingHighlight, row, 1, Qt::AlignLeft);
+    pGrid->setColumnStretch(1, 1);
+
+    // Every change applies live.
+    connect(m_pKeyMatchingHighlight,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            &DlgPrefDJNote::slotKeyMatchingControlChanged);
+
+    layout()->addWidget(pGroup);
+}
+
+void DlgPrefDJNote::slotKeyMatchingControlChanged() {
+    if (m_showingKeyMatchingSettings) {
+        return;
+    }
+    mixxx::keymatch::saveSettings(m_pConfig, keyMatchingSettingsFromControls());
+    // The key matcher reloads the stored settings and repaints the track lists.
+    if (auto* pMatcher = mixxx::keymatch::KeyMatcher::instance()) {
+        pMatcher->reloadSettings();
+    }
+}
+
+void DlgPrefDJNote::showKeyMatchingSettings(const mixxx::keymatch::Settings& settings) {
+    m_showingKeyMatchingSettings = true;
+    m_pKeyMatchingHighlight->setCurrentIndex(
+            m_pKeyMatchingHighlight->findData(static_cast<int>(settings.highlight)));
+    m_showingKeyMatchingSettings = false;
+}
+
+mixxx::keymatch::Settings DlgPrefDJNote::keyMatchingSettingsFromControls() const {
+    mixxx::keymatch::Settings settings;
+    settings.highlight = static_cast<mixxx::keymatch::Highlight>(
+            m_pKeyMatchingHighlight->currentData().toInt());
     return settings;
 }

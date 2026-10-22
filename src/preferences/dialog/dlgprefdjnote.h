@@ -1,6 +1,7 @@
 #pragma once
 
 #include "preferences/dialog/dlgpreferencepage.h"
+#include "library/keymatch/keymatchsettings.h"
 #include "preferences/usersettings.h"
 #include "widget/knobreadoutsettings.h"
 
@@ -17,6 +18,10 @@ class QLabel;
 // change signal to slotKnobReadoutControlChanged() and cover it in those two
 // functions; reset then follows. Like the Waveforms page, every change is
 // stored (and so applied) at once, without waiting for Apply.
+//
+// Key matching group: the same way, through createKeyMatchingGroup(),
+// slotKeyMatchingControlChanged(), showKeyMatchingSettings() and
+// keyMatchingSettingsFromControls().
 class DlgPrefDJNote : public DlgPreferencePage {
     Q_OBJECT
   public:
@@ -29,6 +34,7 @@ class DlgPrefDJNote : public DlgPreferencePage {
 
   private slots:
     void slotKnobReadoutControlChanged();
+    void slotKeyMatchingControlChanged();
 
   private:
     void createKnobReadoutGroup();
@@ -36,6 +42,10 @@ class DlgPrefDJNote : public DlgPreferencePage {
     void setKnobReadoutDetailsEnabled(bool enabled);
     void showKnobReadoutSettings(const mixxx::knobreadout::Settings& settings);
     mixxx::knobreadout::Settings knobReadoutSettingsFromControls() const;
+
+    void createKeyMatchingGroup();
+    void showKeyMatchingSettings(const mixxx::keymatch::Settings& settings);
+    mixxx::keymatch::Settings keyMatchingSettingsFromControls() const;
 
     const UserSettingsPointer m_pConfig;
     QCheckBox* m_pKnobReadoutEnabled;
@@ -46,4 +56,8 @@ class DlgPrefDJNote : public DlgPreferencePage {
     // Set while showKnobReadoutSettings() fills the controls, so that showing
     // settings doesn't store them.
     bool m_showingKnobReadoutSettings = false;
+
+    QComboBox* m_pKeyMatchingHighlight;
+    // Same as m_showingKnobReadoutSettings, for the key matching group.
+    bool m_showingKeyMatchingSettings = false;
 };

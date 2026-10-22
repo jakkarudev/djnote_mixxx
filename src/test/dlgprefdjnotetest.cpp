@@ -5,6 +5,9 @@
 #include <QGroupBox>
 #include <memory>
 
+#include "library/keymatch/keymatcher.h"
+#include "library/keymatch/keymatchsettings.h"
+#include "mixer/playerinfo.h"
 #include "preferences/dialog/dlgprefdjnote.h"
 #include "test/mixxxtest.h"
 #include "widget/knobreadoutsettings.h"
@@ -242,4 +245,102 @@ TEST_F(DlgPrefDJNoteTest, StoredOffShowsModeAndStyleGreyedOut) {
     auto pPage = openPage();
     EXPECT_FALSE(modeComboBox(pPage.get())->isEnabled());
     EXPECT_FALSE(styleComboBox(pPage.get())->isEnabled());
+}
+
+// Key matching (ticket #96): a group with the Highlight combo box.
+namespace {
+
+using mixxx::keymatch::Highlight;
+
+QComboBox* highlightComboBox(DlgPrefDJNote* pPage) {
+    auto* pComboBox = pPage->findChild<QComboBox*>(
+            QStringLiteral("keyMatchingHighlightComboBox"));
+    EXPECT_NE(nullptr, pComboBox);
+    return pComboBox;
+}
+
+void storeHighlight(const UserSettingsPointer& pConfig, Highlight highlight) {
+    mixxx::keymatch::Settings settings;
+    settings.highlight = highlight;
+    mixxx::keymatch::saveSettings(pConfig, settings);
+}
+
+} // namespace
+
+TEST_F(DlgPrefDJNoteTest, KeyMatchingGroupOffersTheHighlightChoices) {
+    auto pPage = openPage();
+    auto* pGroup = pPage->findChild<QGroupBox*>(QStringLiteral("keyMatchingGroupBox"));
+    ASSERT_NE(nullptr, pGroup);
+    EXPECT_EQ(QStringLiteral("Key matching"), pGroup->title());
+    auto* pHighlight = highlightComboBox(pPage.get());
+    ASSERT_NE(nullptr, pHighlight);
+    ASSERT_EQ(3, pHighlight->count());
+    EXPECT_EQ(QStringLiteral("Off"), pHighlight->itemText(0));
+    EXPECT_EQ(QStringLiteral("Strict only"), pHighlight->itemText(1));
+    EXPECT_EQ(QStringLiteral("Strict and fuzzy"), pHighlight->itemText(2));
+}
+
+TEST_F(DlgPrefDJNoteTest, HighlightIsStrictAndFuzzyByDefault) {
+    auto pPage = openPage();
+    EXPECT_EQ(QStringLiteral("Strict and fuzzy"), highlightComboBox(pPage.get())->currentText());
+}
+
+TEST_F(DlgPrefDJNoteTest, HighlightShowsTheStoredSetting) {
+    storeHighlight(config(), Highlight::StrictOnly);
+    auto pPage = openPage();
+    EXPECT_EQ(QStringLiteral("Strict only"), highlightComboBox(pPage.get())->currentText());
+}
+
+TEST_F(DlgPrefDJNoteTest, HighlightAppliesLive) {
+    auto pPage = openPage();
+    auto* pHighlight = highlightComboBox(pPage.get());
+    pHighlight->setCurrentIndex(pHighlight->findText(QStringLiteral("Off")));
+    EXPECT_EQ(Highlight::Off, mixxx::keymatch::loadSettings(config()).highlight);
+    pHighlight->setCurrentIndex(pHighlight->findText(QStringLiteral("Strict only")));
+    EXPECT_EQ(Highlight::StrictOnly, mixxx::keymatch::loadSettings(config()).highlight);
+}
+
+TEST_F(DlgPrefDJNoteTest, HighlightTellsTheKeyMatcher) {
+    PlayerInfo::create();
+    {
+        auto pPage = openPage();
+        mixxx::keymatch::KeyMatcher matcher(config());
+        auto* pHighlight = highlightComboBox(pPage.get());
+        pHighlight->setCurrentIndex(pHighlight->findText(QStringLiteral("Off")));
+        EXPECT_EQ(Highlight::Off, matcher.settings().highlight);
+    }
+    PlayerInfo::destroy();
+}
+
+TEST_F(DlgPrefDJNoteTest, CancelKeepsTheLiveHighlight) {
+    auto pPage = openPage();
+    auto* pHighlight = highlightComboBox(pPage.get());
+    pHighlight->setCurrentIndex(pHighlight->findText(QStringLiteral("Off")));
+    pPage->slotCancel();
+    EXPECT_EQ(QStringLiteral("Off"), pHighlight->currentText());
+    EXPECT_EQ(Highlight::Off, mixxx::keymatch::loadSettings(config()).highlight);
+}
+
+TEST_F(DlgPrefDJNoteTest, OpeningThePageStoresNoKeyMatchingSetting) {
+    auto pPage = openPage();
+    EXPECT_FALSE(config()->exists(ConfigKey("[DJNote]", "KeyMatchingHighlight")));
+}
+
+TEST_F(DlgPrefDJNoteTest, ResetRestoresStrictAndFuzzy) {
+    storeHighlight(config(), Highlight::Off);
+    auto pPage = openPage();
+    pPage->slotResetToDefaults();
+    EXPECT_EQ(QStringLiteral("Strict and fuzzy"), highlightComboBox(pPage.get())->currentText());
+    EXPECT_EQ(Highlight::StrictAndFuzzy, mixxx::keymatch::loadSettings(config()).highlight);
+}
+
+TEST_F(DlgPrefDJNoteTest, KeyMatchingSettingsRoundTripAndFallBack) {
+    EXPECT_EQ(Highlight::StrictAndFuzzy, mixxx::keymatch::loadSettings(config()).highlight);
+    for (Highlight highlight :
+            {Highlight::Off, Highlight::StrictOnly, Highlight::StrictAndFuzzy}) {
+        storeHighlight(config(), highlight);
+        EXPECT_EQ(highlight, mixxx::keymatch::loadSettings(config()).highlight);
+    }
+    config()->setValue(ConfigKey("[DJNote]", "KeyMatchingHighlight"), QStringLiteral("bogus"));
+    EXPECT_EQ(Highlight::StrictAndFuzzy, mixxx::keymatch::loadSettings(config()).highlight);
 }
