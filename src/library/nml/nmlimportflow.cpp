@@ -10,6 +10,7 @@
 #include "library/nml/dlgnmlimport.h"
 #include "library/nml/dlgnmlimportplaylists.h"
 #include "library/nml/nmlimport.h"
+#include "library/nml/nmlreuse.h"
 #include "library/nml/nmlsettings.h"
 #include "library/trackcollection.h"
 #include "library/trackcollectionmanager.h"
@@ -30,7 +31,9 @@ QString nmlImportSummary(const QString& playlistName,
         const QStringList& missingTracks,
         const QStringList& matchedLibraryTracks,
         int droppedCues,
-        const QStringList& lockedGridTracks) {
+        const QStringList& lockedGridTracks,
+        const QStringList& reusedTracks,
+        const QStringList& keptSeparateTracks) {
     QString text = tr("Imported %1 tracks into the playlist \"%2\" (%3 new in the library).")
                            .arg(QString::number(tracksInPlaylist),
                                    playlistName,
@@ -47,6 +50,18 @@ QString nmlImportSummary(const QString& playlistName,
                 tr("%1 tracks were matched to tracks already in the library:")
                         .arg(QString::number(matchedLibraryTracks.size())) +
                 QStringLiteral("\n") + matchedLibraryTracks.join(QLatin1Char('\n'));
+    }
+    if (!reusedTracks.isEmpty()) { // DJNote (#112)
+        text += QStringLiteral("\n\n") +
+                tr("%1 tracks reuse an existing track in the library (identical preparation):")
+                        .arg(QString::number(reusedTracks.size())) +
+                QStringLiteral("\n") + reusedTracks.join(QLatin1Char('\n'));
+    }
+    if (!keptSeparateTracks.isEmpty()) { // DJNote (#112)
+        text += QStringLiteral("\n\n") +
+                tr("%1 tracks kept separate: preparation differs:")
+                        .arg(QString::number(keptSeparateTracks.size())) +
+                QStringLiteral("\n") + keptSeparateTracks.join(QLatin1Char('\n'));
     }
     if (!lockedGridTracks.isEmpty()) { // DJNote (#109)
         text += QStringLiteral("\n\n") +
@@ -93,6 +108,7 @@ int runNmlImportFlow(QWidget* pParent,
     }
 
     updateNmlPlanComparisons(&plan, pTrackCollectionManager); // #109
+    proposeNmlReuse(&plan, pTrackCollectionManager);          // #112
 
     // #113: a file with several playlists gets the tick-box review instead.
     const QList<NmlPlaylistChoice> choices = nmlPlaylistChoices(plan, dao);
@@ -118,7 +134,9 @@ int runNmlImportFlow(QWidget* pParent,
                     r.missingTracks,
                     r.matchedLibraryLabels,
                     r.droppedCues,
-                    r.lockedGridTracks));
+                    r.lockedGridTracks,
+                    r.reusedTrackLabels,
+                    r.keptSeparateLabels));
             lastPlaylistId = r.playlistId;
         }
         QMessageBox::information(pParent,
@@ -147,7 +165,9 @@ int runNmlImportFlow(QWidget* pParent,
                     result.missingTracks,
                     result.matchedLibraryLabels,
                     result.droppedCues,
-                    result.lockedGridTracks));
+                    result.lockedGridTracks,
+                    result.reusedTrackLabels,
+                    result.keptSeparateLabels));
     return result.playlistId;
 }
 

@@ -33,6 +33,8 @@ class DlgNmlImport : public QDialog {
         return m_plan;
     }
 
+    // DJNote (#112): status plus the reuse existing track wording.
+    static QString rowStatusText(const NmlPlanTrack& track);
     static QString statusText(NmlTrackStatus status);
 
   private slots:
