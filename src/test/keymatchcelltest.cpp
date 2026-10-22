@@ -530,6 +530,7 @@ TEST_F(KeyMatchCellTest, TurningShiftedMatchingOffDropsPurpleAndRepaints) {
 
 TEST_F(KeyMatchCellTest, CustomColoursReachTheCellAndRepaint) {
     referenceIsShifted(QStringLiteral("8A"), QStringLiteral("3A"));
+    trackKeyIs(QStringLiteral("9A")); // lists the track, so there is a row to repaint
     mixxx::keymatch::Settings settings = mixxx::keymatch::loadSettings(config());
     settings.strictColor = QColor(QStringLiteral("#010101"));
     settings.fuzzyColor = QColor(QStringLiteral("#020202"));
