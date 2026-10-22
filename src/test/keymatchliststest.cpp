@@ -15,6 +15,7 @@
 #include "library/keymatch/keymatchsettings.h"
 #include "library/trackcollection.h"
 #include "mixer/playerinfo.h"
+#include "test/keymatchtestutils.h"
 #include "test/librarytest.h"
 #include "track/keyutils.h"
 
@@ -22,10 +23,9 @@
 // (ticket #102): the same colours as a library list, at the cell seam.
 namespace {
 
-using mixxx::keymatch::KeyMatcher;
-
-const QColor kGreen(QStringLiteral("#4ade80"));
-const QColor kYellow(QStringLiteral("#facc15"));
+using keymatchtest::kGreen;
+using keymatchtest::kYellow;
+using keymatchtest::KeyMatchTestBed;
 
 // Traktor's tables, which carry the key as text (the lists share the external
 // base models).
@@ -36,29 +36,12 @@ const QString kPlaylistTracksTable = QStringLiteral("traktor_playlist_tracks");
 class KeyMatchListsTest : public LibraryTest {
   protected:
     KeyMatchListsTest()
-            : m_numDecks(ConfigKey(QStringLiteral("[App]"), QStringLiteral("num_decks"))),
-              m_play(ConfigKey(QStringLiteral("[Channel1]"), QStringLiteral("play"))),
-              m_syncLeader(ConfigKey(QStringLiteral("[Channel1]"), QStringLiteral("sync_leader"))),
-              m_fileKey(ConfigKey(QStringLiteral("[Channel1]"), QStringLiteral("file_key"))),
-              m_key(ConfigKey(QStringLiteral("[Channel1]"), QStringLiteral("key"))),
+            : m_bed(config(), 1, 0),
               m_coverLookup(internalCollection()) {
-        m_numDecks.set(1);
-        PlayerInfo::create();
-        m_pMatcher = std::make_unique<KeyMatcher>(config());
-    }
-    ~KeyMatchListsTest() override {
-        m_pMatcher.reset();
-        PlayerInfo::destroy();
     }
 
-    // The reference deck: deck 1 plays as sync leader in `camelot`.
     void referenceIs(const QString& camelot) {
-        const auto key = KeyUtils::guessKeyFromText(camelot);
-        ASSERT_NE(mixxx::track::io::key::INVALID, key);
-        m_fileKey.set(KeyUtils::keyToNumericValue(key));
-        m_key.set(KeyUtils::keyToNumericValue(key));
-        m_syncLeader.set(2);
-        m_play.set(1);
+        m_bed.referenceIs(camelot);
     }
 
     // Computer.
@@ -120,25 +103,15 @@ class KeyMatchListsTest : public LibraryTest {
     }
 
     void colourEveryColumn() {
-        mixxx::keymatch::Settings settings;
-        settings.wholeRow = true;
-        mixxx::keymatch::saveSettings(config(), settings);
-        m_pMatcher->reloadSettings();
+        m_bed.changeSettings([](auto& settings) { settings.wholeRow = true; });
     }
 
     void changeReferenceTo3B() {
-        const auto key = KeyUtils::guessKeyFromText(QStringLiteral("3B"));
-        m_fileKey.set(KeyUtils::keyToNumericValue(key));
-        m_key.set(KeyUtils::keyToNumericValue(key));
+        m_bed.changeReferenceTo3B();
     }
 
-    ControlObject m_numDecks;
-    ControlObject m_play;
-    ControlObject m_syncLeader;
-    ControlObject m_fileKey;
-    ControlObject m_key;
+    KeyMatchTestBed m_bed;
     CoverLookup m_coverLookup;
-    std::unique_ptr<KeyMatcher> m_pMatcher;
 };
 
 } // namespace

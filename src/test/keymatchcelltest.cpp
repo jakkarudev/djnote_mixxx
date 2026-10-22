@@ -16,6 +16,7 @@
 #include "library/missing_hidden/missingtablemodel.h"
 #include "library/queryutil.h"
 #include "mixer/playerinfo.h"
+#include "test/keymatchtestutils.h"
 #include "test/librarytest.h"
 #include "track/keyutils.h"
 #include "track/track.h"
@@ -28,10 +29,9 @@
 namespace {
 
 using mixxx::keymatch::Highlight;
-using mixxx::keymatch::KeyMatcher;
-
-const QColor kGreen(QStringLiteral("#4ade80"));
-const QColor kYellow(QStringLiteral("#facc15"));
+using keymatchtest::kGreen;
+using keymatchtest::kYellow;
+using keymatchtest::KeyMatchTestBed;
 // Each tier colour mixed 50/50 with the default played colour #555555.
 const QColor kPlayedGreen(80, 154, 107);
 const QColor kPlayedYellow(168, 145, 53);
@@ -41,14 +41,7 @@ const QColor kLightPurple(QStringLiteral("#e9d5ff"));
 class KeyMatchCellTest : public LibraryTest {
   protected:
     KeyMatchCellTest()
-            : m_numDecks(ConfigKey(QStringLiteral("[App]"), QStringLiteral("num_decks"))),
-              m_play(ConfigKey(QStringLiteral("[Channel1]"), QStringLiteral("play"))),
-              m_syncLeader(ConfigKey(QStringLiteral("[Channel1]"), QStringLiteral("sync_leader"))),
-              m_fileKey(ConfigKey(QStringLiteral("[Channel1]"), QStringLiteral("file_key"))),
-              m_key(ConfigKey(QStringLiteral("[Channel1]"), QStringLiteral("key"))) {
-        m_numDecks.set(1);
-        PlayerInfo::create();
-        m_pMatcher = std::make_unique<KeyMatcher>(config());
+            : m_bed(config(), 1, 0) {
         m_pTrack = getOrAddTrackByLocation(
                 getTestDir().filePath(QStringLiteral("id3-test-data/artist.mp3")));
         connectTrackSource();
@@ -60,8 +53,6 @@ class KeyMatchCellTest : public LibraryTest {
         BaseTrackTableModel::setApplyPlayedTrackColor(true);
         m_pModel.reset();
         m_pTrack.reset();
-        m_pMatcher.reset();
-        PlayerInfo::destroy();
     }
 
     // What the Tracks feature gives the library: the track source the list
@@ -105,14 +96,8 @@ class KeyMatchCellTest : public LibraryTest {
         internalCollection()->connectTrackSource(m_pTrackSource);
     }
 
-    // The reference deck: deck 1 plays as sync leader in `camelot`.
     void referenceIs(const QString& camelot) {
-        const auto key = KeyUtils::guessKeyFromText(camelot);
-        ASSERT_NE(mixxx::track::io::key::INVALID, key);
-        m_fileKey.set(KeyUtils::keyToNumericValue(key));
-        m_key.set(KeyUtils::keyToNumericValue(key));
-        m_syncLeader.set(2);
-        m_play.set(1);
+        m_bed.referenceIs(camelot);
     }
 
     void trackKeyIs(const QString& camelot) {
@@ -158,22 +143,19 @@ class KeyMatchCellTest : public LibraryTest {
     }
 
     void storeSettings(const mixxx::keymatch::Settings& settings) {
-        mixxx::keymatch::saveSettings(config(), settings);
-        m_pMatcher->reloadSettings();
+        m_bed.storeSettings(settings);
     }
 
     void setBoldMatchedText(bool bold) {
         mixxx::keymatch::Settings settings = mixxx::keymatch::loadSettings(config());
         settings.boldMatchedText = bold;
-        mixxx::keymatch::saveSettings(config(), settings);
-        m_pMatcher->reloadSettings();
+        storeSettings(settings);
     }
 
     void setMatchShiftedKey(bool match) {
         mixxx::keymatch::Settings settings = mixxx::keymatch::loadSettings(config());
         settings.matchShiftedKey = match;
-        mixxx::keymatch::saveSettings(config(), settings);
-        m_pMatcher->reloadSettings();
+        storeSettings(settings);
     }
 
     QVariant fontOf(ColumnCache::Column column) const {
@@ -188,15 +170,10 @@ class KeyMatchCellTest : public LibraryTest {
     // The reference deck plays in `stored` at the shifted key `shifted`.
     void referenceIsShifted(const QString& stored, const QString& shifted) {
         referenceIs(stored);
-        m_key.set(KeyUtils::keyToNumericValue(KeyUtils::guessKeyFromText(shifted)));
+        m_bed.deck(1).setShiftedKey(KeyUtils::guessKeyFromText(shifted));
     }
 
-    ControlObject m_numDecks;
-    ControlObject m_play;
-    ControlObject m_syncLeader;
-    ControlObject m_fileKey;
-    ControlObject m_key;
-    std::unique_ptr<KeyMatcher> m_pMatcher;
+    KeyMatchTestBed m_bed;
     QSharedPointer<BaseTrackCache> m_pTrackSource;
     TrackPointer m_pTrack;
     std::unique_ptr<LibraryTableModel> m_pModel;
@@ -246,8 +223,8 @@ TEST_F(KeyMatchCellTest, NothingIsHighlightedWithoutAReferenceDeck) {
 }
 
 TEST_F(KeyMatchCellTest, ReferenceWithoutAKeyHighlightsNothing) {
-    m_syncLeader.set(2);
-    m_play.set(1);
+    m_bed.deck(1).syncLeader.set(2);
+    m_bed.deck(1).play.set(1);
     EXPECT_FALSE(keyColorFor(QStringLiteral("8A")).isValid());
 }
 
@@ -302,8 +279,8 @@ TEST_F(KeyMatchCellTest, ChangingTheReferenceRepaintsWithoutReloading) {
     QSignalSpy repainted(m_pModel.get(), &QAbstractItemModel::dataChanged);
     QSignalSpy reloaded(m_pModel.get(), &QAbstractItemModel::modelReset);
     const auto key = KeyUtils::guessKeyFromText(QStringLiteral("3B"));
-    m_fileKey.set(KeyUtils::keyToNumericValue(key));
-    m_key.set(KeyUtils::keyToNumericValue(key));
+    m_bed.deck(1).fileKey.set(KeyUtils::keyToNumericValue(key));
+    m_bed.deck(1).key.set(KeyUtils::keyToNumericValue(key));
     EXPECT_GE(repainted.count(), 1);
     EXPECT_EQ(0, reloaded.count());
     EXPECT_FALSE(keyColor().isValid());
@@ -569,7 +546,7 @@ TEST_F(KeyMatchCellTest, ChangingTheShiftedKeyRepaints) {
     trackKeyIs(QStringLiteral("2A"));
     ASSERT_FALSE(keyColor().isValid());
     QSignalSpy repainted(m_pModel.get(), &QAbstractItemModel::dataChanged);
-    m_key.set(KeyUtils::keyToNumericValue(KeyUtils::guessKeyFromText(QStringLiteral("3A"))));
+    m_bed.deck(1).key.set(KeyUtils::keyToNumericValue(KeyUtils::guessKeyFromText(QStringLiteral("3A"))));
     EXPECT_GE(repainted.count(), 1);
     EXPECT_EQ(QVariant::fromValue(kPurple), keyColor());
 }

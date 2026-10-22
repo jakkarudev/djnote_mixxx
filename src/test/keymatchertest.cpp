@@ -8,6 +8,7 @@
 #include "control/controlobject.h"
 #include "library/keymatch/keymatchsettings.h"
 #include "mixer/playerinfo.h"
+#include "test/keymatchtestutils.h"
 #include "test/mixxxtest.h"
 #include "track/keyutils.h"
 
@@ -15,6 +16,8 @@
 // deck controls and PlayerInfo's current playing deck signal.
 namespace {
 
+using keymatchtest::DeckControls;
+using keymatchtest::KeyMatchTestBed;
 using mixxx::keymatch::Highlight;
 using mixxx::keymatch::KeyMatcher;
 using mixxx::keymatch::KeyMatchTier;
@@ -28,53 +31,18 @@ ChromaticKey camelot(int hour, bool major) {
     return KeyUtils::tonicToKey(tonic, major);
 }
 
-class DeckControls {
-  public:
-    explicit DeckControls(int deck)
-            : group(QStringLiteral("[Channel%1]").arg(deck)),
-              play(ConfigKey(group, QStringLiteral("play"))),
-              syncLeader(ConfigKey(group, QStringLiteral("sync_leader"))),
-              fileKey(ConfigKey(group, QStringLiteral("file_key"))),
-              key(ConfigKey(group, QStringLiteral("key"))) {
-    }
-    void setStoredKey(ChromaticKey stored) {
-        fileKey.set(KeyUtils::keyToNumericValue(stored));
-    }
-    void setShiftedKey(ChromaticKey shifted) {
-        key.set(KeyUtils::keyToNumericValue(shifted));
-    }
-
-    const QString group;
-    ControlObject play;
-    ControlObject syncLeader;
-    ControlObject fileKey;
-    ControlObject key;
-};
-
 class KeyMatcherTest : public MixxxTest {
   protected:
     KeyMatcherTest()
-            : m_numDecks(ConfigKey(QStringLiteral("[App]"), QStringLiteral("num_decks"))),
-              m_numSamplers(ConfigKey(QStringLiteral("[App]"), QStringLiteral("num_samplers"))) {
-        m_numDecks.set(2);
-        m_numSamplers.set(1);
-        PlayerInfo::create();
-        for (int deck : {1, 2}) {
-            m_decks.push_back(std::make_unique<DeckControls>(deck));
-        }
-        m_pMatcher = std::make_unique<KeyMatcher>(config());
-    }
-    ~KeyMatcherTest() override {
-        m_pMatcher.reset();
-        PlayerInfo::destroy();
+            : m_bed(config(), 2, 1) {
     }
 
     DeckControls& deck(int number) {
-        return *m_decks.at(number - 1);
+        return m_bed.deck(number);
     }
 
     KeyMatcher& matcher() {
-        return *m_pMatcher;
+        return m_bed.matcher();
     }
 
     // Deck 1 plays as sync leader with the given stored key.
@@ -91,17 +59,11 @@ class KeyMatcherTest : public MixxxTest {
     }
 
     void setHighlight(Highlight highlight) {
-        mixxx::keymatch::Settings settings;
-        settings.highlight = highlight;
-        mixxx::keymatch::saveSettings(config(), settings);
-        matcher().reloadSettings();
+        m_bed.changeSettings([highlight](auto& settings) { settings.highlight = highlight; });
     }
 
     void setMatchShiftedKey(bool match) {
-        mixxx::keymatch::Settings settings = mixxx::keymatch::loadSettings(config());
-        settings.matchShiftedKey = match;
-        mixxx::keymatch::saveSettings(config(), settings);
-        matcher().reloadSettings();
+        m_bed.changeSettings([match](auto& settings) { settings.matchShiftedKey = match; });
     }
 
     // 8A stored, played two semitones up: shifted key B minor (10A).
@@ -119,10 +81,7 @@ class KeyMatcherTest : public MixxxTest {
         emit PlayerInfo::instance().currentPlayingDeckChanged(deckNumber - 1);
     }
 
-    ControlObject m_numDecks;
-    ControlObject m_numSamplers;
-    std::vector<std::unique_ptr<DeckControls>> m_decks;
-    std::unique_ptr<KeyMatcher> m_pMatcher;
+    KeyMatchTestBed m_bed;
 };
 
 } // namespace
