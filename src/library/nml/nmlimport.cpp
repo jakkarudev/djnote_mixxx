@@ -7,6 +7,7 @@
 #include <QSet>
 
 #include "library/dao/playlistdao.h"
+#include "library/nml/nmlpreparation.h"
 #include "library/trackcollection.h"
 #include "library/trackcollectionmanager.h"
 #include "track/track.h"
@@ -250,6 +251,11 @@ NmlImportResult applyNmlImport(const NmlImportPlan& plan,
         }
         if (!alreadyInLibrary) {
             ++result.newLibraryTracks;
+            // Preparation (grid, key, lock) applies to tracks new to the
+            // library only; existing ones belong to the keep/replace ticket.
+            if (item.entryIndex >= 0) {
+                applyNmlPreparation(pTrack.get(), plan.document.entries.at(item.entryIndex));
+            }
         }
         ids.append(pTrack->getId());
     }
