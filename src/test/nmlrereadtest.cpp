@@ -94,6 +94,48 @@ class NmlRereadTest : public LibraryTest {
         return query.next() && query.value(0).toInt() == 1;
     }
 
+    // The missing `file` comes back next to the .nml, but that path is already a
+    // library track of its own: the playlist entry must use that track.
+    void expectKeepUsesExisting(const QString& file, NmlRereadMode mode) {
+        const int playlistId = importSet({file});
+        const QList<TrackId> before = tracksInOrder(playlistId);
+        ASSERT_EQ(4, before.size());
+        TrackId missingId;
+        for (const TrackId id : before) {
+            if (isFlaggedMissing(id)) {
+                missingId = id;
+            }
+        }
+        ASSERT_TRUE(missingId.isValid());
+
+        nmltest::copyAudio(getTestDir(), file, m_nmlDir);
+        const TrackPointer pExisting = getOrAddTrackByLocation(m_nmlDir.filePath(file));
+        ASSERT_TRUE(pExisting);
+        ASSERT_NE(missingId, pExisting->getId());
+        const int rowsBefore = libraryRowCount();
+
+        const NmlRereadPlan plan = planNmlReread(playlistId, trackCollectionManager());
+        ASSERT_TRUE(plan.error.isEmpty()) << plan.error.toStdString();
+        const NmlRereadResult result = applyNmlReread(plan, mode, trackCollectionManager());
+        ASSERT_TRUE(result.error.isEmpty()) << result.error.toStdString();
+
+        QList<TrackId> expected = before;
+        for (TrackId& id : expected) {
+            if (id == missingId) {
+                id = pExisting->getId();
+            }
+        }
+        EXPECT_EQ(expected, tracksInOrder(playlistId)); // same positions
+        EXPECT_EQ(rowsBefore, libraryRowCount());
+        EXPECT_TRUE(isFlaggedMissing(missingId)); // the old row is left alone
+        EXPECT_TRUE(result.relinked.isEmpty());
+        EXPECT_EQ(1, result.usedExistingTracks.size());
+        EXPECT_TRUE(result.missingTracks.isEmpty());
+        EXPECT_TRUE(pExisting->getBeats()); // preparation applied to it
+        EXPECT_TRUE(nmlRereadSummary(QStringLiteral("Set"), mode, result)
+                            .contains(QStringLiteral("already in the library")));
+    }
+
     QTemporaryDir m_dir;
     QDir m_nmlDir;
     QString m_nml;
@@ -319,6 +361,48 @@ TEST_F(NmlRereadTest, KeepSwapsAMissingTrackForTheAcceptedLibraryMatch) {
     QList<TrackId> expected = before;
     expected[1] = pMatch->getId();
     EXPECT_EQ(expected, tracksInOrder(playlistId));
+}
+
+// ---- the found file is already another library track ----
+
+TEST_F(NmlRereadTest, KeepUsesTheLibraryTrackAlreadyAtTheFoundMp3Path) {
+    expectKeepUsesExisting(QStringLiteral("cover-test-vbr.mp3"), NmlRereadMode::Keep);
+}
+
+TEST_F(NmlRereadTest, KeepUsesTheLibraryTrackAlreadyAtTheFoundFlacPath) {
+    expectKeepUsesExisting(QStringLiteral("cover-test.flac"), NmlRereadMode::Keep);
+}
+
+TEST_F(NmlRereadTest, ReplaceUsesTheLibraryTrackAlreadyAtTheFoundFlacPath) {
+    expectKeepUsesExisting(QStringLiteral("cover-test.flac"), NmlRereadMode::Replace);
+}
+
+// ---- status wording in Keep mode ----
+
+TEST_F(NmlRereadTest, KeepLabelsAnEntryThatIsFineAsAlreadyInPlaylist) {
+    const int playlistId = importSet();
+    // The audio files are gone from the disk, but the library rows are not flagged.
+    for (const QString& f : m_nmlDir.entryList(QDir::Files)) {
+        if (!f.endsWith(QLatin1String(".nml"))) {
+            ASSERT_TRUE(m_nmlDir.remove(f));
+        }
+    }
+    const NmlRereadPlan plan = planNmlReread(playlistId, trackCollectionManager());
+    ASSERT_TRUE(plan.error.isEmpty()) << plan.error.toStdString();
+    ASSERT_EQ(NmlTrackStatus::NotFound, plan.plan.tracks.at(0).status);
+    EXPECT_FALSE(nmlRereadEntryMissing(plan, 0, trackCollectionManager()));
+    EXPECT_EQ(QStringLiteral("already in playlist"),
+            nmlKeepRowStatusText(plan.plan.tracks.at(0), false));
+    EXPECT_EQ(QStringLiteral("missing"), nmlRowStatusText(plan.plan.tracks.at(0)));
+}
+
+TEST_F(NmlRereadTest, KeepKeepsTheMissingLabelForAnEntryMissingInThePlaylist) {
+    const int playlistId = importSet({QStringLiteral("cover-test.flac")});
+    const NmlRereadPlan plan = planNmlReread(playlistId, trackCollectionManager());
+    ASSERT_TRUE(plan.error.isEmpty()) << plan.error.toStdString();
+    ASSERT_EQ(NmlTrackStatus::NotFound, plan.plan.tracks.at(1).status);
+    EXPECT_TRUE(nmlRereadEntryMissing(plan, 1, trackCollectionManager()));
+    EXPECT_EQ(QStringLiteral("missing"), nmlKeepRowStatusText(plan.plan.tracks.at(1), true));
 }
 
 // ---- finding the playlist, moved .nml, lock ----

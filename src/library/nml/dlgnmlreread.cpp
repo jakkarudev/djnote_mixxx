@@ -39,6 +39,7 @@ DlgNmlReread::DlgNmlReread(const NmlRereadPlan& plan,
     m_pKeep->setChecked(true);
     pLayout->addWidget(m_pReplace);
     pLayout->addWidget(m_pKeep);
+    connect(m_pKeep, &QRadioButton::toggled, this, &DlgNmlReread::refreshRows);
 
     m_pTable = new QTableWidget(0, 3, this);
     m_pTable->setHorizontalHeaderLabels({tr("Title"), tr("Artist"), tr("Status")});
@@ -78,6 +79,10 @@ void DlgNmlReread::refreshRows() {
         m_pTable->setItem(row, 0, new QTableWidgetItem(t.title.isEmpty() ? t.primaryKey : t.title));
         m_pTable->setItem(row, 1, new QTableWidgetItem(t.artist));
         m_pTable->setItem(row, 2, newNmlStatusItem(t));
+        if (mode() == NmlRereadMode::Keep) {
+            m_pTable->item(row, 2)->setText(nmlKeepRowStatusText(
+                    t, nmlRereadEntryMissing(m_plan, row, m_pManager)));
+        }
     }
     m_pTable->resizeColumnsToContents();
     m_refreshing = false;
@@ -90,7 +95,10 @@ void DlgNmlReread::onItemChanged(QTableWidgetItem* pItem) {
     applyNmlStatusTick(&m_plan.plan, pItem->row(), pItem->checkState() == Qt::Checked);
     if (pItem->row() < m_plan.plan.tracks.size()) {
         m_refreshing = true;
-        pItem->setText(nmlRowStatusText(m_plan.plan.tracks.at(pItem->row())));
+        pItem->setText(mode() == NmlRereadMode::Keep
+                        ? nmlKeepRowStatusText(m_plan.plan.tracks.at(pItem->row()),
+                                  nmlRereadEntryMissing(m_plan, pItem->row(), m_pManager))
+                        : nmlRowStatusText(m_plan.plan.tracks.at(pItem->row())));
         m_refreshing = false;
     }
 }
