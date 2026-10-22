@@ -10,22 +10,16 @@ namespace keymatch {
 
 namespace {
 
-// The default tier colours. Settable colours come with their own settings.
-const QColor kStrictColor(0x4a, 0xde, 0x80);
-const QColor kFuzzyColor(0xfa, 0xcc, 0x15);
-const QColor kShiftedStrictColor(0xc0, 0x84, 0xfc);
-const QColor kShiftedFuzzyColor(0xe9, 0xd5, 0xff);
-
-std::optional<QColor> colorOf(KeyMatchTier tier) {
+std::optional<QColor> colorOf(KeyMatchTier tier, const Settings& settings) {
     switch (tier) {
     case KeyMatchTier::Strict:
-        return kStrictColor;
+        return settings.strictColor;
     case KeyMatchTier::Fuzzy:
-        return kFuzzyColor;
+        return settings.fuzzyColor;
     case KeyMatchTier::ShiftedStrict:
-        return kShiftedStrictColor;
+        return settings.shiftedStrictColor;
     case KeyMatchTier::ShiftedFuzzy:
-        return kShiftedFuzzyColor;
+        return settings.shiftedFuzzyColor;
     case KeyMatchTier::None:
         break;
     }
@@ -106,7 +100,7 @@ CellStyle cellStyle(const CellInput& input) {
         return {};
     }
     CellStyle style;
-    const std::optional<QColor> color = colorOf(pMatcher->match(input.key));
+    const std::optional<QColor> color = colorOf(pMatcher->match(input.key), pMatcher->settings());
     style.color = color;
     // A played match is mixed 50/50 with the played colour.
     if (style.color && input.played && input.playedColor) {

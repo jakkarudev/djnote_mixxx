@@ -9,6 +9,7 @@ class QCheckBox;
 class QComboBox;
 class QLabel;
 class QListWidget;
+class QPushButton;
 
 // The DJNote preferences page: settings of DJNote features that have no
 // upstream page to live on. Built in code (no .ui file).
@@ -27,6 +28,9 @@ class DlgPrefDJNote : public DlgPreferencePage {
     Q_OBJECT
   public:
     DlgPrefDJNote(QWidget* pParent, UserSettingsPointer pConfig);
+
+    // What choosing `color` in the slot's colour dialog does.
+    void pickKeyMatchingColor(mixxx::keymatch::ColourSlot slot, const QColor& color);
 
   public slots:
     void slotUpdate() override;
@@ -48,6 +52,7 @@ class DlgPrefDJNote : public DlgPreferencePage {
     // Greys out what means nothing in the current state: the checklist while
     // Highlight is Off, the other columns while Whole row is ticked.
     void updateKeyMatchingEnabled();
+    void showKeyMatchingColor(int index, const QColor& color);
     void showKeyMatchingSettings(const mixxx::keymatch::Settings& settings);
     mixxx::keymatch::Settings keyMatchingSettingsFromControls() const;
 
@@ -65,6 +70,11 @@ class DlgPrefDJNote : public DlgPreferencePage {
     QCheckBox* m_pKeyMatchingShiftedKey;
     QListWidget* m_pKeyMatchingColumns;
     QCheckBox* m_pKeyMatchingBold;
+    // One swatch button per mixxx::keymatch::ColourSlot, holding its colour in
+    // the "keyMatchColor" property, with its row label.
+    QPushButton* m_keyMatchingColorButtons[4] = {};
+    QLabel* m_keyMatchingColorLabels[4] = {};
+    QPushButton* m_pKeyMatchingResetColors = nullptr;
     // Same as m_showingKnobReadoutSettings, for the key matching group.
     bool m_showingKeyMatchingSettings = false;
 };

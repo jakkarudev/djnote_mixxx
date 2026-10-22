@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QColor>
 #include <QList>
 #include <QString>
 #include <set>
@@ -49,6 +50,16 @@ enum class ColumnIdentity {
 // The identities the DJ can choose from, Key first.
 QList<ColumnIdentity> choosableColumns();
 
+// The four settable match colours, one per tier.
+enum class ColourSlot {
+    Strict,
+    Fuzzy,
+    ShiftedStrict,
+    ShiftedFuzzy,
+};
+
+QColor defaultColor(ColourSlot slot);
+
 // Add a field here, its key in keymatchsettings.cpp and its control on
 // DlgPrefDJNote; the key matcher reloads the whole struct when the page changes
 // something, so a new setting applies live without more plumbing.
@@ -66,6 +77,15 @@ struct Settings {
     bool boldMatchedText = true;
     // Also match the shifted key of the reference deck (purple).
     bool matchShiftedKey = true;
+    // The tier colours.
+    QColor strictColor = defaultColor(ColourSlot::Strict);
+    QColor fuzzyColor = defaultColor(ColourSlot::Fuzzy);
+    QColor shiftedStrictColor = defaultColor(ColourSlot::ShiftedStrict);
+    QColor shiftedFuzzyColor = defaultColor(ColourSlot::ShiftedFuzzy);
+
+    QColor& colour(ColourSlot slot);
+    const QColor& colour(ColourSlot slot) const;
+    void resetColours();
 };
 
 // Missing keys fall back to the defaults above.

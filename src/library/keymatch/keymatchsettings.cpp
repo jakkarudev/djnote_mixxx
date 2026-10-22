@@ -49,6 +49,25 @@ const QString kHighlightOff = QStringLiteral("off");
 const QString kHighlightStrictOnly = QStringLiteral("strictOnly");
 const QString kHighlightStrictAndFuzzy = QStringLiteral("strictAndFuzzy");
 
+constexpr ColourSlot kColourSlots[] = {ColourSlot::Strict,
+        ColourSlot::Fuzzy,
+        ColourSlot::ShiftedStrict,
+        ColourSlot::ShiftedFuzzy};
+
+ConfigKey colourKey(ColourSlot slot) {
+    switch (slot) {
+    case ColourSlot::Strict:
+        return ConfigKey(kDJNoteGroup, QStringLiteral("KeyMatchingStrictColor"));
+    case ColourSlot::Fuzzy:
+        return ConfigKey(kDJNoteGroup, QStringLiteral("KeyMatchingFuzzyColor"));
+    case ColourSlot::ShiftedStrict:
+        return ConfigKey(kDJNoteGroup, QStringLiteral("KeyMatchingShiftedStrictColor"));
+    case ColourSlot::ShiftedFuzzy:
+        break;
+    }
+    return ConfigKey(kDJNoteGroup, QStringLiteral("KeyMatchingShiftedFuzzyColor"));
+}
+
 Highlight highlightFromString(const QString& name, Highlight fallback) {
     if (name == kHighlightOff) {
         return Highlight::Off;
@@ -75,6 +94,44 @@ QString highlightToString(Highlight highlight) {
 }
 
 } // namespace
+
+QColor defaultColor(ColourSlot slot) {
+    switch (slot) {
+    case ColourSlot::Strict:
+        return QColor(0x4a, 0xde, 0x80);
+    case ColourSlot::Fuzzy:
+        return QColor(0xfa, 0xcc, 0x15);
+    case ColourSlot::ShiftedStrict:
+        return QColor(0xc0, 0x84, 0xfc);
+    case ColourSlot::ShiftedFuzzy:
+        break;
+    }
+    return QColor(0xe9, 0xd5, 0xff);
+}
+
+QColor& Settings::colour(ColourSlot slot) {
+    switch (slot) {
+    case ColourSlot::Strict:
+        return strictColor;
+    case ColourSlot::Fuzzy:
+        return fuzzyColor;
+    case ColourSlot::ShiftedStrict:
+        return shiftedStrictColor;
+    case ColourSlot::ShiftedFuzzy:
+        break;
+    }
+    return shiftedFuzzyColor;
+}
+
+const QColor& Settings::colour(ColourSlot slot) const {
+    return const_cast<Settings*>(this)->colour(slot);
+}
+
+void Settings::resetColours() {
+    for (const auto slot : kColourSlots) {
+        colour(slot) = defaultColor(slot);
+    }
+}
 
 QList<ColumnIdentity> choosableColumns() {
     QList<ColumnIdentity> columns;
@@ -106,6 +163,14 @@ Settings loadSettings(const UserSettingsPointer& pConfig) {
         settings.boldMatchedText = false;
     }
     settings.matchShiftedKey = pConfig->getValue<bool>(kShiftedKeyCfgKey, settings.matchShiftedKey);
+    // Colours are stored as #rrggbb; anything else reads as the default.
+    for (const auto slot : kColourSlots) {
+        const QString text = pConfig->getValueString(colourKey(slot));
+        const QColor color(text);
+        if (text.startsWith(QLatin1Char('#')) && color.isValid()) {
+            settings.colour(slot) = color;
+        }
+    }
     return settings;
 }
 
@@ -124,6 +189,9 @@ void saveSettings(const UserSettingsPointer& pConfig, const Settings& settings) 
     pConfig->setValue(kBoldMatchedTextCfgKey,
             settings.boldMatchedText ? QStringLiteral("true") : QStringLiteral("false"));
     pConfig->setValue(kShiftedKeyCfgKey, settings.matchShiftedKey);
+    for (const auto slot : kColourSlots) {
+        pConfig->setValue(colourKey(slot), settings.colour(slot).name(QColor::HexRgb));
+    }
 }
 
 } // namespace keymatch
