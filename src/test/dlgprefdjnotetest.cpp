@@ -344,3 +344,87 @@ TEST_F(DlgPrefDJNoteTest, KeyMatchingSettingsRoundTripAndFallBack) {
     config()->setValue(ConfigKey("[DJNote]", "KeyMatchingHighlight"), QStringLiteral("bogus"));
     EXPECT_EQ(Highlight::StrictAndFuzzy, mixxx::keymatch::loadSettings(config()).highlight);
 }
+
+// Key matching (ticket #97): the shifted key checkbox.
+namespace {
+
+QCheckBox* shiftedKeyCheckBox(DlgPrefDJNote* pPage) {
+    auto* pCheckBox = pPage->findChild<QCheckBox*>(
+            QStringLiteral("keyMatchingShiftedKeyCheckBox"));
+    EXPECT_NE(nullptr, pCheckBox);
+    return pCheckBox;
+}
+
+} // namespace
+
+TEST_F(DlgPrefDJNoteTest, ShiftedKeyCheckBoxIsOnByDefault) {
+    auto pPage = openPage();
+    auto* pCheckBox = shiftedKeyCheckBox(pPage.get());
+    EXPECT_EQ(QStringLiteral("Also match the shifted key of the reference deck"),
+            pCheckBox->text());
+    EXPECT_TRUE(pCheckBox->isChecked());
+}
+
+TEST_F(DlgPrefDJNoteTest, ShiftedKeyCheckBoxShowsTheStoredSetting) {
+    mixxx::keymatch::Settings settings;
+    settings.matchShiftedKey = false;
+    mixxx::keymatch::saveSettings(config(), settings);
+    auto pPage = openPage();
+    EXPECT_FALSE(shiftedKeyCheckBox(pPage.get())->isChecked());
+}
+
+TEST_F(DlgPrefDJNoteTest, ShiftedKeyCheckBoxAppliesLiveAndKeepsHighlight) {
+    storeHighlight(config(), Highlight::StrictOnly);
+    auto pPage = openPage();
+    shiftedKeyCheckBox(pPage.get())->setChecked(false);
+    EXPECT_FALSE(mixxx::keymatch::loadSettings(config()).matchShiftedKey);
+    EXPECT_EQ(Highlight::StrictOnly, mixxx::keymatch::loadSettings(config()).highlight);
+}
+
+TEST_F(DlgPrefDJNoteTest, ShiftedKeyCheckBoxTellsTheKeyMatcher) {
+    PlayerInfo::create();
+    {
+        auto pPage = openPage();
+        mixxx::keymatch::KeyMatcher matcher(config());
+        shiftedKeyCheckBox(pPage.get())->setChecked(false);
+        EXPECT_FALSE(matcher.settings().matchShiftedKey);
+    }
+    PlayerInfo::destroy();
+}
+
+TEST_F(DlgPrefDJNoteTest, ShiftedKeyCheckBoxIsGreyedOutWhileHighlightIsOff) {
+    auto pPage = openPage();
+    auto* pHighlight = highlightComboBox(pPage.get());
+    EXPECT_TRUE(shiftedKeyCheckBox(pPage.get())->isEnabled());
+    pHighlight->setCurrentIndex(pHighlight->findText(QStringLiteral("Off")));
+    EXPECT_FALSE(shiftedKeyCheckBox(pPage.get())->isEnabled());
+    pHighlight->setCurrentIndex(pHighlight->findText(QStringLiteral("Strict only")));
+    EXPECT_TRUE(shiftedKeyCheckBox(pPage.get())->isEnabled());
+}
+
+TEST_F(DlgPrefDJNoteTest, StoredOffShowsTheShiftedKeyCheckBoxGreyedOut) {
+    storeHighlight(config(), Highlight::Off);
+    auto pPage = openPage();
+    EXPECT_FALSE(shiftedKeyCheckBox(pPage.get())->isEnabled());
+}
+
+TEST_F(DlgPrefDJNoteTest, ResetRestoresTheShiftedKeyCheckBox) {
+    mixxx::keymatch::Settings settings;
+    settings.matchShiftedKey = false;
+    settings.highlight = Highlight::Off;
+    mixxx::keymatch::saveSettings(config(), settings);
+    auto pPage = openPage();
+    pPage->slotResetToDefaults();
+    EXPECT_TRUE(shiftedKeyCheckBox(pPage.get())->isChecked());
+    EXPECT_TRUE(shiftedKeyCheckBox(pPage.get())->isEnabled());
+    EXPECT_TRUE(mixxx::keymatch::loadSettings(config()).matchShiftedKey);
+}
+
+TEST_F(DlgPrefDJNoteTest, ShiftedKeySettingRoundTrips) {
+    EXPECT_TRUE(mixxx::keymatch::loadSettings(config()).matchShiftedKey);
+    mixxx::keymatch::Settings settings;
+    settings.matchShiftedKey = false;
+    mixxx::keymatch::saveSettings(config(), settings);
+    EXPECT_FALSE(mixxx::keymatch::loadSettings(config()).matchShiftedKey);
+}
+

@@ -19,7 +19,8 @@ DlgPrefDJNote::DlgPrefDJNote(QWidget* pParent, UserSettingsPointer pConfig)
           m_pKnobReadoutMode(nullptr),
           m_pKnobReadoutStyleLabel(nullptr),
           m_pKnobReadoutStyle(nullptr),
-          m_pKeyMatchingHighlight(nullptr) {
+          m_pKeyMatchingHighlight(nullptr),
+          m_pKeyMatchingShiftedKey(nullptr) {
     auto* pPageLayout = new QVBoxLayout(this);
     pPageLayout->setContentsMargins(0, 0, 0, 0);
     createKnobReadoutGroup();
@@ -179,7 +180,20 @@ void DlgPrefDJNote::createKeyMatchingGroup() {
     pGrid->addWidget(m_pKeyMatchingHighlight, row, 1, Qt::AlignLeft);
     pGrid->setColumnStretch(1, 1);
 
+    m_pKeyMatchingShiftedKey = new QCheckBox(
+            tr("Also match the shifted key of the reference deck"), pGroup);
+    m_pKeyMatchingShiftedKey->setObjectName(QStringLiteral("keyMatchingShiftedKeyCheckBox"));
+    m_pKeyMatchingShiftedKey->setToolTip(
+            tr("When the reference deck plays in a different key than the one "
+               "stored for its track (key lock off with a tempo change, or a "
+               "key shift), also colour tracks that fit that key purple."));
+    pGrid->addWidget(m_pKeyMatchingShiftedKey, pGrid->rowCount(), 0, 1, 2);
+
     // Every change applies live.
+    connect(m_pKeyMatchingShiftedKey,
+            &QCheckBox::toggled,
+            this,
+            &DlgPrefDJNote::slotKeyMatchingControlChanged);
     connect(m_pKeyMatchingHighlight,
             QOverload<int>::of(&QComboBox::currentIndexChanged),
             this,
@@ -192,6 +206,9 @@ void DlgPrefDJNote::slotKeyMatchingControlChanged() {
     if (m_showingKeyMatchingSettings) {
         return;
     }
+    m_pKeyMatchingShiftedKey->setEnabled(
+            m_pKeyMatchingHighlight->currentData().toInt() !=
+            static_cast<int>(mixxx::keymatch::Highlight::Off));
     mixxx::keymatch::saveSettings(m_pConfig, keyMatchingSettingsFromControls());
     // The key matcher reloads the stored settings and repaints the track lists.
     if (auto* pMatcher = mixxx::keymatch::KeyMatcher::instance()) {
@@ -203,6 +220,8 @@ void DlgPrefDJNote::showKeyMatchingSettings(const mixxx::keymatch::Settings& set
     m_showingKeyMatchingSettings = true;
     m_pKeyMatchingHighlight->setCurrentIndex(
             m_pKeyMatchingHighlight->findData(static_cast<int>(settings.highlight)));
+    m_pKeyMatchingShiftedKey->setChecked(settings.matchShiftedKey);
+    m_pKeyMatchingShiftedKey->setEnabled(settings.highlight != mixxx::keymatch::Highlight::Off);
     m_showingKeyMatchingSettings = false;
 }
 
@@ -210,5 +229,6 @@ mixxx::keymatch::Settings DlgPrefDJNote::keyMatchingSettingsFromControls() const
     mixxx::keymatch::Settings settings;
     settings.highlight = static_cast<mixxx::keymatch::Highlight>(
             m_pKeyMatchingHighlight->currentData().toInt());
+    settings.matchShiftedKey = m_pKeyMatchingShiftedKey->isChecked();
     return settings;
 }

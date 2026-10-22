@@ -10,6 +10,7 @@ namespace {
 const QString kDJNoteGroup = QStringLiteral("[DJNote]");
 
 const ConfigKey kHighlightCfgKey(kDJNoteGroup, QStringLiteral("KeyMatchingHighlight"));
+const ConfigKey kShiftedKeyCfgKey(kDJNoteGroup, QStringLiteral("KeyMatchingShiftedKey"));
 
 // Stored as names, so the values stay readable and reorder-safe; unknown names
 // read as the default.
@@ -48,11 +49,13 @@ Settings loadSettings(const UserSettingsPointer& pConfig) {
     Settings settings;
     settings.highlight = highlightFromString(
             pConfig->getValueString(kHighlightCfgKey), settings.highlight);
+    settings.matchShiftedKey = pConfig->getValue<bool>(kShiftedKeyCfgKey, settings.matchShiftedKey);
     return settings;
 }
 
 void saveSettings(const UserSettingsPointer& pConfig, const Settings& settings) {
     pConfig->setValue(kHighlightCfgKey, highlightToString(settings.highlight));
+    pConfig->setValue(kShiftedKeyCfgKey, settings.matchShiftedKey);
 }
 
 } // namespace keymatch

@@ -19,6 +19,8 @@ enum class Highlight {
 // something, so a new setting applies live without more plumbing.
 struct Settings {
     Highlight highlight = Highlight::StrictAndFuzzy;
+    // Also match the shifted key of the reference deck (purple).
+    bool matchShiftedKey = true;
 };
 
 // Missing keys fall back to the defaults above.

@@ -187,7 +187,8 @@ KeyMatchTier KeyMatcher::match(ChromaticKey candidate) const {
     }
     // The stored key's tier always wins over the shifted key's.
     KeyMatchTier tier = tierBetween(m_reference.storedKey, candidate);
-    if (tier == KeyMatchTier::None && m_reference.shiftedKey != INVALID) {
+    if (tier == KeyMatchTier::None && m_settings.matchShiftedKey &&
+            m_reference.shiftedKey != INVALID) {
         switch (tierBetween(m_reference.shiftedKey, candidate)) {
         case KeyMatchTier::Strict:
             tier = KeyMatchTier::ShiftedStrict;
