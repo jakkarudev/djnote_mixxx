@@ -100,13 +100,13 @@ int runNmlImportFlow(QWidget* pParent,
         return lastPlaylistId;
     }
 
-    DlgNmlImport dialog(plan, dao, pParent);
+    DlgNmlImport dialog(plan, dao, pParent, pTrackCollectionManager);
     if (dialog.exec() != QDialog::Accepted) {
         return kInvalidPlaylistId;
     }
 
     const NmlImportResult result =
-            applyNmlImport(plan, dialog.playlistName(), pTrackCollectionManager);
+            applyNmlImport(dialog.plan(), dialog.playlistName(), pTrackCollectionManager);
     if (!result.error.isEmpty() && result.playlistId == kInvalidPlaylistId) {
         QMessageBox::warning(pParent, tr("Import Traktor Playlist"), result.error);
         return kInvalidPlaylistId;

@@ -231,7 +231,17 @@ NmlImportResult applyNmlImport(const NmlImportPlan& plan,
         const QString label = item.title.isEmpty()
                 ? item.primaryKey
                 : (item.artist.isEmpty() ? item.title : item.artist + QStringLiteral(" - ") + item.title);
-        if (item.status == NmlTrackStatus::NotFound) {
+        // DJNote (#111): an accepted library match puts that track in the Playlist;
+        // an unticked one is applied like a missing row. The existing track's
+        // preparation is the keep/replace rule's business, not touched here.
+        if (item.status == NmlTrackStatus::MatchedInLibrary && item.accepted &&
+                pTrackCollectionManager->getTrackById(item.libraryTrackId)) {
+            ids.append(item.libraryTrackId);
+            ++result.matchedLibraryTracks;
+            continue;
+        }
+        if (item.status == NmlTrackStatus::NotFound ||
+                item.status == NmlTrackStatus::MatchedInLibrary) {
             TrackId missingId;
             if (addMissingTrack(pTrackCollectionManager, item, &missingId)) {
                 result.missingTracks.append(label);

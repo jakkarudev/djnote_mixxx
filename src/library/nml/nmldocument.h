@@ -59,6 +59,7 @@ struct NmlEntry {
     std::optional<double> bpm;     // TEMPO@BPM
     std::optional<int> ranking;    // INFO@RANKING 0-255
     std::optional<int> color;      // INFO@COLOR
+    double playtimeSeconds = 0.0;  // INFO@PLAYTIME_FLOAT, else PLAYTIME; 0 = unknown
     QList<NmlCue> cues;
 };
 
