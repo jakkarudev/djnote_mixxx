@@ -5,11 +5,6 @@
 #include <QtDebug>
 
 #include "library/library.h"
-#include "library/nml/nmlexportflow.h" // DJNote
-#include "library/nml/nmlimportflow.h" // DJNote
-#include "library/nml/nmlreread.h" // DJNote (#114)
-#include "library/nml/nmlrereadflow.h" // DJNote (#114)
-#include "library/nml/nmlsourcelink.h" // DJNote (#114)
 #include "library/parser.h"
 #include "library/playlisttablemodel.h"
 #include "library/queryutil.h"
@@ -38,11 +33,6 @@ PlaylistFeature::PlaylistFeature(Library* pLibrary, UserSettingsPointer pConfig)
     m_pSidebarModel->setRootItem(std::move(pRootItem));
     constructChildModel(kInvalidPlaylistId);
 
-    // DJNote (#114): create the source-NML link table if missing, drop links of deleted Playlists.
-    new mixxx::nml::NmlSourceLinkKeeper(&m_playlistDao,
-            pLibrary->trackCollectionManager()->internalCollection()->database(),
-            this);
-
     m_pShufflePlaylistAction = new QAction(tr("Shuffle Playlist"), this);
     connect(m_pShufflePlaylistAction,
             &QAction::triggered,
@@ -60,15 +50,6 @@ void PlaylistFeature::onRightClick(const QPoint& globalPos) {
     menu.addAction(m_pCreatePlaylistAction);
     menu.addSeparator();
     menu.addAction(m_pCreateImportPlaylistAction);
-    // DJNote: Traktor NML import (src/library/nml/)
-    menu.addAction(tr("Import Traktor Playlist (.nml)..."), this, [this]() {
-        const int playlistId = mixxx::nml::runNmlImportFlow(m_pSidebarWidget,
-                m_pLibrary->trackCollectionManager(),
-                m_pConfig);
-        if (playlistId != kInvalidPlaylistId) {
-            activatePlaylist(playlistId);
-        }
-    });
     menu.exec(globalPos);
 }
 
@@ -107,25 +88,6 @@ void PlaylistFeature::onRightClickChild(
     menu.addAction(m_pImportPlaylistAction);
     menu.addAction(m_pExportPlaylistAction);
     menu.addAction(m_pExportTrackFilesAction);
-    // DJNote: Traktor NML export (src/library/nml/)
-    menu.addAction(tr("Export as Traktor Playlist (.nml)..."), this, [this, playlistId]() {
-        mixxx::nml::runNmlExportFlow(m_pSidebarWidget,
-                m_pLibrary->trackCollectionManager(),
-                m_pConfig,
-                playlistId);
-    });
-    // DJNote (#114): only Playlists created by an NML import remember their source NML.
-    if (mixxx::nml::loadNmlSourceLink(
-                m_pLibrary->trackCollectionManager()->internalCollection()->database(),
-                playlistId)) {
-        QAction* pRereadAction = menu.addAction(tr("Re-read NML..."), this, [this, playlistId]() {
-            mixxx::nml::runNmlRereadFlow(m_pSidebarWidget,
-                    m_pLibrary->trackCollectionManager(),
-                    m_pConfig,
-                    playlistId);
-        });
-        pRereadAction->setEnabled(!locked);
-    }
     menu.exec(globalPos);
 }
 
