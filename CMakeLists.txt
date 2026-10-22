@@ -1011,6 +1011,10 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/library/nml/nmlreuse.cpp
   src/library/nml/nmlwriter.cpp
   src/library/nml/nmlpreparation.cpp
+  src/library/nml/dlgnmlreread.cpp
+  src/library/nml/nmlreread.cpp
+  src/library/nml/nmlrereadflow.cpp
+  src/library/nml/nmlsourcelink.cpp
   src/library/library_prefs.cpp
   src/library/library.cpp
   src/library/librarycontrol.cpp
@@ -2277,6 +2281,7 @@ if(BUILD_TESTING)
     src/test/nmlimporttest.cpp
     src/test/nmlkeepreplacetest.cpp
     src/test/nmlpreparationtest.cpp
+    src/test/nmlrereadtest.cpp
     src/test/nmlreusetest.cpp
     src/test/nmlmultiplaylisttest.cpp
     src/test/keyutilstest.cpp

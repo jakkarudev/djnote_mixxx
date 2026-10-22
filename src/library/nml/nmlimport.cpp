@@ -9,6 +9,7 @@
 #include "library/dao/playlistdao.h"
 #include "library/nml/nmlcues.h"
 #include "library/nml/nmlpreparation.h"
+#include "library/nml/nmlsourcelink.h" // DJNote (#114)
 #include "library/trackcollection.h"
 #include "library/trackcollectionmanager.h"
 #include "track/track.h"
@@ -377,6 +378,15 @@ NmlImportResult applyNmlImport(const NmlImportPlan& plan,
     }
     result.playlistId = playlistId;
     result.tracksInPlaylist = ids.size();
+    // DJNote (#114): remember the source NML so the Playlist can be re-read.
+    if (plan.playlistIndex >= 0 && plan.playlistIndex < plan.document.playlists.size()) {
+        NmlSourceLink link;
+        link.playlistId = playlistId;
+        link.nmlPath = plan.nmlPath;
+        link.uuid = plan.document.playlists.at(plan.playlistIndex).uuid;
+        link.name = plan.document.playlists.at(plan.playlistIndex).name;
+        saveNmlSourceLink(pTrackCollectionManager->internalCollection()->database(), link);
+    }
     return result;
 }
 
