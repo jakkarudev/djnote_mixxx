@@ -999,6 +999,7 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/library/nml/nmldocument.cpp
   src/library/nml/nmlimport.cpp
   src/library/nml/nmlimportflow.cpp
+  src/library/nml/nmlpreparation.cpp
   src/library/library_prefs.cpp
   src/library/library.cpp
   src/library/librarycontrol.cpp
@@ -2258,6 +2259,7 @@ if(BUILD_TESTING)
     src/test/keymatchliststest.cpp
     src/test/nmldocumenttest.cpp
     src/test/nmlimporttest.cpp
+    src/test/nmlpreparationtest.cpp
     src/test/keyutilstest.cpp
     src/test/knobreadoutcompacttexttest.cpp
     src/test/knobreadoutfacetest.cpp
