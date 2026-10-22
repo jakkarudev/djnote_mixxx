@@ -41,7 +41,6 @@ enum class ColumnIdentity {
     Bpm,
     ReplayGain,
     Location,
-    TimesPlayed,
     DateAdded,
     LastPlayed,
     NotColoured,

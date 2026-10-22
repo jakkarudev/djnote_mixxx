@@ -35,7 +35,6 @@ const QList<QPair<ColumnIdentity, QString>>& columnNames() {
             {ColumnIdentity::Bpm, QStringLiteral("bpm")},
             {ColumnIdentity::ReplayGain, QStringLiteral("replayGain")},
             {ColumnIdentity::Location, QStringLiteral("location")},
-            {ColumnIdentity::TimesPlayed, QStringLiteral("timesPlayed")},
             {ColumnIdentity::DateAdded, QStringLiteral("dateAdded")},
             {ColumnIdentity::LastPlayed, QStringLiteral("lastPlayed")},
     };

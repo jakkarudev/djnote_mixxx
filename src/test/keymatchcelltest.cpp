@@ -9,6 +9,7 @@
 #include "library/columncache.h"
 #include "library/dao/trackschema.h"
 #include "library/keymatch/keymatcher.h"
+#include "library/keymatch/keymatchcell.h"
 #include "library/keymatch/keymatchsettings.h"
 #include "library/basetracktablemodel.h"
 #include "library/librarytablemodel.h"
@@ -69,6 +70,7 @@ class KeyMatchCellTest : public LibraryTest {
         const QStringList columns = {
                 LIBRARYTABLE_ID,
                 LIBRARYTABLE_PLAYED,
+                LIBRARYTABLE_TIMESPLAYED,
                 LIBRARYTABLE_ARTIST,
                 LIBRARYTABLE_TITLE,
                 LIBRARYTABLE_BPM,
@@ -388,9 +390,22 @@ TEST_F(KeyMatchCellTest, WholeRowColoursEveryTextColumnButNoOthers) {
     }
     for (ColumnCache::Column column : {ColumnCache::COLUMN_LIBRARYTABLE_COVERART,
                  ColumnCache::COLUMN_LIBRARYTABLE_COLOR,
-                 ColumnCache::COLUMN_LIBRARYTABLE_PLAYED}) {
+                 ColumnCache::COLUMN_LIBRARYTABLE_TIMESPLAYED}) {
+        // TIMESPLAYED is the Played checkbox column.
         EXPECT_FALSE(cell(column).data(Qt::ForegroundRole).isValid()) << column;
     }
+}
+
+TEST_F(KeyMatchCellTest, ThePlayedCheckboxColumnHasNoIdentity) {
+    EXPECT_EQ(ColumnIdentity::NotColoured,
+            mixxx::keymatch::columnIdentity(ColumnCache::COLUMN_LIBRARYTABLE_TIMESPLAYED));
+}
+
+TEST_F(KeyMatchCellTest, AStoredPlayedTimesColumnLoadsCleanlyAndIsIgnored) {
+    config()->setValue(ConfigKey(QStringLiteral("[DJNote]"), QStringLiteral("KeyMatchingColumns")),
+            QStringLiteral("timesPlayed,key"));
+    const auto settings = mixxx::keymatch::loadSettings(config());
+    EXPECT_EQ((std::set<ColumnIdentity>{ColumnIdentity::Key}), settings.columns);
 }
 
 TEST_F(KeyMatchCellTest, AColumnTheListLacksIsSkipped) {

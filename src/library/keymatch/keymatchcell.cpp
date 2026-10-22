@@ -82,8 +82,6 @@ ColumnIdentity columnIdentity(ColumnCache::Column column) {
         return ColumnIdentity::ReplayGain;
     case ColumnCache::COLUMN_TRACKLOCATIONSTABLE_LOCATION:
         return ColumnIdentity::Location;
-    case ColumnCache::COLUMN_LIBRARYTABLE_TIMESPLAYED:
-        return ColumnIdentity::TimesPlayed;
     case ColumnCache::COLUMN_LIBRARYTABLE_DATETIMEADDED:
         return ColumnIdentity::DateAdded;
     case ColumnCache::COLUMN_LIBRARYTABLE_LAST_PLAYED_AT:

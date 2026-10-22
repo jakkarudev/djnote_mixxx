@@ -56,8 +56,6 @@ QString columnLabel(mixxx::keymatch::ColumnIdentity identity) {
         return DlgPrefDJNote::tr("ReplayGain");
     case ColumnIdentity::Location:
         return DlgPrefDJNote::tr("Location");
-    case ColumnIdentity::TimesPlayed:
-        return DlgPrefDJNote::tr("Played times");
     case ColumnIdentity::DateAdded:
         return DlgPrefDJNote::tr("Date Added");
     case ColumnIdentity::LastPlayed:
@@ -230,8 +228,8 @@ void DlgPrefDJNote::createKeyMatchingGroup() {
     m_pKeyMatchingHighlight->addItem(tr("Strict and fuzzy"),
             static_cast<int>(mixxx::keymatch::Highlight::StrictAndFuzzy));
     m_pKeyMatchingHighlight->setToolTip(
-            tr("Colour the key of library tracks that fit the key of the deck "
-               "you are mixing from. Strict matches (same key, one hour away "
+            tr("Colour the cells of tracks in the track lists whose key fits "
+               "the key of the deck you are mixing from. Strict matches (same key, one hour away "
                "or the relative major/minor) are green; fuzzy matches (two "
                "hours or a semitone away) are yellow."));
     auto* pHighlightLabel = new QLabel(tr("Highlight"), pGroup);
