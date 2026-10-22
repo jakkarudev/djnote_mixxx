@@ -166,3 +166,25 @@ _Avoid_: pitched key, effective key, current key
 **Shifted key match**:
 A strict or fuzzy match against the shifted key rather than the stored key. A track that matches the stored key counts as an ordinary key match, even if it also matches the shifted key.
 _Avoid_: purple match, pitch match
+
+## Traktor exchange
+
+**Preparation**:
+What a DJ sets on a track so it is ready to play: its beat grid, BPM, key, main cue, hotcues, loops, colour and rating. It belongs to the track's file in the library, so two copies of the same audio are prepared separately.
+_Avoid_: analysis (that is what the detectors do), track data, metadata
+
+**NML export**:
+A Playlist written as a Traktor `.nml` file, carrying each track's preparation and, optionally, a copy of each track.
+_Avoid_: Traktor playlist, NML bundle
+
+**Export folder**:
+The folder that holds an NML export's `.nml` file and its copied tracks side by side. It can be moved as a whole to another place or computer, and DJNote or Traktor still find the tracks next to the `.nml`.
+_Avoid_: bundle, package, set folder
+
+**Missing track**:
+A library track whose file was not found at its location, either at the last library rescan or when its Playlist was imported. It is not listed with the library's tracks, but it keeps its place in its Playlists, drawn in the skin's missing colour, until its file is found again.
+_Avoid_: deleted track, broken track, lost track
+
+**Source NML**:
+The `.nml` file a Playlist was imported from. DJNote remembers it so the Playlist can be re-read from it later. A Playlist made in DJNote, or duplicated from an imported one, has none.
+_Avoid_: linked NML, origin file, NML link

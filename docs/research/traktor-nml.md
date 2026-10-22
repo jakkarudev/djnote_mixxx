@@ -395,3 +395,19 @@ These are facts about both sides. Nothing here decides how to convert.
 - hellricer, "Decoding TRAKTOR4 field": https://hellricer.github.io/2021/05/05/decoding-traktor4-field.html
 - DJ TechTools, "After the show: sharing sets in Traktor & Serato DJ" (2014): https://djtechtools.com/2014/02/24/after-the-show-sharing-sets-in-traktor-serato-dj
 - Earlier DJNote research: `docs/research/traktor-waveform.md` (§4.3, §8.5), `docs/research/jkr-beat-grid-handoff.md`.
+
+---
+
+## Addendum (2026-10-22): what the installed Traktor Pro 4.0.2 writes today
+
+Checked during the `/grill-with-docs` session for #88 against `Documents\Native Instruments\Traktor 4.0.2\collection.nml` (written 2026-10-21), the History files, and a new playlist export of 14 tracks to `C:\Users\Jakkaru\Documents\test\test.nml` (2026-10-22). The installed program is `Traktor Pro 4.exe`, product version 4.0.2. All of these are [O].
+
+- **VERSION 20 everywhere.** The collection, every History file and the new playlist export are `<NML VERSION="20">` with `PROGRAM="Traktor Pro 4"`. The VERSION 19 export of 2025-09-06 described above therefore came from an older Traktor. The summary's "VERSION 19 = Traktor 4.0.2" is wrong.
+- **Flexible beatgrids are real and exported unchanged.** `Salona - Connected` has six `TYPE="4"` markers, each on `HOTCUE="-1"` with its own `<GRID BPM>` (137.004, 119.988, 137.003, 119.997, 137.001, 136.971). `Salona - Leaps of Faith` has five (130.06, 174.00, 130.13, 130.54, 130.94). `TEMPO@BPM` equals the first marker's BPM. This answers open questions 3 and 4 for Traktor 4.0.2.
+- **Hotcue button 1 is an ordinary cue.** In VERSION 20 the grid marker is never on a button. Button 1 holds a separate `TYPE="0"` cue: sometimes at the grid marker's position (named `AutoGrid`, `COLOR="#FFFFFF"` in the collection, or `n.n.` in the test export), sometimes at another position (`Bumpy`: hotcue at 71.6 ms, grid at 1836.3 ms).
+- **Loops sit on hotcue buttons**: `TYPE="5"` with `LEN` in ms and `HOTCUE` 2 or 6.
+- **`LOCK="1"` with `LOCK_MODIFICATION_TIME`** appears on locked entries in the export.
+- **A playlist can repeat a track.** `PLAYLIST ENTRIES="15"` against `COLLECTION ENTRIES="14"`, because `Salona - Connected` appears twice.
+- **`IMPORT_DATE` is again the export day** (`2026/10/22`). This supports open question 8.
+- `FLAGS` values here are 12, 24 and 28. No element is self-closed.
+- The copied files keep their original names and their read-only attribute (`03. Atropp & Fisheye - Grão de Areia.flac` is read-only in the export folder).
