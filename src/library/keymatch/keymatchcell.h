@@ -32,6 +32,9 @@ struct CellInput {
     mixxx::track::io::key::ChromaticKey key = mixxx::track::io::key::INVALID;
     bool missing = false;
     bool played = false;
+    // The table view's played colour, set only while Mixxx colours played
+    // tracks.
+    std::optional<QColor> playedColor;
 };
 
 // The colour and font the cell takes from key matching. Unset colour and no
@@ -50,7 +53,8 @@ CellStyle cellStyle(const CellInput& input);
 // normal look.
 QVariant cellData(ColumnCache::Column column,
         int role,
-        const std::function<QVariant(ColumnCache::Column)>& siblingValue);
+        const std::function<QVariant(ColumnCache::Column)>& siblingValue,
+        const std::optional<QColor>& playedColor = std::nullopt);
 
 // Makes the model repaint all its cells whenever key matching changes.
 void repaintOnChange(QAbstractItemModel* pModel);

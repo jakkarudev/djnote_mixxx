@@ -69,12 +69,21 @@ CellStyle cellStyle(const CellInput& input) {
     }
     CellStyle style;
     style.color = colorOf(pMatcher->match(input.key));
+    // A played match is mixed 50/50 with the played colour.
+    if (style.color && input.played && input.playedColor) {
+        const QColor& a = *style.color;
+        const QColor& b = *input.playedColor;
+        style.color = QColor((a.red() + b.red() + 1) / 2,
+                (a.green() + b.green() + 1) / 2,
+                (a.blue() + b.blue() + 1) / 2);
+    }
     return style;
 }
 
 QVariant cellData(ColumnCache::Column column,
         int role,
-        const std::function<QVariant(ColumnCache::Column)>& siblingValue) {
+        const std::function<QVariant(ColumnCache::Column)>& siblingValue,
+        const std::optional<QColor>& playedColor) {
     const ColumnIdentity identity = columnIdentity(column);
     if (!isColoured(identity) || !KeyMatcher::instance()) {
         return QVariant();
@@ -86,6 +95,7 @@ QVariant cellData(ColumnCache::Column column,
     input.missing = !missing.isNull() && missing.toBool();
     const QVariant played = siblingValue(ColumnCache::COLUMN_LIBRARYTABLE_PLAYED);
     input.played = !played.isNull() && played.toBool();
+    input.playedColor = playedColor;
 
     const CellStyle style = cellStyle(input);
     if (role == Qt::ForegroundRole) {
