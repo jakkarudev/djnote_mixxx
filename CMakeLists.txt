@@ -960,6 +960,9 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/library/coverartutils.cpp
   src/library/covercolumnsort.cpp
   src/library/coverlookup.cpp
+  src/library/keymatch/keymatcher.cpp
+  src/library/keymatch/keymatchcell.cpp
+  src/library/keymatch/keymatchsettings.cpp
   src/library/dao/analysisdao.cpp
   src/library/dao/autodjcratesdao.cpp
   src/library/dao/cuedao.cpp
@@ -2245,6 +2248,8 @@ if(BUILD_TESTING)
     src/test/indexrange_test.cpp
     src/test/itunesxmlimportertest.cpp
     src/test/keyfactorytest.cpp
+    src/test/keymatchcelltest.cpp
+    src/test/keymatchertest.cpp
     src/test/keyutilstest.cpp
     src/test/knobreadoutcompacttexttest.cpp
     src/test/knobreadoutfacetest.cpp

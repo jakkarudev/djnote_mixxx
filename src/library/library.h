@@ -19,6 +19,9 @@ class AnalysisFeature;
 class BrowseFeature;
 class ControlObject;
 class CoverLookup; // DJNote
+namespace mixxx::keymatch { // DJNote
+class KeyMatcher;
+}
 class CrateFeature;
 class LibraryControl;
 class LibraryFeature;
@@ -171,6 +174,7 @@ class Library: public QObject {
     parented_ptr<SidebarModel> m_pSidebarModel;
     parented_ptr<LibraryControl> m_pLibraryControl;
     parented_ptr<CoverLookup> m_pCoverLookup; // DJNote
+    parented_ptr<mixxx::keymatch::KeyMatcher> m_pKeyMatcher; // DJNote
 
     QList<LibraryFeature*> m_features;
     const static QString m_sTrackViewName;
