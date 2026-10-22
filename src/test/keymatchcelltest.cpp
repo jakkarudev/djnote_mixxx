@@ -289,7 +289,8 @@ TEST_F(KeyMatchCellTest, ShiftedKeyMatchesArePurple) {
     for (const char* key : {"2A", "3B", "4A"}) {
         EXPECT_EQ(QVariant::fromValue(kPurple), keyColorFor(QString::fromLatin1(key))) << key;
     }
-    for (const char* key : {"10A", "1A", "5A"}) {
+    // 8A and 10A match the stored key (green, yellow) and keep that colour.
+    for (const char* key : {"1A", "5A"}) {
         EXPECT_EQ(QVariant::fromValue(kLightPurple), keyColorFor(QString::fromLatin1(key))) << key;
     }
 }
