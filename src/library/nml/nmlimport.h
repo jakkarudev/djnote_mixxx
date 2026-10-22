@@ -5,6 +5,7 @@
 #include <QStringList>
 
 #include "library/nml/nmldocument.h"
+#include "library/nml/nmlkeepreplace.h"
 #include "track/trackid.h"
 
 class PlaylistDAO;
@@ -42,6 +43,11 @@ struct NmlPlanTrack {
     // DJ keeps it (tick box). An unticked proposal is applied as missing.
     TrackId libraryTrackId;
     bool accepted = true;
+    // #109: set by updateNmlPlanComparisons(). The row lands on a track already
+    // in the library (same path, or an accepted library match) and `comparison`
+    // is the per-part comparison of that track with the NML entry.
+    bool existingTrack = false;
+    NmlPreparationComparison comparison;
 };
 
 struct NmlImportPlan {
@@ -51,6 +57,8 @@ struct NmlImportPlan {
     int playlistIndex = 0; // into document.playlists
     QString defaultName;   // free Playlist name proposed to the DJ
     QList<NmlPlanTrack> tracks; // playlist order, repeats kept
+    // #109: what Apply does with rows on existing tracks that have preparation.
+    NmlPreparationMode preparationMode = NmlPreparationMode::Keep;
 };
 
 struct NmlImportResult {
@@ -65,7 +73,20 @@ struct NmlImportResult {
     int droppedCues = 0;
     QStringList matchedLibraryLabels; // #111: one line per accepted library match
     int matchedLibraryTracks = 0; // #111: accepted library matches put into the Playlist
+    // #109: rows on existing tracks whose preparation was written (parts taken or replaced).
+    int existingTracksUpdated = 0;
+    // #109: tracks whose BPM-locked grid kept the NML's different grid out (either mode).
+    QStringList lockedGridTracks;
 };
+
+/// #109: fills existingTrack/comparison on every row of the plan (looks up the
+/// library; writes nothing). Call after planning and after the find-missing
+/// operations change rows.
+void updateNmlPlanComparisons(NmlImportPlan* pPlan, TrackCollectionManager* pTrackCollectionManager);
+
+/// #109: at least one row lands on an existing track that has preparation, so
+/// the review shows the Keep/Replace choice.
+bool nmlPlanHasExistingPreparation(const NmlImportPlan& plan);
 
 /// First free Playlist name: `base`, then `base 1`, `base 2` (upstream's
 /// import suffix; not PlaylistDAO::createUniquePlaylist which uses "(2)").

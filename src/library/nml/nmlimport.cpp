@@ -100,7 +100,62 @@ void fillPlanTracks(NmlImportPlan* pPlan, int playlistIndex) {
         plan.tracks.append(track);
     }
 }
+// DJNote (#109)
+void applyKeepReplace(Track* pTrack,
+        const NmlImportPlan& plan,
+        const NmlPlanTrack& item,
+        const QString& label,
+        NmlImportResult* pResult) {
+    if (!pTrack || item.entryIndex < 0) {
+        return;
+    }
+    const NmlEntry& entry = plan.document.entries.at(item.entryIndex);
+    const NmlKeepReplaceOutcome outcome =
+            applyNmlToExistingTrack(pTrack, entry, plan.preparationMode);
+    if (outcome.changed) {
+        ++pResult->existingTracksUpdated;
+    }
+    if (outcome.lockedGridKept) {
+        pResult->lockedGridTracks.append(label);
+    }
+    pResult->droppedCues += outcome.droppedCues;
+}
 } // namespace
+
+void updateNmlPlanComparisons(
+        NmlImportPlan* pPlan, TrackCollectionManager* pTrackCollectionManager) {
+    for (NmlPlanTrack& item : pPlan->tracks) {
+        item.existingTrack = false;
+        item.comparison = NmlPreparationComparison();
+        if (item.entryIndex < 0 || item.entryIndex >= pPlan->document.entries.size()) {
+            continue;
+        }
+        TrackPointer pTrack;
+        if (item.status == NmlTrackStatus::MatchedInLibrary) {
+            if (item.accepted) {
+                pTrack = pTrackCollectionManager->getTrackById(item.libraryTrackId);
+            }
+        } else if (item.status != NmlTrackStatus::NotFound && !item.resolvedPath.isEmpty()) {
+            pTrack = pTrackCollectionManager->getTrackByRef(
+                    TrackRef::fromFilePath(item.resolvedPath));
+        }
+        if (!pTrack) {
+            continue;
+        }
+        item.existingTrack = true;
+        item.comparison = compareNmlPreparation(
+                *pTrack, pPlan->document.entries.at(item.entryIndex));
+    }
+}
+
+bool nmlPlanHasExistingPreparation(const NmlImportPlan& plan) {
+    for (const NmlPlanTrack& item : plan.tracks) {
+        if (item.existingTrack && item.comparison.trackHasPreparation()) {
+            return true;
+        }
+    }
+    return false;
+}
 
 QList<int> importableNmlPlaylists(const NmlDocument& document) {
     QList<int> others;
@@ -246,6 +301,7 @@ NmlImportResult applyNmlImport(const NmlImportPlan& plan,
     }
 
     QList<TrackId> ids;
+    QSet<TrackId> newIds;
     for (const NmlPlanTrack& item : plan.tracks) {
         const QString label = item.title.isEmpty()
                 ? item.primaryKey
@@ -255,6 +311,9 @@ NmlImportResult applyNmlImport(const NmlImportPlan& plan,
         // preparation is the keep/replace rule's business, not touched here.
         if (item.status == NmlTrackStatus::MatchedInLibrary && item.accepted &&
                 pTrackCollectionManager->getTrackById(item.libraryTrackId)) {
+            // DJNote (#109): the keep/replace rule for the existing track.
+            applyKeepReplace(pTrackCollectionManager->getTrackById(item.libraryTrackId).get(),
+                    plan, item, label, &result);
             ids.append(item.libraryTrackId);
             ++result.matchedLibraryTracks;
             result.matchedLibraryLabels.append(label);
@@ -279,6 +338,7 @@ NmlImportResult applyNmlImport(const NmlImportPlan& plan,
             continue;
         }
         if (!alreadyInLibrary) {
+            newIds.insert(pTrack->getId()); // a repeat of it later in the list is not "existing"
             ++result.newLibraryTracks;
             // Preparation (grid, key, lock) applies to tracks new to the
             // library only; existing ones belong to the keep/replace ticket.
@@ -289,6 +349,10 @@ NmlImportResult applyNmlImport(const NmlImportPlan& plan,
                 result.droppedCues += applyNmlCues(pTrack.get(), entry);
                 applyNmlColorAndRating(pTrack.get(), entry);
             }
+        }
+        if (alreadyInLibrary && !newIds.contains(pTrack->getId())) {
+            // DJNote (#109): the keep/replace rule for the existing track.
+            applyKeepReplace(pTrack.get(), plan, item, label, &result);
         }
         ids.append(pTrack->getId());
     }
