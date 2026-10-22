@@ -28,7 +28,8 @@ QString nmlImportSummary(const QString& playlistName,
         int newLibraryTracks,
         const QStringList& skipped,
         const QStringList& missingTracks,
-        const QStringList& matchedLibraryTracks) {
+        const QStringList& matchedLibraryTracks,
+        int droppedCues) {
     QString text = tr("Imported %1 tracks into the playlist \"%2\" (%3 new in the library).")
                            .arg(QString::number(tracksInPlaylist),
                                    playlistName,
@@ -45,6 +46,12 @@ QString nmlImportSummary(const QString& playlistName,
                 tr("%1 tracks were matched to tracks already in the library:")
                         .arg(QString::number(matchedLibraryTracks.size())) +
                 QStringLiteral("\n") + matchedLibraryTracks.join(QLatin1Char('\n'));
+    }
+    if (droppedCues > 0) {
+        text += QStringLiteral("\n\n") +
+                tr("%1 cues were not imported (cues without a hotcue button beyond "
+                   "the main cue, and loops without a button).")
+                        .arg(QString::number(droppedCues));
     }
     if (!skipped.isEmpty()) {
         text += QStringLiteral("\n\n") +
@@ -100,7 +107,8 @@ int runNmlImportFlow(QWidget* pParent,
                     r.newLibraryTracks,
                     r.skipped,
                     r.missingTracks,
-                    r.matchedLibraryLabels));
+                    r.matchedLibraryLabels,
+                    r.droppedCues));
             lastPlaylistId = r.playlistId;
         }
         QMessageBox::information(pParent,
@@ -127,7 +135,8 @@ int runNmlImportFlow(QWidget* pParent,
                     result.newLibraryTracks,
                     result.skipped,
                     result.missingTracks,
-                    result.matchedLibraryLabels));
+                    result.matchedLibraryLabels,
+                    result.droppedCues));
     return result.playlistId;
 }
 

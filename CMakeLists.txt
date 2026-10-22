@@ -997,6 +997,7 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/library/keymatch/keymatchsettings.cpp
   src/library/nml/dlgnmlimport.cpp
   src/library/nml/dlgnmlimportplaylists.cpp
+  src/library/nml/nmlcues.cpp
   src/library/nml/nmldocument.cpp
   src/library/nml/nmlexport.cpp
   src/library/nml/nmlexportflow.cpp
@@ -2264,6 +2265,7 @@ if(BUILD_TESTING)
     src/test/keymatchertest.cpp
     src/test/keymatchliststest.cpp
     src/test/nmldocumenttest.cpp
+    src/test/nmlcuestest.cpp
     src/test/nmlexporttest.cpp
     src/test/nmlfindmissingtest.cpp
     src/test/nmlimporttest.cpp

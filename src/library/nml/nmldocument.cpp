@@ -17,6 +17,17 @@ std::optional<int> optInt(const QXmlStreamAttributes& a, const char* name) {
     return ok ? std::optional<int>(v) : std::nullopt;
 }
 
+// CUE_V2@COLOR="#RRGGBB" (VERSION 20).
+std::optional<int> optHexColor(const QXmlStreamAttributes& a, const char* name) {
+    QString text = a.value(QLatin1String(name)).toString();
+    if (text.startsWith(QLatin1Char('#'))) {
+        text.remove(0, 1);
+    }
+    bool ok = false;
+    const int v = text.toInt(&ok, 16);
+    return ok ? std::optional<int>(v) : std::nullopt;
+}
+
 std::optional<double> optDouble(const QXmlStreamAttributes& a, const char* name) {
     if (!a.hasAttribute(QLatin1String(name))) {
         return std::nullopt;
@@ -150,7 +161,7 @@ bool NmlDocument::read(QIODevice* pDevice, QString* pError) {
                 cue.lengthMillis = a.value(QLatin1String("LEN")).toDouble();
                 cue.hotcue = optInt(a, "HOTCUE").value_or(-1);
                 cue.displOrder = optInt(a, "DISPL_ORDER").value_or(0);
-                cue.color = optInt(a, "COLOR");
+                cue.color = optHexColor(a, "COLOR");
             } else if (name == QLatin1String("GRID") && parent == QLatin1String("CUE_V2")) {
                 cue.gridBpm = optDouble(a, "BPM");
             } else if (name == QLatin1String("NODE")) {

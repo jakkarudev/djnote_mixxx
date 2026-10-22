@@ -22,7 +22,7 @@ int runNmlImportFlow(QWidget* pParent,
 QString nmlImportSummary(const QString& playlistName, int tracksInPlaylist,
         int newLibraryTracks, const QStringList& skipped,
         const QStringList& missingTracks = {},
-        const QStringList& matchedLibraryTracks = {});
+        const QStringList& matchedLibraryTracks = {}, int droppedCues = 0);
 
 } // namespace nml
 } // namespace mixxx
