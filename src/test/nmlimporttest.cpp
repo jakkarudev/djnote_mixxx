@@ -166,7 +166,7 @@ TEST_F(NmlImportTest, NotFoundBecomesMissingTrackAtItsPosition) {
     const QList<TrackId> ids = tracksInOrder(result.playlistId);
     ASSERT_EQ(4, ids.size());
     EXPECT_EQ(4, result.tracksInPlaylist);
-    EXPECT_EQ(3, result.newLibraryTracks);
+    EXPECT_EQ(2, result.newLibraryTracks); // missing track not counted
     // The missing track keeps position 2 and is titled from the NML.
     const TrackPointer pMissing = trackCollectionManager()->getTrackById(ids.at(1));
     ASSERT_TRUE(pMissing);
