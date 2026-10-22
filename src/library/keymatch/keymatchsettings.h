@@ -1,5 +1,9 @@
 #pragma once
 
+#include <QList>
+#include <QString>
+#include <set>
+
 #include "preferences/usersettings.h"
 
 // The key matching settings (see GLOSSARY.md, "Key matching"), shown on the
@@ -14,11 +18,50 @@ enum class Highlight {
     StrictAndFuzzy,
 };
 
+// A column's identity, shared by all track list types: each model maps its own
+// columns to these, so one choice applies to every list. Only text columns have
+// an identity; Cover, Color, Rating, Played, Preview and the like are
+// NotColoured and never offered.
+enum class ColumnIdentity {
+    Key,
+    Title,
+    Artist,
+    Album,
+    AlbumArtist,
+    Year,
+    Genre,
+    Composer,
+    Grouping,
+    TrackNumber,
+    FileType,
+    Comment,
+    Duration,
+    Bitrate,
+    Bpm,
+    ReplayGain,
+    Location,
+    TimesPlayed,
+    DateAdded,
+    LastPlayed,
+    NotColoured,
+};
+
+// The identities the DJ can choose from, Key first.
+QList<ColumnIdentity> choosableColumns();
+
 // Add a field here, its key in keymatchsettings.cpp and its control on
 // DlgPrefDJNote; the key matcher reloads the whole struct when the page changes
 // something, so a new setting applies live without more plumbing.
 struct Settings {
     Highlight highlight = Highlight::StrictAndFuzzy;
+    // Which columns get the match colour; wholeRow means every text column.
+    std::set<ColumnIdentity> columns = {ColumnIdentity::Key};
+    bool wholeRow = false;
+
+    bool colours(ColumnIdentity column) const {
+        return column != ColumnIdentity::NotColoured &&
+                (wholeRow || columns.count(column) > 0);
+    }
 };
 
 // Missing keys fall back to the defaults above.
