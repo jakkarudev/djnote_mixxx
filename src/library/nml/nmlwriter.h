@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QByteArray>
+#include <QDate>
 #include <QDateTime>
 #include <QList>
 #include <QString>
@@ -44,6 +45,8 @@ struct NmlWriteEntry {
     std::optional<int> ranking;     // INFO@RANKING 0-255
     std::optional<int> color;       // INFO@COLOR 1-7
     QList<NmlCue> cues;             // written in the given order
+    int playCount = 0;              // INFO@PLAYCOUNT, 0: omitted
+    QDate lastPlayed;               // INFO@LAST_PLAYED, invalid: omitted
 };
 
 struct NmlWriteDocument {
