@@ -2,6 +2,7 @@
 
 #include <QDir>
 #include <QFileInfo>
+#include <QSet>
 
 #include "library/dao/playlistdao.h"
 #include "library/trackcollection.h"
@@ -22,24 +23,12 @@ QString nextFreePlaylistName(const PlaylistDAO& dao, const QString& base) {
     return name;
 }
 
-NmlImportPlan planNmlImport(const QString& nmlPath,
-        const PlaylistDAO& dao,
-        int playlistIndex) {
-    NmlImportPlan plan;
-    plan.nmlPath = nmlPath;
+namespace {
+void fillPlanTracks(NmlImportPlan* pPlan, int playlistIndex) {
+    NmlImportPlan& plan = *pPlan;
     plan.playlistIndex = playlistIndex;
-    QString error;
-    if (!plan.document.readFile(nmlPath, &error)) {
-        plan.error = error;
-        return plan;
-    }
-    if (playlistIndex < 0 || playlistIndex >= plan.document.playlists.size()) {
-        plan.error = QStringLiteral("The file contains no playlist");
-        return plan;
-    }
-    const QFileInfo nmlInfo(nmlPath);
-    plan.defaultName = nextFreePlaylistName(dao, nmlInfo.completeBaseName());
-
+    plan.tracks.clear();
+    const QFileInfo nmlInfo(plan.nmlPath);
     const NmlPlaylist& playlist = plan.document.playlists.at(playlistIndex);
     for (const QString& key : playlist.primaryKeys) {
         NmlPlanTrack track;
@@ -70,7 +59,114 @@ NmlImportPlan planNmlImport(const QString& nmlPath,
         }
         plan.tracks.append(track);
     }
+}
+} // namespace
+
+QList<int> importableNmlPlaylists(const NmlDocument& document) {
+    QList<int> others;
+    int preparation = -1;
+    for (int i = 0; i < document.playlists.size(); ++i) {
+        const QString& name = document.playlists.at(i).name;
+        if (name.startsWith(QLatin1Char('_'))) {
+            continue;
+        }
+        if (name == QLatin1String("Preparation")) {
+            preparation = i;
+            continue;
+        }
+        others.append(i);
+    }
+    if (others.isEmpty() && preparation >= 0) {
+        others.append(preparation);
+    }
+    return others;
+}
+
+NmlImportPlan planNmlImport(const QString& nmlPath,
+        const PlaylistDAO& dao,
+        int playlistIndex) {
+    NmlImportPlan plan;
+    plan.nmlPath = nmlPath;
+    plan.playlistIndex = playlistIndex;
+    QString error;
+    if (!plan.document.readFile(nmlPath, &error)) {
+        plan.error = error;
+        return plan;
+    }
+    if (playlistIndex < 0) {
+        const QList<int> importable = importableNmlPlaylists(plan.document);
+        playlistIndex = importable.isEmpty() ? -1 : importable.first();
+    }
+    if (playlistIndex < 0 || playlistIndex >= plan.document.playlists.size()) {
+        plan.error = QStringLiteral("The file contains no playlist");
+        return plan;
+    }
+    plan.defaultName = nextFreePlaylistName(dao, QFileInfo(nmlPath).completeBaseName());
+    fillPlanTracks(&plan, playlistIndex);
     return plan;
+}
+
+NmlImportPlan selectNmlPlaylist(const NmlImportPlan& plan, int playlistIndex) {
+    NmlImportPlan selected = plan;
+    if (playlistIndex < 0 || playlistIndex >= plan.document.playlists.size()) {
+        selected.error = QStringLiteral("The file contains no playlist");
+        selected.tracks.clear();
+        return selected;
+    }
+    fillPlanTracks(&selected, playlistIndex);
+    return selected;
+}
+
+QList<NmlPlaylistChoice> nmlPlaylistChoices(const NmlImportPlan& plan, const PlaylistDAO& dao) {
+    QList<NmlPlaylistChoice> choices;
+    const QList<int> importable = importableNmlPlaylists(plan.document);
+    QSet<QString> taken;
+    for (int index : importable) {
+        const NmlPlaylist& playlist = plan.document.playlists.at(index);
+        NmlPlaylistChoice choice;
+        choice.playlistIndex = index;
+        choice.trackCount = static_cast<int>(playlist.primaryKeys.size());
+        if (importable.size() == 1) {
+            choice.name = plan.defaultName;
+        } else {
+            QString base = playlist.name.trimmed();
+            if (base.isEmpty()) {
+                base = QFileInfo(plan.nmlPath).completeBaseName();
+            }
+            QString name = nextFreePlaylistName(dao, base);
+            // Also avoid the names given to earlier rows.
+            for (int i = 1; taken.contains(name); ++i) {
+                name = nextFreePlaylistName(dao, base + QChar(' ') + QString::number(i));
+            }
+            choice.name = name;
+        }
+        taken.insert(choice.name);
+        choices.append(choice);
+    }
+    return choices;
+}
+
+NmlMultiImportResult applyNmlImportPlaylists(const NmlImportPlan& plan,
+        const QList<NmlPlaylistChoice>& choices,
+        TrackCollectionManager* pTrackCollectionManager) {
+    NmlMultiImportResult multi;
+    if (!plan.error.isEmpty()) {
+        multi.error = plan.error;
+        return multi;
+    }
+    const PlaylistDAO& dao = pTrackCollectionManager->internalCollection()->getPlaylistDAO();
+    for (const NmlPlaylistChoice& choice : choices) {
+        if (!choice.selected) {
+            continue;
+        }
+        // Earlier rows are already created, so this also separates equal names.
+        const QString base = choice.name.trimmed();
+        const QString name = base.isEmpty() ? base : nextFreePlaylistName(dao, base);
+        multi.playlistNames.append(name);
+        multi.results.append(applyNmlImport(
+                selectNmlPlaylist(plan, choice.playlistIndex), name, pTrackCollectionManager));
+    }
+    return multi;
 }
 
 NmlImportResult applyNmlImport(const NmlImportPlan& plan,
