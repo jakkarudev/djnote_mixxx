@@ -1,6 +1,6 @@
 # The Traktor NML format, for playlist import and export
 
-Research notes for a later design session on **NML import/export in DJNote**. Written 2026-10-21 against a real Traktor playlist export on the user's machine, Native Instruments' Traktor Pro 4 manual, third-party NML readers and writers on GitHub, and this repo at branch `djnote` (upstream checked at `upstream/main` 300bd8967c). Nothing here is a design. It collects facts and says where each one comes from.
+Research notes for a later design session on **NML import/export in DJNote**. Written 2026-10-21 against a real NML export from Traktor on the user's machine, Native Instruments' Traktor Pro 4 manual, third-party NML readers and writers on GitHub, and this repo at branch `djnote` (upstream checked at `upstream/main` 300bd8967c). Nothing here is a design. It collects facts and says where each one comes from.
 
 NI does not publish an NML schema. Every claim is tagged with its evidence class:
 
@@ -203,7 +203,7 @@ The `INFO KEY` text uses whatever notation the source used. Traktor's "Displayed
 - **Entries.** Each `ENTRY` holds one `PRIMARYKEY TYPE="TRACK"`. `TYPE="STEM"` appears for stem files in the VERSION 20 fixture [RE]. Order is playlist order [O]. Playlists can repeat a track [?].
 - **KEY format.** `KEY = VOLUME + DIR + FILE`, with no separator between `VOLUME` and `DIR` because `DIR` already starts with `/:`. That gives `C:/:Users/:…/:file.flac` on Windows, and presumably `Macintosh HD/:Users/:…` on macOS (Segolene `nml_to_rekord.py:67-78`) [O, RE]. `VOLUMEID` is not part of the key [O].
 - **Joining to the collection.** The match is a string compare with the `LOCATION` of a `COLLECTION/ENTRY`. All 23 keys match exactly [O]. Mixxx converts both sides to a filesystem path and looks the track up by path (`traktorfeature.cpp:547-569`) [M]. The export's `COLLECTION` is written in the same order as the playlist [O].
-- **Name.** `NODE@NAME` keeps the Traktor playlist name (`4skotina extended psyland (2)`). The `.nml` file name (`TheLastOneProject Final`) and the folder come from what the user typed in the export dialog (manual p. 99: "Enter a name for the Playlist to be exported … Enter a destination path") [O, D]. Whether Traktor created the folder itself is unclear [?].
+- **Name.** `NODE@NAME` keeps the playlist name (`4skotina extended psyland (2)`). The `.nml` file name (`TheLastOneProject Final`) and the folder come from what the user typed in the export dialog (manual p. 99: "Enter a name for the Playlist to be exported … Enter a destination path") [O, D]. Whether Traktor created the folder itself is unclear [?].
 
 ---
 
@@ -334,7 +334,7 @@ These are facts about both sides. Nothing here decides how to convert.
 | `ENTRY@TITLE`, `@ARTIST` | `TrackInfo` title / artist (`src/track/trackinfo.h:50`, `:17`) | |
 | `ALBUM@TITLE`, `@TRACK`, `@OF_TRACKS` | `AlbumInfo` title (`albuminfo.h:25`); `TrackInfo` trackNumber / trackTotal (`trackinfo.h:51-52`) | |
 | `INFO@GENRE`, `@COMMENT`, `@REMIXER` | `TrackInfo` genre, comment, remixer (`trackinfo.h:28`, `:19`, `:43`) | |
-| `INFO@LABEL` | `AlbumInfo` recordLabel (`albuminfo.h:22`) | |
+| `INFO@LABEL` | `AlbumInfo` recordLabel (`albuminfo.h:22`) | Compiled out: it exists only behind `__EXTRA_METADATA__`, which no build defines, so Mixxx never reads it. DJNote's export reads the tag from the file with TagLib (`nmllabel.cpp`). |
 | `INFO@PRODUCER`, `@MIX`, `@CATALOG_NO` | no direct field. The nearest are `TrackInfo` composer / subtitle / grouping (`trackinfo.h`) | |
 | `INFO@RELEASE_DATE` (`yyyy/M/d`) | `TrackInfo` year, a string, "= release date" (`trackinfo.h:56`) | Mixxx's reader stores the raw string (`traktorfeature.cpp:351`). |
 | `INFO@BITRATE` (bit/s) | track bitrate in kbps (Mixxx divides by 1000, `traktorfeature.cpp:348`) | Mixxx normally reads this from the file. |
@@ -343,7 +343,7 @@ These are facts about both sides. Nothing here decides how to convert.
 | `INFO@COLOR` (1–7) | `TrackRecord` color, an RGB value (`trackrecord.h:56`) | Mixxx ships a "Traktor Pro Track Colors" palette in the same order: Red `#FA4B35`, Orange `#FF8402`, Yellow `#FFF700`, Green `#00F329`, Blue `#0187FF`, Violet `#A669FF`, Magenta `#FE55EA` (`src/util/color/predefinedcolorpalettes.cpp:65-71`, `:334-345`). |
 | `INFO@PLAYCOUNT`, `@LAST_PLAYED` (date) | `PlayCounter` timesPlayed / lastPlayedAt, a QDateTime (`src/track/playcounter.h:13-38`) | NML has no time of day. |
 | `INFO@IMPORT_DATE` | `TrackRecord` dateAdded, a QDateTime (`trackrecord.h:52`) | Reset by playlist export (§3.4). |
-| `INFO@KEY` (text) | `TrackInfo` keyText (`trackinfo.h:33`); `KeyUtils::guessKeyFromText` (`keyutils.cpp:409`) | Mixed notations. |
+| `INFO@KEY` (text) | `TrackInfo` keyText (`trackinfo.h:33`); `KeyUtils::guessKeyFromText` (`keyutils.cpp:409`) | Mixed notations on import (any is parsed). Export always writes Open Key (`6m`, `2d`), Traktor's own form. |
 | `MUSICAL_KEY@VALUE` (0–23) | `ChromaticKey` 1–24 (`keys.proto:13-39`): **Mixxx = VALUE + 1** | §3.7; upstream reader bug. |
 | `TEMPO@BPM` + `CUE_V2 TYPE=4 START` | `Beats::fromConstTempo(sampleRate, FramePos, Bpm, subVersion)` (`src/track/beats.h:248-252`); multi-marker grids → `Beats::fromBeatMarkers` (`:259-264`) | START ms → frames = ms/1000 × sample rate. The Rekordbox importer builds grids from beat positions with its own sub-version (`src/library/rekordbox/rekordboxfeature.cpp:916-920`). |
 | `ENTRY@LOCK="1"` | `Track::setBpmLocked` (`src/track/track.h:158`) | Traktor's lock covers all analysed values; Mixxx's lock covers only the BPM. |
@@ -411,3 +411,13 @@ Checked during the `/grill-with-docs` session for #88 against `Documents\Native 
 - **`IMPORT_DATE` is again the export day** (`2026/10/22`). This supports open question 8.
 - `FLAGS` values here are 12, 24 and 28. No element is self-closed.
 - The copied files keep their original names and their read-only attribute (`03. Atropp & Fisheye - Grão de Areia.flac` is read-only in the export folder).
+
+## Addendum (2026-10-22, audit #116): rules the export follows
+
+From comparing DJNote's export with 452 real Traktor entries (all [O]).
+
+- **Grid markers.** In a constant grid Traktor's marker is beat 1 of a bar (`Bumpy` 1836.3 ms, hotcue at 71.6 ms). The export writes that anchor, not the track's first beat: moving it by a number of beats that is not a multiple of 4 shifts the downbeat. A flexible grid has one marker per tempo change with the BPM of the whole section (`Connected`: 137.001480 then 136.971420 are two markers). Pieces of one tempo that the database splits into 1-3 beats by frame rounding are merged, and their BPM is total beats over total frames, not that of one rounded piece. There is no BPM threshold.
+- **Cues.** A grid marker sorts before a hotcue at the same `START`. `COLOR` is absent on most Traktor cues, so the export omits it for DJNote's default cue colour (`#FF8000`) and writes it for other colours (`#FFFFFF` is common).
+- **`INFO@KEY`** is Open Key text. **`FLAGS`**: bit 0x10 (16) is set together with `LOCK="1"` in 25 of 26 locked entries and in no unlocked one, so a locked entry gets 28 and others 12.
+- **Tracks without a grid** have `TEMPO@BPM` and no marker (`Meaning`: 105.000000). A grid that only came from the file's BPM tag is exported the same way.
+- **`ALBUM`**: `TRACK` and `OF_TRACKS` are integers (`1`, `10`), `OF_TRACKS` before `TRACK`.

@@ -10,6 +10,7 @@
 #include "analyzer/plugins/analyzerjkrbeats.h"
 #include "analyzer/plugins/analyzerqueenmarybeats.h"
 #include "analyzer/plugins/analyzersoundtouchbeats.h"
+#include "library/nml/nmlconstants.h" // DJNote
 #include "library/rekordbox/rekordboxconstants.h"
 #include "track/beatfactory.h"
 #include "track/track.h"
@@ -178,7 +179,8 @@ bool AnalyzerBeats::shouldAnalyze(TrackPointer pTrack) const {
     }
 
     QString subVersion = pBeats->getSubVersion();
-    if (subVersion == mixxx::rekordboxconstants::beatsSubversion) {
+    if (subVersion == mixxx::rekordboxconstants::beatsSubversion ||
+            subVersion == mixxx::nml::kBeatsSubVersion) { // DJNote: Traktor NML import
         return m_bPreferencesReanalyzeImported;
     }
 

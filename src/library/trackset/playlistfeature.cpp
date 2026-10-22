@@ -5,6 +5,7 @@
 #include <QtDebug>
 
 #include "library/library.h"
+#include "library/nml/nmlplaylistmenu.h" // DJNote
 #include "library/parser.h"
 #include "library/playlisttablemodel.h"
 #include "library/queryutil.h"
@@ -32,6 +33,7 @@ PlaylistFeature::PlaylistFeature(Library* pLibrary, UserSettingsPointer pConfig)
     std::unique_ptr<TreeItem> pRootItem = TreeItem::newRoot(this);
     m_pSidebarModel->setRootItem(std::move(pRootItem));
     constructChildModel(kInvalidPlaylistId);
+    mixxx::nml::createSourceNmlKeeper(&m_playlistDao, pLibrary, this); // DJNote
 
     m_pShufflePlaylistAction = new QAction(tr("Shuffle Playlist"), this);
     connect(m_pShufflePlaylistAction,
@@ -50,6 +52,8 @@ void PlaylistFeature::onRightClick(const QPoint& globalPos) {
     menu.addAction(m_pCreatePlaylistAction);
     menu.addSeparator();
     menu.addAction(m_pCreateImportPlaylistAction);
+    mixxx::nml::addNmlImportAction(&menu, m_pSidebarWidget, m_pLibrary, m_pConfig, // DJNote
+            [this](int playlistId) { activatePlaylist(playlistId); });
     menu.exec(globalPos);
 }
 
@@ -88,6 +92,7 @@ void PlaylistFeature::onRightClickChild(
     menu.addAction(m_pImportPlaylistAction);
     menu.addAction(m_pExportPlaylistAction);
     menu.addAction(m_pExportTrackFilesAction);
+    mixxx::nml::addNmlPlaylistActions(&menu, m_pSidebarWidget, m_pLibrary, m_pConfig, playlistId, locked); // DJNote
     menu.exec(globalPos);
 }
 

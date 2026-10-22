@@ -995,6 +995,31 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/library/keymatch/keymatchcell.cpp
   src/library/keymatch/keymatcher.cpp
   src/library/keymatch/keymatchsettings.cpp
+  src/library/nml/dlgnmlimport.cpp
+  src/library/nml/dlgnmlimportplaylists.cpp
+  src/library/nml/nmlcues.cpp
+  src/library/nml/nmlexportpreparation.cpp
+  src/library/nml/nmldocument.cpp
+  src/library/nml/nmlexport.cpp
+  src/library/nml/nmlexportflow.cpp
+  src/library/nml/nmlfindmissing.cpp
+  src/library/nml/nmlfindmissingpanel.cpp
+  src/library/nml/nmlimport.cpp
+  src/library/nml/nmllabel.cpp
+  src/library/nml/nmlkeepreplace.cpp
+  src/library/nml/nmlkeepreplacepanel.cpp
+  src/library/nml/nmlimportflow.cpp
+  src/library/nml/nmlreuse.cpp
+  src/library/nml/nmlwriter.cpp
+  src/library/nml/nmlpreparation.cpp
+  src/library/nml/dlgnmlreread.cpp
+  src/library/nml/nmlreread.cpp
+  src/library/nml/nmlrereadflow.cpp
+  src/library/nml/nmlplaylistmenu.cpp
+  src/library/nml/nmlreviewwidgets.cpp
+  src/library/nml/nmlsupport.cpp
+  src/library/nml/nmlsummarydialog.cpp
+  src/library/nml/sourcenml.cpp
   src/library/library_prefs.cpp
   src/library/library.cpp
   src/library/librarycontrol.cpp
@@ -2252,6 +2277,19 @@ if(BUILD_TESTING)
     src/test/keymatchcelltest.cpp
     src/test/keymatchertest.cpp
     src/test/keymatchliststest.cpp
+    src/test/nmldocumenttest.cpp
+    src/test/nmlcuestest.cpp
+    src/test/nmlexportpreparationtest.cpp
+    src/test/nmlroundtriptest.cpp
+    src/test/nmlexporttest.cpp
+    src/test/nmlsummarytest.cpp
+    src/test/nmlfindmissingtest.cpp
+    src/test/nmlimporttest.cpp
+    src/test/nmlkeepreplacetest.cpp
+    src/test/nmlpreparationtest.cpp
+    src/test/nmlrereadtest.cpp
+    src/test/nmlreusetest.cpp
+    src/test/nmlmultiplaylisttest.cpp
     src/test/keyutilstest.cpp
     src/test/knobreadoutcompacttexttest.cpp
     src/test/knobreadoutfacetest.cpp
