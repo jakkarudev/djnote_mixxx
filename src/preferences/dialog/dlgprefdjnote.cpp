@@ -79,7 +79,11 @@ DlgPrefDJNote::DlgPrefDJNote(QWidget* pParent, UserSettingsPointer pConfig)
           m_pKeyMatchingHighlight(nullptr),
           m_pKeyMatchingShiftedKey(nullptr),
           m_pKeyMatchingColumns(nullptr),
-          m_pKeyMatchingBold(nullptr) {
+          m_pKeyMatchingBold(nullptr),
+          m_keyMatchingColorButtons{},
+          m_keyMatchingColorLabels{},
+          m_pKeyMatchingResetColors(nullptr),
+          m_showingKeyMatchingSettings(false) {
     auto* pPageLayout = new QVBoxLayout(this);
     pPageLayout->setContentsMargins(0, 0, 0, 0);
     createKnobReadoutGroup();
@@ -216,7 +220,6 @@ mixxx::knobreadout::Settings DlgPrefDJNote::knobReadoutSettingsFromControls() co
 void DlgPrefDJNote::createKeyMatchingGroup() {
     auto* pGroup = new QGroupBox(tr("Key matching"), this);
     pGroup->setObjectName(QStringLiteral("keyMatchingGroupBox"));
-    // Two columns (label, control), so later settings can add labelled rows.
     auto* pGrid = new QGridLayout(pGroup);
 
     m_pKeyMatchingHighlight = new QComboBox(pGroup);
@@ -272,15 +275,11 @@ void DlgPrefDJNote::createKeyMatchingGroup() {
     const int columnsRow = pGrid->rowCount();
     pGrid->addWidget(pColumnsLabel, columnsRow, 0);
     pGrid->addWidget(m_pKeyMatchingColumns, columnsRow, 1);
-    // Sits under the column checklist once that exists.
+
     m_pKeyMatchingBold = new QCheckBox(tr("Bold matched text"), pGroup);
     m_pKeyMatchingBold->setObjectName(QStringLiteral("keyMatchingBoldCheckBox"));
     m_pKeyMatchingBold->setToolTip(tr("Show the highlighted cells in bold."));
     pGrid->addWidget(m_pKeyMatchingBold, pGrid->rowCount(), 0, 1, 2);
-    connect(m_pKeyMatchingBold,
-            &QCheckBox::toggled,
-            this,
-            &DlgPrefDJNote::slotKeyMatchingControlChanged);
 
     // Colour pickers: a swatch button per tier opens the colour dialog.
     struct ColourRow {
@@ -336,6 +335,10 @@ void DlgPrefDJNote::createKeyMatchingGroup() {
     });
 
     // Every change applies live.
+    connect(m_pKeyMatchingBold,
+            &QCheckBox::toggled,
+            this,
+            &DlgPrefDJNote::slotKeyMatchingControlChanged);
     connect(m_pKeyMatchingShiftedKey,
             &QCheckBox::toggled,
             this,
@@ -369,20 +372,18 @@ void DlgPrefDJNote::updateKeyMatchingEnabled() {
     m_showingKeyMatchingSettings = true; // changing flags emits itemChanged
     const auto highlight = static_cast<mixxx::keymatch::Highlight>(
             m_pKeyMatchingHighlight->currentData().toInt());
-    m_pKeyMatchingShiftedKey->setEnabled(highlight != mixxx::keymatch::Highlight::Off);
-    m_pKeyMatchingColumns->setEnabled(highlight != mixxx::keymatch::Highlight::Off);
-    m_pKeyMatchingBold->setEnabled(highlight != mixxx::keymatch::Highlight::Off);
-    if (m_pKeyMatchingResetColors) {
-        const bool on = highlight != mixxx::keymatch::Highlight::Off;
-        const bool fuzzy = highlight == mixxx::keymatch::Highlight::StrictAndFuzzy;
-        const bool shifted = on && m_pKeyMatchingShiftedKey->isChecked();
-        const bool enabled[4] = {on, fuzzy, shifted, shifted && fuzzy};
-        for (int i = 0; i < 4; ++i) {
-            m_keyMatchingColorButtons[i]->setEnabled(enabled[i]);
-            m_keyMatchingColorLabels[i]->setEnabled(enabled[i]);
-        }
-        m_pKeyMatchingResetColors->setEnabled(on);
+    const bool on = highlight != mixxx::keymatch::Highlight::Off;
+    const bool fuzzy = highlight == mixxx::keymatch::Highlight::StrictAndFuzzy;
+    const bool shifted = on && m_pKeyMatchingShiftedKey->isChecked();
+    m_pKeyMatchingShiftedKey->setEnabled(on);
+    m_pKeyMatchingColumns->setEnabled(on);
+    m_pKeyMatchingBold->setEnabled(on);
+    const bool enabled[4] = {on, fuzzy, shifted, shifted && fuzzy};
+    for (int i = 0; i < 4; ++i) {
+        m_keyMatchingColorButtons[i]->setEnabled(enabled[i]);
+        m_keyMatchingColorLabels[i]->setEnabled(enabled[i]);
     }
+    m_pKeyMatchingResetColors->setEnabled(on);
     const bool wholeRow =
             m_pKeyMatchingColumns->item(0)->checkState() == Qt::Checked;
     for (int i = 1; i < m_pKeyMatchingColumns->count(); ++i) {

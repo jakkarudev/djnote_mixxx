@@ -960,10 +960,6 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/library/coverartutils.cpp
   src/library/covercolumnsort.cpp
   src/library/coverlookup.cpp
-  src/library/keymatch/keymatcher.cpp
-  src/library/keymatch/keymatchbrowse.cpp
-  src/library/keymatch/keymatchcell.cpp
-  src/library/keymatch/keymatchsettings.cpp
   src/library/dao/analysisdao.cpp
   src/library/dao/autodjcratesdao.cpp
   src/library/dao/cuedao.cpp
@@ -995,6 +991,10 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/library/itunes/itunesimporter.cpp
   src/library/itunes/itunesplaylistmodel.cpp
   src/library/itunes/itunesxmlimporter.cpp
+  src/library/keymatch/keymatchbrowse.cpp
+  src/library/keymatch/keymatchcell.cpp
+  src/library/keymatch/keymatcher.cpp
+  src/library/keymatch/keymatchsettings.cpp
   src/library/library_prefs.cpp
   src/library/library.cpp
   src/library/librarycontrol.cpp
@@ -2250,8 +2250,8 @@ if(BUILD_TESTING)
     src/test/itunesxmlimportertest.cpp
     src/test/keyfactorytest.cpp
     src/test/keymatchcelltest.cpp
-    src/test/keymatchlists_test.cpp
     src/test/keymatchertest.cpp
+    src/test/keymatchliststest.cpp
     src/test/keyutilstest.cpp
     src/test/knobreadoutcompacttexttest.cpp
     src/test/knobreadoutfacetest.cpp

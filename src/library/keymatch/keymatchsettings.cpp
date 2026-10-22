@@ -14,6 +14,7 @@ const ConfigKey kBoldMatchedTextCfgKey(kDJNoteGroup, QStringLiteral("KeyMatching
 
 const ConfigKey kColumnsCfgKey(kDJNoteGroup, QStringLiteral("KeyMatchingColumns"));
 const ConfigKey kWholeRowCfgKey(kDJNoteGroup, QStringLiteral("KeyMatchingWholeRow"));
+const ConfigKey kShiftedKeyCfgKey(kDJNoteGroup, QStringLiteral("KeyMatchingShiftedKey"));
 
 // Columns are stored by name, comma separated; unknown names are skipped.
 const QList<QPair<ColumnIdentity, QString>>& columnNames() {
@@ -40,7 +41,6 @@ const QList<QPair<ColumnIdentity, QString>>& columnNames() {
     };
     return names;
 }
-const ConfigKey kShiftedKeyCfgKey(kDJNoteGroup, QStringLiteral("KeyMatchingShiftedKey"));
 
 // Stored as names, so the values stay readable and reorder-safe; unknown names
 // read as the default.

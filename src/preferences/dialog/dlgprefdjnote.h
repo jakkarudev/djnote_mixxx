@@ -49,8 +49,10 @@ class DlgPrefDJNote : public DlgPreferencePage {
     mixxx::knobreadout::Settings knobReadoutSettingsFromControls() const;
 
     void createKeyMatchingGroup();
-    // Greys out what means nothing in the current state: the checklist while
-    // Highlight is Off, the other columns while Whole row is ticked.
+    // Greys out what means nothing in the current state: while Highlight is
+    // Off the shifted key checkbox, checklist, bold checkbox, colour buttons
+    // and Reset; the fuzzy colours without fuzzy matching; the shifted colours
+    // without the shifted key; the other columns while Whole row is ticked.
     void updateKeyMatchingEnabled();
     void showKeyMatchingColor(int index, const QColor& color);
     void showKeyMatchingSettings(const mixxx::keymatch::Settings& settings);
@@ -72,9 +74,9 @@ class DlgPrefDJNote : public DlgPreferencePage {
     QCheckBox* m_pKeyMatchingBold;
     // One swatch button per mixxx::keymatch::ColourSlot, holding its colour in
     // the "keyMatchColor" property, with its row label.
-    QPushButton* m_keyMatchingColorButtons[4] = {};
-    QLabel* m_keyMatchingColorLabels[4] = {};
-    QPushButton* m_pKeyMatchingResetColors = nullptr;
+    QPushButton* m_keyMatchingColorButtons[4];
+    QLabel* m_keyMatchingColorLabels[4];
+    QPushButton* m_pKeyMatchingResetColors;
     // Same as m_showingKnobReadoutSettings, for the key matching group.
-    bool m_showingKeyMatchingSettings = false;
+    bool m_showingKeyMatchingSettings;
 };
