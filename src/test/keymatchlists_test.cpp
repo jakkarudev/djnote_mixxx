@@ -12,6 +12,7 @@
 #include "library/browse/browsetablemodel.h"
 #include "library/coverlookup.h"
 #include "library/keymatch/keymatcher.h"
+#include "library/keymatch/keymatchsettings.h"
 #include "library/trackcollection.h"
 #include "mixer/playerinfo.h"
 #include "test/librarytest.h"
@@ -116,6 +117,13 @@ class KeyMatchListsTest : public LibraryTest {
     static QVariant externalKeyColor(BaseExternalTrackModel* pModel) {
         return pModel->index(0, pModel->fieldIndex(ColumnCache::COLUMN_LIBRARYTABLE_KEY))
                 .data(Qt::ForegroundRole);
+    }
+
+    void colourEveryColumn() {
+        mixxx::keymatch::Settings settings;
+        settings.wholeRow = true;
+        mixxx::keymatch::saveSettings(config(), settings);
+        m_pMatcher->reloadSettings();
     }
 
     void changeReferenceTo3B() {
@@ -246,4 +254,29 @@ TEST_F(KeyMatchListsTest, ExternalLibraryRepaintsWhenTheReferenceChanges) {
     changeReferenceTo3B();
     EXPECT_GE(repainted.count(), 1);
     EXPECT_FALSE(externalKeyColor(pModel.get()).isValid());
+}
+
+TEST_F(KeyMatchListsTest, ComputerColoursTheChosenColumnsAndBoldsThem) {
+    referenceIs(QStringLiteral("8A"));
+    colourEveryColumn();
+    const auto pModel = browseModel();
+    pModel->setItem(0, COLUMN_ARTIST, new QStandardItem(QStringLiteral("Artist")));
+    ASSERT_EQ(QVariant::fromValue(kGreen), browseKeyColor(pModel.get(), QStringLiteral("8A")));
+    EXPECT_EQ(QVariant::fromValue(kGreen), pModel->index(0, COLUMN_ARTIST).data(Qt::ForegroundRole));
+    EXPECT_TRUE(pModel->index(0, COLUMN_ARTIST).data(Qt::FontRole).value<QFont>().bold());
+    // Never coloured.
+    EXPECT_FALSE(pModel->index(0, COLUMN_PREVIEW).data(Qt::ForegroundRole).isValid());
+    EXPECT_FALSE(pModel->index(0, COLUMN_COVERART).data(Qt::ForegroundRole).isValid());
+}
+
+TEST_F(KeyMatchListsTest, ExternalLibraryColoursTheChosenColumns) {
+    referenceIs(QStringLiteral("8A"));
+    colourEveryColumn();
+    addExternalTrack(QStringLiteral("8A"));
+    const auto pSource = trackSource();
+    const auto pModel = externalModel(pSource);
+    ASSERT_EQ(1, pModel->rowCount());
+    EXPECT_EQ(QVariant::fromValue(kGreen),
+            pModel->index(0, pModel->fieldIndex(ColumnCache::COLUMN_LIBRARYTABLE_ARTIST))
+                    .data(Qt::ForegroundRole));
 }
