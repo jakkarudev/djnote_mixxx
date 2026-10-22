@@ -29,7 +29,8 @@ QString nmlImportSummary(const QString& playlistName,
         const QStringList& skipped,
         const QStringList& missingTracks,
         const QStringList& matchedLibraryTracks,
-        int droppedCues) {
+        int droppedCues,
+        const QStringList& lockedGridTracks) {
     QString text = tr("Imported %1 tracks into the playlist \"%2\" (%3 new in the library).")
                            .arg(QString::number(tracksInPlaylist),
                                    playlistName,
@@ -46,6 +47,12 @@ QString nmlImportSummary(const QString& playlistName,
                 tr("%1 tracks were matched to tracks already in the library:")
                         .arg(QString::number(matchedLibraryTracks.size())) +
                 QStringLiteral("\n") + matchedLibraryTracks.join(QLatin1Char('\n'));
+    }
+    if (!lockedGridTracks.isEmpty()) { // DJNote (#109)
+        text += QStringLiteral("\n\n") +
+                tr("%1 tracks have a BPM-locked grid; their grid was not replaced:")
+                        .arg(QString::number(lockedGridTracks.size())) +
+                QStringLiteral("\n") + lockedGridTracks.join(QLatin1Char('\n'));
     }
     if (droppedCues > 0) {
         text += QStringLiteral("\n\n") +
@@ -77,13 +84,15 @@ int runNmlImportFlow(QWidget* pParent,
     pConfig->setValue(kNmlImportLastFolderKey, QFileInfo(nmlPath).absolutePath());
 
     PlaylistDAO& dao = pTrackCollectionManager->internalCollection()->getPlaylistDAO();
-    const NmlImportPlan plan = planNmlImport(nmlPath, dao);
+    NmlImportPlan plan = planNmlImport(nmlPath, dao);
     if (!plan.error.isEmpty()) {
         QMessageBox::warning(pParent,
                 tr("Import Traktor Playlist"),
                 tr("The file could not be imported: %1").arg(plan.error));
         return kInvalidPlaylistId;
     }
+
+    updateNmlPlanComparisons(&plan, pTrackCollectionManager); // #109
 
     // #113: a file with several playlists gets the tick-box review instead.
     const QList<NmlPlaylistChoice> choices = nmlPlaylistChoices(plan, dao);
@@ -108,7 +117,8 @@ int runNmlImportFlow(QWidget* pParent,
                     r.skipped,
                     r.missingTracks,
                     r.matchedLibraryLabels,
-                    r.droppedCues));
+                    r.droppedCues,
+                    r.lockedGridTracks));
             lastPlaylistId = r.playlistId;
         }
         QMessageBox::information(pParent,
@@ -136,7 +146,8 @@ int runNmlImportFlow(QWidget* pParent,
                     result.skipped,
                     result.missingTracks,
                     result.matchedLibraryLabels,
-                    result.droppedCues));
+                    result.droppedCues,
+                    result.lockedGridTracks));
     return result.playlistId;
 }
 

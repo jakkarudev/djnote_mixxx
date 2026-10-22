@@ -11,6 +11,7 @@
 #include "library/nml/dlgnmlimport.h"
 #include "library/nml/nmlfindmissing.h"
 #include "library/nml/nmlfindmissingpanel.h"
+#include "library/nml/nmlkeepreplacepanel.h"
 
 
 namespace mixxx {
@@ -93,6 +94,31 @@ void DlgNmlImportPlaylists::init(TrackCollectionManager* pManager) {
                 this);
         connect(pFindPanel, &NmlFindMissingPanel::changed, this, &DlgNmlImportPlaylists::refreshRows);
         pLayout->addWidget(pFindPanel);
+
+        // DJNote (#109): keep/replace choice for the ticked playlists' rows.
+        auto* pKeepReplace = new NmlKeepReplacePanel(
+                [this]() {
+                    QList<NmlImportPlan*> all;
+                    for (NmlImportPlan& plan : m_plans) {
+                        all.append(&plan);
+                    }
+                    return all;
+                },
+                pManager,
+                this,
+                [this]() {
+                    QList<NmlImportPlan*> ticked;
+                    for (int i = 0; i < m_plans.size(); ++i) {
+                        const QTableWidgetItem* pItem = m_pTable->item(i, kNameColumn);
+                        if (pItem && pItem->checkState() == Qt::Checked) {
+                            ticked.append(&m_plans[i]);
+                        }
+                    }
+                    return ticked;
+                });
+        connect(pFindPanel, &NmlFindMissingPanel::changed, pKeepReplace, &NmlKeepReplacePanel::refresh);
+        connect(m_pTable, &QTableWidget::itemChanged, pKeepReplace, &NmlKeepReplacePanel::refresh);
+        pLayout->addWidget(pKeepReplace);
     }
 
     m_pWarning = new QLabel(this);
