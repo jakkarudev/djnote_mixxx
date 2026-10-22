@@ -3,6 +3,7 @@
 #include <QColor>
 #include <QList>
 #include <QString>
+#include <iterator>
 #include <set>
 
 #include "preferences/usersettings.h"
@@ -46,18 +47,33 @@ enum class ColumnIdentity {
     NotColoured,
 };
 
-// The identities the DJ can choose from, Key first.
-QList<ColumnIdentity> choosableColumns();
+// An identity the DJ can choose from, with the name it is stored under and its
+// label (a DlgPrefDJNote translation source string) in the checklist.
+struct ChoosableColumn {
+    ColumnIdentity identity;
+    QString name;
+    const char* label;
+};
 
-// The four settable match colours, one per tier.
-enum class ColourSlot {
+// The identities the DJ can choose from, Key first.
+const QList<ChoosableColumn>& choosableColumns();
+
+// The settable match colours, one per tier.
+enum class ColorSlot {
     Strict,
     Fuzzy,
     ShiftedStrict,
     ShiftedFuzzy,
 };
 
-QColor defaultColor(ColourSlot slot);
+// Every slot, in order; a slot's number is static_cast<int>(slot).
+inline constexpr ColorSlot kColorSlots[] = {ColorSlot::Strict,
+        ColorSlot::Fuzzy,
+        ColorSlot::ShiftedStrict,
+        ColorSlot::ShiftedFuzzy};
+inline constexpr int kColorSlotCount = static_cast<int>(std::size(kColorSlots));
+
+QColor defaultColor(ColorSlot slot);
 
 // Add a field here, its key in keymatchsettings.cpp and its control on
 // DlgPrefDJNote; the key matcher reloads the whole struct when the page changes
@@ -68,23 +84,25 @@ struct Settings {
     std::set<ColumnIdentity> columns = {ColumnIdentity::Key};
     bool wholeRow = false;
 
-    bool colours(ColumnIdentity column) const {
-        return column != ColumnIdentity::NotColoured &&
-                (wholeRow || columns.count(column) > 0);
-    }
     // Coloured cells are bold.
     bool boldMatchedText = true;
     // Also match the shifted key of the reference deck (purple).
     bool matchShiftedKey = true;
     // The tier colours.
-    QColor strictColor = defaultColor(ColourSlot::Strict);
-    QColor fuzzyColor = defaultColor(ColourSlot::Fuzzy);
-    QColor shiftedStrictColor = defaultColor(ColourSlot::ShiftedStrict);
-    QColor shiftedFuzzyColor = defaultColor(ColourSlot::ShiftedFuzzy);
+    QColor strictColor = defaultColor(ColorSlot::Strict);
+    QColor fuzzyColor = defaultColor(ColorSlot::Fuzzy);
+    QColor shiftedStrictColor = defaultColor(ColorSlot::ShiftedStrict);
+    QColor shiftedFuzzyColor = defaultColor(ColorSlot::ShiftedFuzzy);
 
-    QColor& colour(ColourSlot slot);
-    const QColor& colour(ColourSlot slot) const;
-    void resetColours();
+    QColor& color(ColorSlot slot);
+    const QColor& color(ColorSlot slot) const;
+    void resetColors();
+
+    // Whether cells of this column get the match colour.
+    bool isColumnColored(ColumnIdentity column) const {
+        return column != ColumnIdentity::NotColoured &&
+                (wholeRow || columns.count(column) > 0);
+    }
 };
 
 // Missing keys fall back to the defaults above.

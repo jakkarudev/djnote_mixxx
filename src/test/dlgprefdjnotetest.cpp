@@ -679,7 +679,7 @@ TEST_F(DlgPrefDJNoteTest, PickingAColourStoresItAndTellsTheMatcher) {
     mixxx::keymatch::KeyMatcher matcher(config());
     auto pPage = openPage();
     pPage->pickKeyMatchingColor(
-            mixxx::keymatch::ColourSlot::ShiftedStrict, QColor(QStringLiteral("#112233")));
+            mixxx::keymatch::ColorSlot::ShiftedStrict, QColor(QStringLiteral("#112233")));
     EXPECT_EQ(QColor(QStringLiteral("#112233")),
             mixxx::keymatch::loadSettings(config()).shiftedStrictColor);
     EXPECT_EQ(QColor(QStringLiteral("#112233")), matcher.settings().shiftedStrictColor);
@@ -697,9 +697,9 @@ TEST_F(DlgPrefDJNoteTest, ColourPickersShowTheStoredColours) {
 TEST_F(DlgPrefDJNoteTest, ResetColoursRestoresTheFourDefaultsOnly) {
     auto pPage = openPage();
     pPage->pickKeyMatchingColor(
-            mixxx::keymatch::ColourSlot::Strict, QColor(QStringLiteral("#112233")));
+            mixxx::keymatch::ColorSlot::Strict, QColor(QStringLiteral("#112233")));
     pPage->pickKeyMatchingColor(
-            mixxx::keymatch::ColourSlot::ShiftedFuzzy, QColor(QStringLiteral("#445566")));
+            mixxx::keymatch::ColorSlot::ShiftedFuzzy, QColor(QStringLiteral("#445566")));
     boldCheckBox(pPage.get())->setChecked(false);
     colourButton(pPage.get(), kResetButton)->click();
     const auto settings = mixxx::keymatch::loadSettings(config());
@@ -712,7 +712,7 @@ TEST_F(DlgPrefDJNoteTest, ResetColoursRestoresTheFourDefaultsOnly) {
 TEST_F(DlgPrefDJNoteTest, ResetToDefaultsRestoresTheColours) {
     auto pPage = openPage();
     pPage->pickKeyMatchingColor(
-            mixxx::keymatch::ColourSlot::Fuzzy, QColor(QStringLiteral("#112233")));
+            mixxx::keymatch::ColorSlot::Fuzzy, QColor(QStringLiteral("#112233")));
     pPage->slotResetToDefaults();
     EXPECT_EQ(QColor(QStringLiteral("#facc15")),
             mixxx::keymatch::loadSettings(config()).fuzzyColor);

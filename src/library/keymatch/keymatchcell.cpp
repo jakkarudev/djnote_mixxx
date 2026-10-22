@@ -10,20 +10,45 @@ namespace keymatch {
 
 namespace {
 
-std::optional<QColor> colorOf(KeyMatchTier tier, const Settings& settings) {
+std::optional<ColorSlot> slotOf(KeyMatchTier tier) {
     switch (tier) {
     case KeyMatchTier::Strict:
-        return settings.strictColor;
+        return ColorSlot::Strict;
     case KeyMatchTier::Fuzzy:
-        return settings.fuzzyColor;
+        return ColorSlot::Fuzzy;
     case KeyMatchTier::ShiftedStrict:
-        return settings.shiftedStrictColor;
+        return ColorSlot::ShiftedStrict;
     case KeyMatchTier::ShiftedFuzzy:
-        return settings.shiftedFuzzyColor;
+        return ColorSlot::ShiftedFuzzy;
     case KeyMatchTier::None:
         break;
     }
     return std::nullopt;
+}
+
+// The style of a cell whose column is coloured under the matcher's settings.
+CellStyle styleOfColoredColumn(const KeyMatcher& matcher, const CellInput& input) {
+    // A missing track keeps Mixxx's missing colour and is never highlighted.
+    if (input.missing) {
+        return {};
+    }
+    const Settings& settings = matcher.settings();
+    const std::optional<ColorSlot> slot = slotOf(matcher.match(input.key));
+    CellStyle style;
+    if (slot) {
+        style.color = settings.color(*slot);
+    }
+    // A played match is mixed 50/50 with the played colour.
+    if (style.color && input.played && input.playedColor) {
+        const QColor& a = *style.color;
+        const QColor& b = *input.playedColor;
+        style.color = QColor((a.red() + b.red() + 1) / 2,
+                (a.green() + b.green() + 1) / 2,
+                (a.blue() + b.blue() + 1) / 2);
+    }
+    // Every coloured cell is bold, played or not.
+    style.bold = slot.has_value() && settings.boldMatchedText;
+    return style;
 }
 
 mixxx::track::io::key::ChromaticKey rowKey(
@@ -93,24 +118,10 @@ ColumnIdentity columnIdentity(ColumnCache::Column column) {
 
 CellStyle cellStyle(const CellInput& input) {
     const KeyMatcher* pMatcher = KeyMatcher::instance();
-    // A missing track keeps Mixxx's missing colour and is never highlighted.
-    if (!pMatcher || input.missing || !pMatcher->settings().colours(input.column)) {
+    if (!pMatcher || !pMatcher->settings().isColumnColored(input.column)) {
         return {};
     }
-    CellStyle style;
-    const std::optional<QColor> color = colorOf(pMatcher->match(input.key), pMatcher->settings());
-    style.color = color;
-    // A played match is mixed 50/50 with the played colour.
-    if (style.color && input.played && input.playedColor) {
-        const QColor& a = *style.color;
-        const QColor& b = *input.playedColor;
-        style.color = QColor((a.red() + b.red() + 1) / 2,
-                (a.green() + b.green() + 1) / 2,
-                (a.blue() + b.blue() + 1) / 2);
-    }
-    // Every coloured cell is bold, played or not.
-    style.bold = color.has_value() && pMatcher->settings().boldMatchedText;
-    return style;
+    return styleOfColoredColumn(*pMatcher, input);
 }
 
 QVariant roleData(const CellStyle& style, int role) {
@@ -132,7 +143,7 @@ QVariant cellData(ColumnCache::Column column,
         const std::optional<QColor>& playedColor) {
     const ColumnIdentity identity = columnIdentity(column);
     const KeyMatcher* pMatcher = KeyMatcher::instance();
-    if (!pMatcher || !pMatcher->settings().colours(identity)) {
+    if (!pMatcher || !pMatcher->settings().isColumnColored(identity)) {
         return QVariant();
     }
     CellInput input;
@@ -144,7 +155,7 @@ QVariant cellData(ColumnCache::Column column,
     input.played = !played.isNull() && played.toBool();
     input.playedColor = playedColor;
 
-    return roleData(cellStyle(input), role);
+    return roleData(styleOfColoredColumn(*pMatcher, input), role);
 }
 
 void repaintOnChange(QAbstractItemModel* pModel) {

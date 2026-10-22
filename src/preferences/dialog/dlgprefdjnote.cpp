@@ -1,6 +1,7 @@
 #include "preferences/dialog/dlgprefdjnote.h"
 
 #include <QCheckBox>
+#include <QCoreApplication>
 #include <QColorDialog>
 #include <QComboBox>
 #include <QGridLayout>
@@ -18,53 +19,6 @@ namespace {
 
 // The Whole row item's data, apart from every ColumnIdentity.
 constexpr int kWholeRowItem = -1;
-
-QString columnLabel(mixxx::keymatch::ColumnIdentity identity) {
-    using mixxx::keymatch::ColumnIdentity;
-    switch (identity) {
-    case ColumnIdentity::Key:
-        return DlgPrefDJNote::tr("Key");
-    case ColumnIdentity::Title:
-        return DlgPrefDJNote::tr("Title");
-    case ColumnIdentity::Artist:
-        return DlgPrefDJNote::tr("Artist");
-    case ColumnIdentity::Album:
-        return DlgPrefDJNote::tr("Album");
-    case ColumnIdentity::AlbumArtist:
-        return DlgPrefDJNote::tr("Album Artist");
-    case ColumnIdentity::Year:
-        return DlgPrefDJNote::tr("Year");
-    case ColumnIdentity::Genre:
-        return DlgPrefDJNote::tr("Genre");
-    case ColumnIdentity::Composer:
-        return DlgPrefDJNote::tr("Composer");
-    case ColumnIdentity::Grouping:
-        return DlgPrefDJNote::tr("Grouping");
-    case ColumnIdentity::TrackNumber:
-        return DlgPrefDJNote::tr("Track #");
-    case ColumnIdentity::FileType:
-        return DlgPrefDJNote::tr("Type");
-    case ColumnIdentity::Comment:
-        return DlgPrefDJNote::tr("Comment");
-    case ColumnIdentity::Duration:
-        return DlgPrefDJNote::tr("Duration");
-    case ColumnIdentity::Bitrate:
-        return DlgPrefDJNote::tr("Bitrate");
-    case ColumnIdentity::Bpm:
-        return DlgPrefDJNote::tr("BPM");
-    case ColumnIdentity::ReplayGain:
-        return DlgPrefDJNote::tr("ReplayGain");
-    case ColumnIdentity::Location:
-        return DlgPrefDJNote::tr("Location");
-    case ColumnIdentity::DateAdded:
-        return DlgPrefDJNote::tr("Date Added");
-    case ColumnIdentity::LastPlayed:
-        return DlgPrefDJNote::tr("Last Played");
-    case ColumnIdentity::NotColoured:
-        break;
-    }
-    return QString();
-}
 
 } // namespace
 
@@ -266,8 +220,9 @@ void DlgPrefDJNote::createKeyMatchingGroup() {
         pItem->setData(Qt::UserRole, identity);
     };
     addColumnItem(tr("Whole row"), kWholeRowItem);
-    for (const auto identity : mixxx::keymatch::choosableColumns()) {
-        addColumnItem(columnLabel(identity), static_cast<int>(identity));
+    for (const auto& column : mixxx::keymatch::choosableColumns()) {
+        addColumnItem(QCoreApplication::translate("DlgPrefDJNote", column.label),
+                static_cast<int>(column.identity));
     }
     auto* pColumnsLabel = new QLabel(tr("Colour these columns"), pGroup);
     pColumnsLabel->setBuddy(m_pKeyMatchingColumns);
@@ -282,39 +237,39 @@ void DlgPrefDJNote::createKeyMatchingGroup() {
     pGrid->addWidget(m_pKeyMatchingBold, pGrid->rowCount(), 0, 1, 2);
 
     // Colour pickers: a swatch button per tier opens the colour dialog.
-    struct ColourRow {
-        mixxx::keymatch::ColourSlot slot;
+    struct ColorRow {
+        mixxx::keymatch::ColorSlot slot;
         QString label;
         QString objectName;
     };
-    const ColourRow colourRows[] = {
-            {mixxx::keymatch::ColourSlot::Strict,
+    const ColorRow colorRows[] = {
+            {mixxx::keymatch::ColorSlot::Strict,
                     tr("Strict match"),
                     QStringLiteral("keyMatchingStrictColorButton")},
-            {mixxx::keymatch::ColourSlot::Fuzzy,
+            {mixxx::keymatch::ColorSlot::Fuzzy,
                     tr("Fuzzy match"),
                     QStringLiteral("keyMatchingFuzzyColorButton")},
-            {mixxx::keymatch::ColourSlot::ShiftedStrict,
+            {mixxx::keymatch::ColorSlot::ShiftedStrict,
                     tr("Shifted strict match"),
                     QStringLiteral("keyMatchingShiftedStrictColorButton")},
-            {mixxx::keymatch::ColourSlot::ShiftedFuzzy,
+            {mixxx::keymatch::ColorSlot::ShiftedFuzzy,
                     tr("Shifted fuzzy match"),
                     QStringLiteral("keyMatchingShiftedFuzzyColorButton")},
     };
-    for (const auto& colourRow : colourRows) {
-        const int index = static_cast<int>(colourRow.slot);
+    for (const auto& colorRow : colorRows) {
+        const int index = static_cast<int>(colorRow.slot);
         auto* pButton = new QPushButton(pGroup);
-        pButton->setObjectName(colourRow.objectName);
+        pButton->setObjectName(colorRow.objectName);
         pButton->setFixedWidth(80);
-        pButton->setToolTip(tr("Choose the colour of %1 highlights.").arg(colourRow.label.toLower()));
-        auto* pLabel = new QLabel(colourRow.label, pGroup);
+        pButton->setToolTip(tr("Choose the colour of %1 highlights.").arg(colorRow.label.toLower()));
+        auto* pLabel = new QLabel(colorRow.label, pGroup);
         pLabel->setBuddy(pButton);
-        const int colourGridRow = pGrid->rowCount();
-        pGrid->addWidget(pLabel, colourGridRow, 0);
-        pGrid->addWidget(pButton, colourGridRow, 1, Qt::AlignLeft);
+        const int colorGridRow = pGrid->rowCount();
+        pGrid->addWidget(pLabel, colorGridRow, 0);
+        pGrid->addWidget(pButton, colorGridRow, 1, Qt::AlignLeft);
         m_keyMatchingColorButtons[index] = pButton;
         m_keyMatchingColorLabels[index] = pLabel;
-        const auto slot = colourRow.slot;
+        const auto slot = colorRow.slot;
         connect(pButton, &QPushButton::clicked, this, [this, slot, pButton] {
             const QColor current = pButton->property("keyMatchColor").value<QColor>();
             const QColor chosen = QColorDialog::getColor(current, this, tr("Choose colour"));
@@ -329,7 +284,7 @@ void DlgPrefDJNote::createKeyMatchingGroup() {
     pGrid->addWidget(m_pKeyMatchingResetColors, pGrid->rowCount(), 1, Qt::AlignLeft);
     connect(m_pKeyMatchingResetColors, &QPushButton::clicked, this, [this] {
         auto settings = keyMatchingSettingsFromControls();
-        settings.resetColours();
+        settings.resetColors();
         showKeyMatchingSettings(settings);
         slotKeyMatchingControlChanged();
     });
@@ -378,10 +333,25 @@ void DlgPrefDJNote::updateKeyMatchingEnabled() {
     m_pKeyMatchingShiftedKey->setEnabled(on);
     m_pKeyMatchingColumns->setEnabled(on);
     m_pKeyMatchingBold->setEnabled(on);
-    const bool enabled[4] = {on, fuzzy, shifted, shifted && fuzzy};
-    for (int i = 0; i < 4; ++i) {
-        m_keyMatchingColorButtons[i]->setEnabled(enabled[i]);
-        m_keyMatchingColorLabels[i]->setEnabled(enabled[i]);
+    for (const auto slot : mixxx::keymatch::kColorSlots) {
+        bool enabled = false;
+        switch (slot) {
+        case mixxx::keymatch::ColorSlot::Strict:
+            enabled = on;
+            break;
+        case mixxx::keymatch::ColorSlot::Fuzzy:
+            enabled = fuzzy;
+            break;
+        case mixxx::keymatch::ColorSlot::ShiftedStrict:
+            enabled = shifted;
+            break;
+        case mixxx::keymatch::ColorSlot::ShiftedFuzzy:
+            enabled = shifted && fuzzy;
+            break;
+        }
+        const int index = static_cast<int>(slot);
+        m_keyMatchingColorButtons[index]->setEnabled(enabled);
+        m_keyMatchingColorLabels[index]->setEnabled(enabled);
     }
     m_pKeyMatchingResetColors->setEnabled(on);
     const bool wholeRow =
@@ -410,8 +380,8 @@ void DlgPrefDJNote::showKeyMatchingSettings(const mixxx::keymatch::Settings& set
     }
     m_pKeyMatchingBold->setChecked(settings.boldMatchedText);
     m_pKeyMatchingShiftedKey->setChecked(settings.matchShiftedKey);
-    for (int i = 0; i < 4; ++i) {
-        showKeyMatchingColor(i, settings.colour(static_cast<mixxx::keymatch::ColourSlot>(i)));
+    for (const auto slot : mixxx::keymatch::kColorSlots) {
+        showKeyMatchingColor(static_cast<int>(slot), settings.color(slot));
     }
     m_showingKeyMatchingSettings = false;
     updateKeyMatchingEnabled();
@@ -434,9 +404,10 @@ mixxx::keymatch::Settings DlgPrefDJNote::keyMatchingSettingsFromControls() const
     }
     settings.boldMatchedText = m_pKeyMatchingBold->isChecked();
     settings.matchShiftedKey = m_pKeyMatchingShiftedKey->isChecked();
-    for (int i = 0; i < 4; ++i) {
-        settings.colour(static_cast<mixxx::keymatch::ColourSlot>(i)) =
-                m_keyMatchingColorButtons[i]->property("keyMatchColor").value<QColor>();
+    for (const auto slot : mixxx::keymatch::kColorSlots) {
+        settings.color(slot) = m_keyMatchingColorButtons[static_cast<int>(slot)]
+                                       ->property("keyMatchColor")
+                                       .value<QColor>();
     }
     return settings;
 }
@@ -449,7 +420,7 @@ void DlgPrefDJNote::showKeyMatchingColor(int index, const QColor& color) {
 }
 
 void DlgPrefDJNote::pickKeyMatchingColor(
-        mixxx::keymatch::ColourSlot slot, const QColor& color) {
+        mixxx::keymatch::ColorSlot slot, const QColor& color) {
     showKeyMatchingColor(static_cast<int>(slot), color);
     slotKeyMatchingControlChanged();
 }

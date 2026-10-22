@@ -30,7 +30,7 @@ class DlgPrefDJNote : public DlgPreferencePage {
     DlgPrefDJNote(QWidget* pParent, UserSettingsPointer pConfig);
 
     // What choosing `color` in the slot's colour dialog does.
-    void pickKeyMatchingColor(mixxx::keymatch::ColourSlot slot, const QColor& color);
+    void pickKeyMatchingColor(mixxx::keymatch::ColorSlot slot, const QColor& color);
 
   public slots:
     void slotUpdate() override;
@@ -72,10 +72,10 @@ class DlgPrefDJNote : public DlgPreferencePage {
     QCheckBox* m_pKeyMatchingShiftedKey;
     QListWidget* m_pKeyMatchingColumns;
     QCheckBox* m_pKeyMatchingBold;
-    // One swatch button per mixxx::keymatch::ColourSlot, holding its colour in
+    // One swatch button per mixxx::keymatch::ColorSlot, holding its colour in
     // the "keyMatchColor" property, with its row label.
-    QPushButton* m_keyMatchingColorButtons[4];
-    QLabel* m_keyMatchingColorLabels[4];
+    QPushButton* m_keyMatchingColorButtons[mixxx::keymatch::kColorSlotCount];
+    QLabel* m_keyMatchingColorLabels[mixxx::keymatch::kColorSlotCount];
     QPushButton* m_pKeyMatchingResetColors;
     // Same as m_showingKnobReadoutSettings, for the key matching group.
     bool m_showingKeyMatchingSettings;

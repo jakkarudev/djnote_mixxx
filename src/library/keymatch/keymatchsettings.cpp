@@ -16,31 +16,29 @@ const ConfigKey kColumnsCfgKey(kDJNoteGroup, QStringLiteral("KeyMatchingColumns"
 const ConfigKey kWholeRowCfgKey(kDJNoteGroup, QStringLiteral("KeyMatchingWholeRow"));
 const ConfigKey kShiftedKeyCfgKey(kDJNoteGroup, QStringLiteral("KeyMatchingShiftedKey"));
 
-// Columns are stored by name, comma separated; unknown names are skipped.
-const QList<QPair<ColumnIdentity, QString>>& columnNames() {
-    static const QList<QPair<ColumnIdentity, QString>> names = {
-            {ColumnIdentity::Key, QStringLiteral("key")},
-            {ColumnIdentity::Title, QStringLiteral("title")},
-            {ColumnIdentity::Artist, QStringLiteral("artist")},
-            {ColumnIdentity::Album, QStringLiteral("album")},
-            {ColumnIdentity::AlbumArtist, QStringLiteral("albumArtist")},
-            {ColumnIdentity::Year, QStringLiteral("year")},
-            {ColumnIdentity::Genre, QStringLiteral("genre")},
-            {ColumnIdentity::Composer, QStringLiteral("composer")},
-            {ColumnIdentity::Grouping, QStringLiteral("grouping")},
-            {ColumnIdentity::TrackNumber, QStringLiteral("trackNumber")},
-            {ColumnIdentity::FileType, QStringLiteral("fileType")},
-            {ColumnIdentity::Comment, QStringLiteral("comment")},
-            {ColumnIdentity::Duration, QStringLiteral("duration")},
-            {ColumnIdentity::Bitrate, QStringLiteral("bitrate")},
-            {ColumnIdentity::Bpm, QStringLiteral("bpm")},
-            {ColumnIdentity::ReplayGain, QStringLiteral("replayGain")},
-            {ColumnIdentity::Location, QStringLiteral("location")},
-            {ColumnIdentity::DateAdded, QStringLiteral("dateAdded")},
-            {ColumnIdentity::LastPlayed, QStringLiteral("lastPlayed")},
-    };
-    return names;
-}
+// Columns are stored by name, comma separated; unknown names (such as a
+// column that is no longer offered) are skipped.
+const QList<ChoosableColumn> kChoosableColumns = {
+        {ColumnIdentity::Key, QStringLiteral("key"), QT_TRANSLATE_NOOP("DlgPrefDJNote", "Key")},
+        {ColumnIdentity::Title, QStringLiteral("title"), QT_TRANSLATE_NOOP("DlgPrefDJNote", "Title")},
+        {ColumnIdentity::Artist, QStringLiteral("artist"), QT_TRANSLATE_NOOP("DlgPrefDJNote", "Artist")},
+        {ColumnIdentity::Album, QStringLiteral("album"), QT_TRANSLATE_NOOP("DlgPrefDJNote", "Album")},
+        {ColumnIdentity::AlbumArtist, QStringLiteral("albumArtist"), QT_TRANSLATE_NOOP("DlgPrefDJNote", "Album Artist")},
+        {ColumnIdentity::Year, QStringLiteral("year"), QT_TRANSLATE_NOOP("DlgPrefDJNote", "Year")},
+        {ColumnIdentity::Genre, QStringLiteral("genre"), QT_TRANSLATE_NOOP("DlgPrefDJNote", "Genre")},
+        {ColumnIdentity::Composer, QStringLiteral("composer"), QT_TRANSLATE_NOOP("DlgPrefDJNote", "Composer")},
+        {ColumnIdentity::Grouping, QStringLiteral("grouping"), QT_TRANSLATE_NOOP("DlgPrefDJNote", "Grouping")},
+        {ColumnIdentity::TrackNumber, QStringLiteral("trackNumber"), QT_TRANSLATE_NOOP("DlgPrefDJNote", "Track #")},
+        {ColumnIdentity::FileType, QStringLiteral("fileType"), QT_TRANSLATE_NOOP("DlgPrefDJNote", "Type")},
+        {ColumnIdentity::Comment, QStringLiteral("comment"), QT_TRANSLATE_NOOP("DlgPrefDJNote", "Comment")},
+        {ColumnIdentity::Duration, QStringLiteral("duration"), QT_TRANSLATE_NOOP("DlgPrefDJNote", "Duration")},
+        {ColumnIdentity::Bitrate, QStringLiteral("bitrate"), QT_TRANSLATE_NOOP("DlgPrefDJNote", "Bitrate")},
+        {ColumnIdentity::Bpm, QStringLiteral("bpm"), QT_TRANSLATE_NOOP("DlgPrefDJNote", "BPM")},
+        {ColumnIdentity::ReplayGain, QStringLiteral("replayGain"), QT_TRANSLATE_NOOP("DlgPrefDJNote", "ReplayGain")},
+        {ColumnIdentity::Location, QStringLiteral("location"), QT_TRANSLATE_NOOP("DlgPrefDJNote", "Location")},
+        {ColumnIdentity::DateAdded, QStringLiteral("dateAdded"), QT_TRANSLATE_NOOP("DlgPrefDJNote", "Date Added")},
+        {ColumnIdentity::LastPlayed, QStringLiteral("lastPlayed"), QT_TRANSLATE_NOOP("DlgPrefDJNote", "Last Played")},
+};
 
 // Stored as names, so the values stay readable and reorder-safe; unknown names
 // read as the default.
@@ -48,23 +46,26 @@ const QString kHighlightOff = QStringLiteral("off");
 const QString kHighlightStrictOnly = QStringLiteral("strictOnly");
 const QString kHighlightStrictAndFuzzy = QStringLiteral("strictAndFuzzy");
 
-constexpr ColourSlot kColourSlots[] = {ColourSlot::Strict,
-        ColourSlot::Fuzzy,
-        ColourSlot::ShiftedStrict,
-        ColourSlot::ShiftedFuzzy};
+// Per slot: the name its config key ends with, its default colour and its
+// field in Settings.
+struct ColorSlotInfo {
+    const char* cfgName;
+    QRgb defaultRgb;
+    QColor Settings::*field;
+};
 
-ConfigKey colourKey(ColourSlot slot) {
-    switch (slot) {
-    case ColourSlot::Strict:
-        return ConfigKey(kDJNoteGroup, QStringLiteral("KeyMatchingStrictColor"));
-    case ColourSlot::Fuzzy:
-        return ConfigKey(kDJNoteGroup, QStringLiteral("KeyMatchingFuzzyColor"));
-    case ColourSlot::ShiftedStrict:
-        return ConfigKey(kDJNoteGroup, QStringLiteral("KeyMatchingShiftedStrictColor"));
-    case ColourSlot::ShiftedFuzzy:
-        break;
-    }
-    return ConfigKey(kDJNoteGroup, QStringLiteral("KeyMatchingShiftedFuzzyColor"));
+const ColorSlotInfo& slotInfo(ColorSlot slot) {
+    static constexpr ColorSlotInfo kInfo[kColorSlotCount] = {
+            {"KeyMatchingStrictColor", 0x4ade80, &Settings::strictColor},
+            {"KeyMatchingFuzzyColor", 0xfacc15, &Settings::fuzzyColor},
+            {"KeyMatchingShiftedStrictColor", 0xc084fc, &Settings::shiftedStrictColor},
+            {"KeyMatchingShiftedFuzzyColor", 0xe9d5ff, &Settings::shiftedFuzzyColor},
+    };
+    return kInfo[static_cast<int>(slot)];
+}
+
+ConfigKey colorKey(ColorSlot slot) {
+    return ConfigKey(kDJNoteGroup, QString::fromLatin1(slotInfo(slot).cfgName));
 }
 
 Highlight highlightFromString(const QString& name, Highlight fallback) {
@@ -94,50 +95,26 @@ QString highlightToString(Highlight highlight) {
 
 } // namespace
 
-QColor defaultColor(ColourSlot slot) {
-    switch (slot) {
-    case ColourSlot::Strict:
-        return QColor(0x4a, 0xde, 0x80);
-    case ColourSlot::Fuzzy:
-        return QColor(0xfa, 0xcc, 0x15);
-    case ColourSlot::ShiftedStrict:
-        return QColor(0xc0, 0x84, 0xfc);
-    case ColourSlot::ShiftedFuzzy:
-        break;
-    }
-    return QColor(0xe9, 0xd5, 0xff);
+QColor defaultColor(ColorSlot slot) {
+    return QColor(slotInfo(slot).defaultRgb);
 }
 
-QColor& Settings::colour(ColourSlot slot) {
-    switch (slot) {
-    case ColourSlot::Strict:
-        return strictColor;
-    case ColourSlot::Fuzzy:
-        return fuzzyColor;
-    case ColourSlot::ShiftedStrict:
-        return shiftedStrictColor;
-    case ColourSlot::ShiftedFuzzy:
-        break;
-    }
-    return shiftedFuzzyColor;
+QColor& Settings::color(ColorSlot slot) {
+    return this->*slotInfo(slot).field;
 }
 
-const QColor& Settings::colour(ColourSlot slot) const {
-    return const_cast<Settings*>(this)->colour(slot);
+const QColor& Settings::color(ColorSlot slot) const {
+    return this->*slotInfo(slot).field;
 }
 
-void Settings::resetColours() {
-    for (const auto slot : kColourSlots) {
-        colour(slot) = defaultColor(slot);
+void Settings::resetColors() {
+    for (const auto slot : kColorSlots) {
+        color(slot) = defaultColor(slot);
     }
 }
 
-QList<ColumnIdentity> choosableColumns() {
-    QList<ColumnIdentity> columns;
-    for (const auto& entry : columnNames()) {
-        columns.append(entry.first);
-    }
-    return columns;
+const QList<ChoosableColumn>& choosableColumns() {
+    return kChoosableColumns;
 }
 
 Settings loadSettings(const UserSettingsPointer& pConfig) {
@@ -148,9 +125,9 @@ Settings loadSettings(const UserSettingsPointer& pConfig) {
         settings.columns.clear();
         const QStringList names = pConfig->getValueString(kColumnsCfgKey)
                                           .split(QLatin1Char(','), Qt::SkipEmptyParts);
-        for (const auto& entry : columnNames()) {
-            if (names.contains(entry.second)) {
-                settings.columns.insert(entry.first);
+        for (const auto& column : kChoosableColumns) {
+            if (names.contains(column.name)) {
+                settings.columns.insert(column.identity);
             }
         }
     }
@@ -163,11 +140,11 @@ Settings loadSettings(const UserSettingsPointer& pConfig) {
     }
     settings.matchShiftedKey = pConfig->getValue<bool>(kShiftedKeyCfgKey, settings.matchShiftedKey);
     // Colours are stored as #rrggbb; anything else reads as the default.
-    for (const auto slot : kColourSlots) {
-        const QString text = pConfig->getValueString(colourKey(slot));
+    for (const auto slot : kColorSlots) {
+        const QString text = pConfig->getValueString(colorKey(slot));
         const QColor color(text);
         if (text.startsWith(QLatin1Char('#')) && color.isValid()) {
-            settings.colour(slot) = color;
+            settings.color(slot) = color;
         }
     }
     return settings;
@@ -176,9 +153,9 @@ Settings loadSettings(const UserSettingsPointer& pConfig) {
 void saveSettings(const UserSettingsPointer& pConfig, const Settings& settings) {
     pConfig->setValue(kHighlightCfgKey, highlightToString(settings.highlight));
     QStringList names;
-    for (const auto& entry : columnNames()) {
-        if (settings.columns.count(entry.first) > 0) {
-            names.append(entry.second);
+    for (const auto& column : kChoosableColumns) {
+        if (settings.columns.count(column.identity) > 0) {
+            names.append(column.name);
         }
     }
     // "-" keeps "no column" distinct from a missing (defaulted) key.
@@ -188,8 +165,8 @@ void saveSettings(const UserSettingsPointer& pConfig, const Settings& settings) 
     pConfig->setValue(kBoldMatchedTextCfgKey,
             settings.boldMatchedText ? QStringLiteral("true") : QStringLiteral("false"));
     pConfig->setValue(kShiftedKeyCfgKey, settings.matchShiftedKey);
-    for (const auto slot : kColourSlots) {
-        pConfig->setValue(colourKey(slot), settings.colour(slot).name(QColor::HexRgb));
+    for (const auto slot : kColorSlots) {
+        pConfig->setValue(colorKey(slot), settings.color(slot).name(QColor::HexRgb));
     }
 }
 
