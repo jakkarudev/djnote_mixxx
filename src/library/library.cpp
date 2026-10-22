@@ -12,6 +12,7 @@
 #include "library/browse/browsefeature.h"
 #include "library/coverlookup.h"         // DJNote
 #include "library/externalcovercolumn.h" // DJNote
+#include "library/keymatch/keymatcher.h" // DJNote
 #ifdef __ENGINEPRIME__
 #include "library/export/libraryexporter.h"
 #endif
@@ -74,6 +75,8 @@ Library::Library(
           // DJNote
           m_pCoverLookup(make_parented<CoverLookup>(
                   pTrackCollectionManager->internalCollection(), this)),
+          // DJNote: before the features, whose track lists consult it.
+          m_pKeyMatcher(make_parented<mixxx::keymatch::KeyMatcher>(pConfig, this)),
           m_pLibraryWidget(nullptr),
           m_pMixxxLibraryFeature(nullptr),
           m_pPlaylistFeature(nullptr),

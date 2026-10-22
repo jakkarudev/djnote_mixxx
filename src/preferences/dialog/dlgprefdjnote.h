@@ -1,12 +1,15 @@
 #pragma once
 
 #include "preferences/dialog/dlgpreferencepage.h"
+#include "library/keymatch/keymatchsettings.h"
 #include "preferences/usersettings.h"
 #include "widget/knobreadoutsettings.h"
 
 class QCheckBox;
 class QComboBox;
 class QLabel;
+class QListWidget;
+class QPushButton;
 
 // The DJNote preferences page: settings of DJNote features that have no
 // upstream page to live on. Built in code (no .ui file).
@@ -17,10 +20,17 @@ class QLabel;
 // change signal to slotKnobReadoutControlChanged() and cover it in those two
 // functions; reset then follows. Like the Waveforms page, every change is
 // stored (and so applied) at once, without waiting for Apply.
+//
+// Key matching group: the same way, through createKeyMatchingGroup(),
+// slotKeyMatchingControlChanged(), showKeyMatchingSettings() and
+// keyMatchingSettingsFromControls().
 class DlgPrefDJNote : public DlgPreferencePage {
     Q_OBJECT
   public:
     DlgPrefDJNote(QWidget* pParent, UserSettingsPointer pConfig);
+
+    // What choosing `color` in the slot's colour dialog does.
+    void pickKeyMatchingColor(mixxx::keymatch::ColorSlot slot, const QColor& color);
 
   public slots:
     void slotUpdate() override;
@@ -29,6 +39,7 @@ class DlgPrefDJNote : public DlgPreferencePage {
 
   private slots:
     void slotKnobReadoutControlChanged();
+    void slotKeyMatchingControlChanged();
 
   private:
     void createKnobReadoutGroup();
@@ -36,6 +47,16 @@ class DlgPrefDJNote : public DlgPreferencePage {
     void setKnobReadoutDetailsEnabled(bool enabled);
     void showKnobReadoutSettings(const mixxx::knobreadout::Settings& settings);
     mixxx::knobreadout::Settings knobReadoutSettingsFromControls() const;
+
+    void createKeyMatchingGroup();
+    // Greys out what means nothing in the current state: while Highlight is
+    // Off the shifted key checkbox, checklist, bold checkbox, colour buttons
+    // and Reset; the fuzzy colours without fuzzy matching; the shifted colours
+    // without the shifted key; the other columns while Whole row is ticked.
+    void updateKeyMatchingEnabled();
+    void showKeyMatchingColor(int index, const QColor& color);
+    void showKeyMatchingSettings(const mixxx::keymatch::Settings& settings);
+    mixxx::keymatch::Settings keyMatchingSettingsFromControls() const;
 
     const UserSettingsPointer m_pConfig;
     QCheckBox* m_pKnobReadoutEnabled;
@@ -46,4 +67,16 @@ class DlgPrefDJNote : public DlgPreferencePage {
     // Set while showKnobReadoutSettings() fills the controls, so that showing
     // settings doesn't store them.
     bool m_showingKnobReadoutSettings = false;
+
+    QComboBox* m_pKeyMatchingHighlight;
+    QCheckBox* m_pKeyMatchingShiftedKey;
+    QListWidget* m_pKeyMatchingColumns;
+    QCheckBox* m_pKeyMatchingBold;
+    // One swatch button per mixxx::keymatch::ColorSlot, holding its colour in
+    // the "keyMatchColor" property, with its row label.
+    QPushButton* m_keyMatchingColorButtons[mixxx::keymatch::kColorSlotCount];
+    QLabel* m_keyMatchingColorLabels[mixxx::keymatch::kColorSlotCount];
+    QPushButton* m_pKeyMatchingResetColors;
+    // Same as m_showingKnobReadoutSettings, for the key matching group.
+    bool m_showingKeyMatchingSettings;
 };

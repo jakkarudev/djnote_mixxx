@@ -7,6 +7,7 @@
 
 #include "library/coverartcache.h"
 #include "library/dao/trackschema.h"
+#include "library/keymatch/keymatchcell.h" // DJNote
 #include "library/starrating.h"
 #include "library/tabledelegates/bpmdelegate.h"
 #include "library/tabledelegates/checkboxdelegate.h"
@@ -121,6 +122,7 @@ BaseTrackTableModel::BaseTrackTableModel(
                 this,
                 &BaseTrackTableModel::slotCoverFound);
     }
+    mixxx::keymatch::repaintOnChange(this); // DJNote
 }
 
 void BaseTrackTableModel::initTableColumnsAndHeaderProperties(
@@ -381,6 +383,16 @@ QVariant BaseTrackTableModel::data(
         bgColor.setAlphaF(static_cast<float>(m_backgroundColorOpacity));
         return QBrush(bgColor);
     } else if (role == Qt::ForegroundRole) {
+        // DJNote: key matching colour; none for missing tracks, which keep the
+        // missing colour below.
+        const QVariant keyMatchColor = mixxx::keymatch::cellData(mapColumn(index.column()),
+                role,
+                [&](ColumnCache::Column column) { return rawSiblingValue(index, column); },
+                s_bApplyPlayedTrackColor ? std::optional<QColor>(m_trackPlayedColor)
+                                         : std::nullopt);
+        if (keyMatchColor.isValid()) {
+            return keyMatchColor;
+        }
         // Custom text color for missing tracks
         // Visible in playlists, crates and Missing feature.
         // Check this first so played, missing tracks (unlikely case, but possible)
@@ -419,6 +431,13 @@ QVariant BaseTrackTableModel::data(
         if (field == ColumnCache::COLUMN_LIBRARYTABLE_COLOR) {
             return QSize(ColumnCache::defaultColumnWidth() / 2, 0);
         }
+    }
+
+    // DJNote: key matching font.
+    if (role == Qt::FontRole) {
+        return mixxx::keymatch::cellData(mapColumn(index.column()),
+                role,
+                [&](ColumnCache::Column column) { return rawSiblingValue(index, column); });
     }
 
     // Only retrieve a value for supported roles
