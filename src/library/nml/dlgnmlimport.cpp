@@ -22,7 +22,7 @@ QString DlgNmlImport::statusText(NmlTrackStatus status) {
     case NmlTrackStatus::NotFound:
         break;
     }
-    return tr("not found");
+    return tr("missing");
 }
 
 DlgNmlImport::DlgNmlImport(

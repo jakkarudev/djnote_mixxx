@@ -2,6 +2,8 @@
 
 #include <QDir>
 #include <QFileInfo>
+#include <QSqlDatabase>
+#include <QSqlQuery>
 
 #include "library/dao/playlistdao.h"
 #include "library/trackcollection.h"
@@ -11,6 +13,41 @@
 
 namespace mixxx {
 namespace nml {
+
+namespace {
+
+// DJNote: flags the library row of `pTrack` as missing (track_locations.fs_deleted)
+// and gives it its NML title/artist; a file that is not there can't be read.
+bool addMissingTrack(TrackCollectionManager* pManager,
+        const NmlPlanTrack& item,
+        TrackId* pId) {
+    if (item.recordedPath.isEmpty()) {
+        return false;
+    }
+    bool alreadyInLibrary = false;
+    const TrackPointer pTrack = pManager->getOrAddTrack(
+            TrackRef::fromFilePath(item.recordedPath), &alreadyInLibrary);
+    if (!pTrack || !pTrack->getId().isValid()) {
+        return false;
+    }
+    if (!alreadyInLibrary) {
+        if (!item.title.isEmpty()) {
+            pTrack->setTitle(item.title);
+        }
+        if (!item.artist.isEmpty()) {
+            pTrack->setArtist(item.artist);
+        }
+    }
+    *pId = pTrack->getId();
+    QSqlQuery query(pManager->internalCollection()->database());
+    query.prepare(QStringLiteral(
+            "UPDATE track_locations SET fs_deleted=1 WHERE id="
+            "(SELECT location FROM library WHERE id=:id)"));
+    query.bindValue(QStringLiteral(":id"), pTrack->getId().toVariant());
+    return query.exec();
+}
+
+} // namespace
 
 QString nextFreePlaylistName(const PlaylistDAO& dao, const QString& base) {
     QString name = base;
@@ -58,6 +95,7 @@ NmlImportPlan planNmlImport(const QString& nmlPath,
             recordedPath = fromTraktorSeparators(key);
             fileName = QFileInfo(recordedPath).fileName();
         }
+        track.recordedPath = recordedPath;
         if (!recordedPath.isEmpty() && QFileInfo::exists(recordedPath)) {
             track.status = NmlTrackStatus::Found;
             track.resolvedPath = recordedPath;
@@ -98,7 +136,13 @@ NmlImportResult applyNmlImport(const NmlImportPlan& plan,
                 ? item.primaryKey
                 : (item.artist.isEmpty() ? item.title : item.artist + QStringLiteral(" - ") + item.title);
         if (item.status == NmlTrackStatus::NotFound) {
-            result.skipped.append(label);
+            TrackId missingId;
+            if (addMissingTrack(pTrackCollectionManager, item, &missingId)) {
+                result.missingTracks.append(label);
+                ids.append(missingId);
+            } else {
+                result.skipped.append(label);
+            }
             continue;
         }
         bool alreadyInLibrary = false;
