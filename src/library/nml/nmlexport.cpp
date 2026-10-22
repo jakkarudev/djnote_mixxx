@@ -10,6 +10,7 @@
 #include <QStandardPaths>
 
 #include "library/nml/nmlexportpreparation.h"
+#include "library/nml/nmllabel.h"
 #include "library/nml/nmlsupport.h"
 #include "library/trackcollection.h"
 #include "library/trackcollectionmanager.h"
@@ -109,6 +110,15 @@ QString nmlExportSummary(const NmlExportResult& result) {
 }
 
 namespace {
+// Traktor writes ALBUM@TRACK / OF_TRACKS as plain integers ("1", not "01");
+// text that is not a number is dropped.
+QString nmlTrackNumberText(const QString& text) {
+    bool ok = false;
+    const int number = text.section(QLatin1Char('/'), 0, 0).trimmed().toInt(&ok);
+    return (ok && number > 0) ? QString::number(number) : QString();
+}
+} // namespace
+
 // this is the one place that turns a Track into an NmlWriteEntry. Add
 // the preparation here (bpm/cues/key/colour/rating/locked); the writer and
 // the worker need no change.
@@ -118,7 +128,9 @@ NmlWriteEntry nmlWriteEntryFromTrack(const Track& track) {
     entry.title = track.getTitle();
     entry.artist = track.getArtist();
     entry.album = track.getAlbum();
-    entry.trackNumber = track.getTrackNumber();
+    entry.trackNumber = nmlTrackNumberText(track.getTrackNumber());
+    entry.trackTotal = nmlTrackNumberText(track.getTrackTotal());
+    entry.label = nmlRecordLabelFromFile(entry.path);
     entry.genre = track.getGenre();
     entry.comment = track.getComment();
     entry.releaseDate = track.getYear();
@@ -127,7 +139,6 @@ NmlWriteEntry nmlWriteEntryFromTrack(const Track& track) {
     fillNmlPreparation(&entry, track); // DJNote
     return entry;
 }
-} // namespace
 
 QList<NmlWriteEntry> nmlExportItemsForPlaylist(
         TrackCollectionManager* pTrackCollectionManager, int playlistId) {

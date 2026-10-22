@@ -1005,6 +1005,7 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/library/nml/nmlfindmissing.cpp
   src/library/nml/nmlfindmissingpanel.cpp
   src/library/nml/nmlimport.cpp
+  src/library/nml/nmllabel.cpp
   src/library/nml/nmlkeepreplace.cpp
   src/library/nml/nmlkeepreplacepanel.cpp
   src/library/nml/nmlimportflow.cpp
