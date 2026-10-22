@@ -64,6 +64,8 @@ struct Settings {
     }
     // Coloured cells are bold.
     bool boldMatchedText = true;
+    // Also match the shifted key of the reference deck (purple).
+    bool matchShiftedKey = true;
 };
 
 // Missing keys fall back to the defaults above.

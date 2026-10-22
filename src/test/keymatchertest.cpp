@@ -97,6 +97,22 @@ class KeyMatcherTest : public MixxxTest {
         matcher().reloadSettings();
     }
 
+    void setMatchShiftedKey(bool match) {
+        mixxx::keymatch::Settings settings = mixxx::keymatch::loadSettings(config());
+        settings.matchShiftedKey = match;
+        mixxx::keymatch::saveSettings(config(), settings);
+        matcher().reloadSettings();
+    }
+
+    // 8A stored, played two semitones up: shifted key B minor (10A).
+    void playLeaderShiftedUp() {
+        deck(1).setStoredKey(camelot(8, false));
+        deck(1).setShiftedKey(KeyUtils::tonicToKey(
+                (KeyUtils::keyToTonic(camelot(8, false)) + 2) % 12, false));
+        deck(1).syncLeader.set(2);
+        deck(1).play.set(1);
+    }
+
     // PlayerInfo reports the loudest playing deck from a 2 s timer; the
     // matcher listens to its signal (0-based deck index, -1 for none).
     void loudestDeckIs(int deckNumber) {
@@ -270,6 +286,33 @@ TEST_F(KeyMatcherTest, StrictOnlyDropsFuzzyTiers) {
     EXPECT_EQ(KeyMatchTier::ShiftedStrict, matcher().match(camelot(11, false)));
     EXPECT_EQ(KeyMatchTier::None, matcher().match(camelot(10, false)));
     EXPECT_EQ(KeyMatchTier::None, matcher().match(camelot(12, false)));
+}
+
+TEST_F(KeyMatcherTest, ShiftedKeyMatchingIsOnByDefault) {
+    EXPECT_TRUE(matcher().settings().matchShiftedKey);
+}
+
+TEST_F(KeyMatcherTest, ShiftedKeyMatchingOffDropsOnlyShiftedTiers) {
+    playLeaderShiftedUp();
+    setMatchShiftedKey(false);
+    EXPECT_EQ(KeyMatchTier::None, matcher().match(camelot(11, false)));
+    EXPECT_EQ(KeyMatchTier::None, matcher().match(camelot(12, false)));
+    EXPECT_EQ(KeyMatchTier::Strict, matcher().match(camelot(9, false)));
+    EXPECT_EQ(KeyMatchTier::Fuzzy, matcher().match(camelot(10, false)));
+}
+
+TEST_F(KeyMatcherTest, HighlightOffDropsShiftedMatchesToo) {
+    playLeaderShiftedUp();
+    setHighlight(Highlight::Off);
+    EXPECT_EQ(KeyMatchTier::None, matcher().match(camelot(11, false)));
+    EXPECT_EQ(KeyMatchTier::None, matcher().match(camelot(9, false)));
+}
+
+TEST_F(KeyMatcherTest, SignalsWhenShiftedKeyMatchingChanges) {
+    playLeaderShiftedUp();
+    QSignalSpy spy(&matcher(), &KeyMatcher::changed);
+    setMatchShiftedKey(false);
+    EXPECT_GE(spy.count(), 1);
 }
 
 TEST_F(KeyMatcherTest, HighlightOffMatchesNothing) {
