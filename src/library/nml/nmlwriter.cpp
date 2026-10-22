@@ -149,6 +149,7 @@ QByteArray writeNml(const NmlWriteDocument& doc) {
 
         if (!e.album.isEmpty() || !e.trackNumber.isEmpty()) {
             out += QStringLiteral("<ALBUM");
+            attr(&out, "OF_TRACKS", e.trackTotal);
             attr(&out, "TRACK", e.trackNumber);
             attr(&out, "TITLE", e.album);
             out += QStringLiteral("></ALBUM>\n");
@@ -184,7 +185,9 @@ QByteArray writeNml(const NmlWriteDocument& doc) {
             attr(&out, "LAST_PLAYED", dateText(e.lastPlayed));
         }
         attr(&out, "RELEASE_DATE", nmlReleaseDate(e.releaseDate));
-        attr(&out, "FLAGS", QStringLiteral("12"));
+        // Traktor sets bit 0x10 together with LOCK (25 of 26 locked entries of
+        // its collection have it, no unlocked one).
+        attr(&out, "FLAGS", QString::fromLatin1(e.locked ? "28" : "12"));
         out += QStringLiteral("></INFO>\n");
 
         if (e.bpm) {

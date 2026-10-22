@@ -2,8 +2,11 @@
 
 #include <QDir>
 #include <QTemporaryDir>
+#include <taglib/fileref.h>
+#include <taglib/tpropertymap.h>
 
 #include "library/dao/playlistdao.h"
+#include "library/nml/nmlconstants.h"
 #include "library/nml/nmldocument.h"
 #include "library/nml/nmlexport.h"
 #include "library/nml/nmlexportpreparation.h"
@@ -69,12 +72,53 @@ class NmlExportPreparationTest : public LibraryTest {
         return entry;
     }
 
+    // Saves the track and reads it back from the database, as the app does
+    // before an export: the grid then holds integer-frame beat positions.
+    TrackPointer reload(TrackPointer pTrack) {
+        const TrackId id = pTrack->getId();
+        EXPECT_NE(TrackCollectionManager::SaveTrackResult::Failed,
+                trackCollectionManager()->saveTrack(pTrack));
+        pTrack.reset();
+        const TrackPointer reloaded = trackCollectionManager()->getTrackById(id);
+        EXPECT_TRUE(reloaded);
+        return reloaded;
+    }
+
+    // The grid the import would build from these markers.
+    static BeatsPointer importedGrid(const TrackPointer& pTrack,
+            const QList<NmlCue>& gridCues,
+            double trackEndMillis) {
+        NmlEntry entry;
+        entry.cues = gridCues;
+        entry.bpm = gridCues.first().gridBpm;
+        const NmlPositionConverter converter(
+                audio::SignalInfo(audio::ChannelCount(2), pTrack->getSampleRate()),
+                0.0,
+                trackEndMillis);
+        return beatsFromNmlEntry(entry, converter);
+    }
+
+    static NmlCue gridCue(double startMillis, double bpm) {
+        NmlCue cue;
+        cue.type = NmlCueType::Grid;
+        cue.name = QStringLiteral("Beat Marker");
+        cue.startMillis = startMillis;
+        cue.gridBpm = bpm;
+        return cue;
+    }
+
     static audio::FramePos frameAtMillis(const TrackPointer& pTrack, double millis) {
         return audio::FramePos(pTrack->getSampleRate() * millis / 1000.0).toLowerFrameBoundary();
     }
 
     QTemporaryDir m_dir;
 };
+
+const QList<double> kConnectedStarts = {
+        53.759780, 28082.122397, 44083.673033, 79119.455225, 95119.904427, 129718.069594};
+const QList<double> kConnectedBpms = {
+        137.004074, 119.988373, 137.002792, 119.996628, 137.001480, 136.971420};
+constexpr double kConnectedMillis = 137116.73;
 
 } // namespace
 
@@ -102,18 +146,18 @@ TEST(NmlExportMappingTest, RankingIs51PerStar) {
     EXPECT_EQ(255, nmlRankingFromStars(5));
 }
 
-TEST_F(NmlExportPreparationTest, ConstantGridExportsOneMarkerAtTheFirstBeat) {
+TEST_F(NmlExportPreparationTest, ConstantGridExportsOneMarkerAtTheStoredAnchor) {
     const TrackPointer pTrack = newTrack(QStringLiteral("cover-test.flac"));
     const audio::SampleRate sr = pTrack->getSampleRate();
-    pTrack->trySetBeats(Beats::fromConstTempo(sr, audio::FramePos(sr * 0.5), Bpm(128.0)));
+    pTrack->trySetBeats(Beats::fromConstTempo(sr, audio::FramePos(sr * 0.5), Bpm(128.0), kBeatsSubVersion));
 
     const NmlWriteEntry entry = exportEntry(pTrack);
     const QList<NmlCue> grid = cuesOfType(entry.cues, NmlCueType::Grid);
     ASSERT_EQ(1, grid.size());
     EXPECT_EQ(-1, grid.first().hotcue);
-    // The marker sits on the track's first beat (a constant grid extends
-    // backwards: 500 ms at 128 BPM is also 500 - 468.75 = 31.25 ms).
-    EXPECT_NEAR(31.25, grid.first().startMillis, kFrameToleranceMillis);
+    // The marker stays on the stored anchor, Traktor's downbeat, not on the
+    // first beat of the track (31.25 ms): that would shift the bar phase.
+    EXPECT_NEAR(500.0, grid.first().startMillis, kFrameToleranceMillis);
     ASSERT_TRUE(grid.first().gridBpm.has_value());
     EXPECT_NEAR(128.0, *grid.first().gridBpm, 1e-6);
     ASSERT_TRUE(entry.bpm.has_value());
@@ -128,7 +172,7 @@ TEST_F(NmlExportPreparationTest, ThreeSectionGridExportsThreeMarkersWithTheirBpm
             BeatMarker(frameAtMillis(pTrack, 1000.0), 8),
             BeatMarker(frameAtMillis(pTrack, 5000.0), 10)};
     pTrack->trySetBeats(Beats::fromBeatMarkers(
-            sr, markers, frameAtMillis(pTrack, 9000.0), Bpm(90.0)));
+            sr, markers, frameAtMillis(pTrack, 9000.0), Bpm(90.0), kBeatsSubVersion));
 
     const NmlWriteEntry entry = exportEntry(pTrack);
     const QList<NmlCue> grid = cuesOfType(entry.cues, NmlCueType::Grid);
@@ -157,7 +201,7 @@ TEST_F(NmlExportPreparationTest, TrailingSameTempoMarkerIsNotAnExtraNmlMarker) {
             BeatMarker(frameAtMillis(pTrack, 5000.0), 10),
             BeatMarker(frameAtMillis(pTrack, 9000.0), 8)};
     pTrack->trySetBeats(Beats::fromBeatMarkers(
-            sr, markers, frameAtMillis(pTrack, 14333.333), Bpm(90.0)));
+            sr, markers, frameAtMillis(pTrack, 14333.333), Bpm(90.0), kBeatsSubVersion));
 
     const QList<NmlCue> grid = cuesOfType(exportEntry(pTrack).cues, NmlCueType::Grid);
     ASSERT_EQ(3, grid.size());
@@ -171,7 +215,7 @@ TEST_F(NmlExportPreparationTest, KeyIsWrittenAsMusicalKeyAndKeyText) {
     NmlWriteEntry entry = exportEntry(pTrack);
     ASSERT_TRUE(entry.musicalKey.has_value());
     EXPECT_EQ(18, *entry.musicalKey);
-    EXPECT_EQ(KeyUtils::keyToString(track::io::key::F_SHARP_MINOR), entry.keyText);
+    EXPECT_EQ(QStringLiteral("4m"), entry.keyText); // Open Key, whatever the notation setting
 
     pTrack->setKey(track::io::key::C_MAJOR, track::io::key::USER);
     entry = exportEntry(pTrack);
@@ -307,3 +351,222 @@ TEST(NmlExportPreparationWriterTest, InfoAttributesFollowTraktor402Order) {
             << text.toStdString();
 }
 
+
+// BUG 1/2 of the Traktor audit: real values of Connected (6 markers, the last
+// two differ by only 0.03 BPM) and Kene (two long sections).
+TEST_F(NmlExportPreparationTest, ConnectedKeepsAllSixMarkersAfterDatabaseReload) {
+    TrackPointer pTrack = newTrack(QStringLiteral("cover-test.flac"));
+    QList<NmlCue> source;
+    for (int i = 0; i < kConnectedStarts.size(); ++i) {
+        source.append(gridCue(kConnectedStarts[i], kConnectedBpms[i]));
+    }
+    ASSERT_TRUE(pTrack->trySetBeats(importedGrid(pTrack, source, kConnectedMillis)));
+    pTrack = reload(pTrack);
+
+    const NmlWriteEntry entry = exportEntry(pTrack);
+    const QList<NmlCue> grid = cuesOfType(entry.cues, NmlCueType::Grid);
+    ASSERT_EQ(6, grid.size());
+    for (int i = 0; i < 6; ++i) {
+        EXPECT_NEAR(kConnectedStarts[i], grid[i].startMillis, 0.03) << i;
+        EXPECT_NEAR(kConnectedBpms[i], *grid[i].gridBpm, 0.01) << i;
+    }
+    ASSERT_TRUE(entry.bpm.has_value());
+    EXPECT_DOUBLE_EQ(*grid.first().gridBpm, *entry.bpm);
+}
+
+TEST_F(NmlExportPreparationTest, KeneSectionBpmComesFromTheWholeSection) {
+    TrackPointer pTrack = newTrack(QStringLiteral("cover-test.flac"));
+    const QList<NmlCue> source = {gridCue(786.513182, 151.916626), gridCue(195103.624993, 151.999603)};
+    ASSERT_TRUE(pTrack->trySetBeats(importedGrid(pTrack, source, 412354.462)));
+    pTrack = reload(pTrack);
+
+    const QList<NmlCue> grid = cuesOfType(exportEntry(pTrack).cues, NmlCueType::Grid);
+    ASSERT_EQ(2, grid.size());
+    // One frame-rounded beat would give 152.0078 (60 * 44100 / 17407).
+    EXPECT_NEAR(151.916626, *grid[0].gridBpm, 0.002);
+    EXPECT_NEAR(151.999603, *grid[1].gridBpm, 0.002);
+}
+
+TEST_F(NmlExportPreparationTest, SecondRoundTripDoesNotDrift) {
+    TrackPointer pTrack = newTrack(QStringLiteral("cover-test.flac"));
+    QList<NmlCue> source;
+    for (int i = 0; i < kConnectedStarts.size(); ++i) {
+        source.append(gridCue(kConnectedStarts[i], kConnectedBpms[i]));
+    }
+    ASSERT_TRUE(pTrack->trySetBeats(importedGrid(pTrack, source, kConnectedMillis)));
+    pTrack = reload(pTrack);
+    const BeatsPointer original = pTrack->getBeats();
+    const QList<NmlCue> first = cuesOfType(exportEntry(pTrack).cues, NmlCueType::Grid);
+
+    ASSERT_TRUE(pTrack->trySetBeats(importedGrid(pTrack, first, kConnectedMillis)));
+    pTrack = reload(pTrack);
+    const QList<NmlCue> second = cuesOfType(exportEntry(pTrack).cues, NmlCueType::Grid);
+    ASSERT_EQ(first.size(), second.size());
+    for (int i = 0; i < first.size(); ++i) {
+        EXPECT_NEAR(first[i].startMillis, second[i].startMillis, 0.03) << i;
+        EXPECT_NEAR(*first[i].gridBpm, *second[i].gridBpm, 0.0005) << i;
+    }
+    // Every beat over the whole track, up to the last marker.
+    const BeatsPointer again = pTrack->getBeats();
+    audio::FramePos pos = original->findNextBeat(audio::FramePos(0));
+    const audio::FramePos end = original->getLastMarkerPosition();
+    int compared = 0;
+    while (pos.isValid() && pos <= end) {
+        EXPECT_LE(std::abs(again->findClosestBeat(pos).value() - pos.value()), 2.0) << compared;
+        pos = original->findNextBeat(pos + audio::FrameDiff_t(1.0));
+        ++compared;
+    }
+    EXPECT_GT(compared, 300);
+}
+
+// BUG 3: Traktor's marker is beat 1 of the bar. Subtil Alchemy: the marker is
+// 3 beats after the first beat of the track.
+TEST_F(NmlExportPreparationTest, ConstantGridKeepsTraktorsAnchorAndBarPhase) {
+    TrackPointer pTrack = newTrack(QStringLiteral("cover-test.flac"));
+    const audio::SampleRate sr = pTrack->getSampleRate();
+    pTrack->trySetBeats(Beats::fromConstTempo(
+            sr, frameAtMillis(pTrack, 1373.474360), Bpm(152.000015), kBeatsSubVersion));
+    pTrack = reload(pTrack);
+    const NmlWriteEntry entry = exportEntry(pTrack);
+    const QList<NmlCue> grid = cuesOfType(entry.cues, NmlCueType::Grid);
+    ASSERT_EQ(1, grid.size());
+    EXPECT_NEAR(1373.474360, grid.first().startMillis, 0.03);
+    EXPECT_NEAR(152.000015, *entry.bpm, 1e-4);
+}
+
+TEST_F(NmlExportPreparationTest, ConstantGridBeforeTheStartMovesByWholeBars) {
+    const TrackPointer pTrack = newTrack(QStringLiteral("cover-test.flac"));
+    // 120 BPM: a beat is 500 ms, a bar 2000 ms. Anchor at -100 ms.
+    pTrack->trySetBeats(Beats::fromConstTempo(pTrack->getSampleRate(),
+            audio::FramePos(-0.1 * pTrack->getSampleRate()),
+            Bpm(120.0),
+            kBeatsSubVersion));
+    const QList<NmlCue> grid = cuesOfType(exportEntry(pTrack).cues, NmlCueType::Grid);
+    ASSERT_EQ(1, grid.size());
+    EXPECT_NEAR(1900.0, grid.first().startMillis, kFrameToleranceMillis);
+}
+
+TEST_F(NmlExportPreparationTest, GridMarkerComesBeforeAHotcueAtTheSameStart) {
+    const TrackPointer pTrack = newTrack(QStringLiteral("cover-test.flac"));
+    const audio::FramePos anchor = frameAtMillis(pTrack, 1836.328431);
+    pTrack->trySetBeats(Beats::fromConstTempo(
+            pTrack->getSampleRate(), anchor, Bpm(136.0), kBeatsSubVersion));
+    pTrack->createAndAddCue(CueType::HotCue, 1, anchor, audio::kInvalidFramePos, RgbColor(0xFFFFFF));
+    pTrack->createAndAddCue(CueType::HotCue, 0, frameAtMillis(pTrack, 71.6), audio::kInvalidFramePos, RgbColor(0xFFFFFF));
+    const QList<NmlCue> cues = exportEntry(pTrack).cues;
+    ASSERT_EQ(3, cues.size());
+    EXPECT_EQ(0, cues[0].hotcue);
+    EXPECT_EQ(NmlCueType::Grid, cues[1].type);
+    EXPECT_EQ(1, cues[2].hotcue);
+}
+
+// Grids nobody prepared.
+TEST_F(NmlExportPreparationTest, GridFromFileTagsIsNotExportedAsTraktorGrid) {
+    const TrackPointer pTrack = newTrack(QStringLiteral("cover-test.flac"));
+    // Ren - Meaning: Mixxx built this grid from the BPM tag (no sub-version).
+    pTrack->trySetBeats(Beats::fromConstTempo(
+            pTrack->getSampleRate(), audio::FramePos(0), Bpm(105.47)));
+    const NmlWriteEntry entry = exportEntry(pTrack);
+    EXPECT_TRUE(cuesOfType(entry.cues, NmlCueType::Grid).isEmpty());
+    // Like Traktor for tracks without a grid: TEMPO only.
+    ASSERT_TRUE(entry.bpm.has_value());
+    EXPECT_NEAR(105.47, *entry.bpm, 1e-3);
+}
+
+TEST_F(NmlExportPreparationTest, LockedTagGridIsStillExported) {
+    const TrackPointer pTrack = newTrack(QStringLiteral("cover-test.flac"));
+    pTrack->trySetBeats(Beats::fromConstTempo(
+            pTrack->getSampleRate(), audio::FramePos(0), Bpm(105.0)));
+    pTrack->setBpmLocked(true);
+    EXPECT_EQ(1, cuesOfType(exportEntry(pTrack).cues, NmlCueType::Grid).size());
+}
+
+// The colour DJNote gives cues imported without one is not written.
+TEST_F(NmlExportPreparationTest, DefaultCueColourIsOmittedAndRealColoursAreKept) {
+    const TrackPointer pTrack = newTrack(QStringLiteral("cover-test.flac"));
+    pTrack->createAndAddCue(CueType::HotCue, 0, frameAtMillis(pTrack, 1000), audio::kInvalidFramePos,
+            PredefinedColorPalettes::kDefaultCueColor);
+    pTrack->createAndAddCue(CueType::HotCue, 1, frameAtMillis(pTrack, 2000), audio::kInvalidFramePos,
+            RgbColor(0xFFFFFF));
+    const QList<NmlCue> cues = exportEntry(pTrack).cues;
+    ASSERT_EQ(2, cues.size());
+    EXPECT_FALSE(cues[0].color.has_value());
+    ASSERT_TRUE(cues[1].color.has_value());
+    EXPECT_EQ(0xFFFFFF, *cues[1].color);
+}
+
+// Traktor's own key text is Open Key, whatever the DJ's notation.
+TEST_F(NmlExportPreparationTest, KeyTextIsOpenKey) {
+    const TrackPointer pTrack = newTrack(QStringLiteral("cover-test.flac"));
+    pTrack->setKey(track::io::key::G_SHARP_MINOR, track::io::key::USER);
+    EXPECT_EQ(QStringLiteral("6m"), exportEntry(pTrack).keyText);
+    EXPECT_EQ(20, exportEntry(pTrack).musicalKey);
+    pTrack->setKey(track::io::key::D_MAJOR, track::io::key::USER);
+    EXPECT_EQ(QStringLiteral("3d"), exportEntry(pTrack).keyText);
+}
+
+TEST_F(NmlExportPreparationTest, EntryCarriesLabelAndIntegerTrackNumbers) {
+    // Mixxx does not model the record label in this build: it is read from
+    // the file's tag (ID3v2 TPUB here).
+    const QString path = nmltest::copyAudio(
+            getTestDir(), QStringLiteral("cover-test-vbr.mp3"), QDir(m_dir.path()));
+    {
+        const std::wstring native = QDir::toNativeSeparators(path).toStdWString();
+        TagLib::FileRef file(native.c_str());
+        ASSERT_FALSE(file.isNull());
+        TagLib::PropertyMap properties = file.file()->properties();
+        properties.replace("LABEL", TagLib::String("Native Instruments"));
+        file.file()->setProperties(properties);
+        ASSERT_TRUE(file.save());
+    }
+    const TrackPointer pTrack = getOrAddTrackByLocation(path);
+    ASSERT_TRUE(pTrack);
+    pTrack->setTrackNumber(QStringLiteral("01"));
+    pTrack->setTrackTotal(QStringLiteral("10"));
+    const NmlWriteEntry entry = nmlWriteEntryFromTrack(*pTrack);
+    EXPECT_EQ(QStringLiteral("Native Instruments"), entry.label);
+    EXPECT_EQ(QStringLiteral("1"), entry.trackNumber);
+    EXPECT_EQ(QStringLiteral("10"), entry.trackTotal);
+}
+
+TEST(NmlExportPreparationWriterTest, LockSetsTraktorsLockBitInFlags) {
+    NmlWriteEntry e;
+    e.path = QStringLiteral("C:/a/x.mp3");
+    e.title = QStringLiteral("X");
+    e.album = QStringLiteral("A");
+    e.trackNumber = QStringLiteral("1");
+    e.trackTotal = QStringLiteral("10");
+    NmlWriteDocument doc;
+    doc.entries = {e};
+    doc.playlistOrder = {0};
+    doc.exportTimeUtc = exportTime();
+    QString text = QString::fromUtf8(writeNml(doc));
+    EXPECT_TRUE(text.contains(QStringLiteral("FLAGS=\"12\"")));
+    EXPECT_TRUE(text.contains(QStringLiteral("<ALBUM OF_TRACKS=\"10\" TRACK=\"1\" TITLE=\"A\">")))
+            << text.toStdString();
+    doc.entries[0].locked = true;
+    text = QString::fromUtf8(writeNml(doc));
+    EXPECT_TRUE(text.contains(QStringLiteral("LOCK=\"1\"")));
+    EXPECT_TRUE(text.contains(QStringLiteral("FLAGS=\"28\"")));
+}
+
+TEST(NmlExportPreparationWriterTest, CueWithoutColourHasNoColorAttribute) {
+    NmlWriteEntry e;
+    e.path = QStringLiteral("C:/a/x.mp3");
+    e.title = QStringLiteral("X");
+    NmlCue plain;
+    plain.type = NmlCueType::Cue;
+    plain.name = QStringLiteral("n.n.");
+    plain.hotcue = 0;
+    NmlCue white = plain;
+    white.hotcue = 1;
+    white.color = 0xFFFFFF;
+    e.cues = {plain, white};
+    NmlWriteDocument doc;
+    doc.entries = {e};
+    doc.playlistOrder = {0};
+    doc.exportTimeUtc = exportTime();
+    const QString text = QString::fromUtf8(writeNml(doc));
+    EXPECT_EQ(1, text.count(QStringLiteral("COLOR=\"#")));
+    EXPECT_TRUE(text.contains(QStringLiteral("COLOR=\"#FFFFFF\"")));
+}

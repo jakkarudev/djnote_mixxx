@@ -30,9 +30,16 @@ std::optional<int> nmlColorIndexFromTrackColor(const RgbColor::optional_t& color
 /// RANKING for a 0-5 star rating (51 per star); nullopt for no rating.
 std::optional<int> nmlRankingFromStars(int stars);
 
-/// One Grid marker per tempo section, ascending. A constant grid gives one
-/// marker at the first beat. Every marker is on HOTCUE -1 with its own BPM.
+/// One Grid marker per tempo section, ascending, each on HOTCUE -1 with the
+/// BPM of its whole section (total beats over total frames). A constant grid
+/// gives one marker at its stored anchor (Traktor's downbeat), moved by whole
+/// bars only when the anchor is before the start of the track.
 QList<NmlCue> nmlGridCuesFromBeats(const Beats& beats, const NmlPositionConverter& converter);
+
+/// Whether the grid is the DJ's work (analysed, imported or BPM-locked) and so
+/// worth writing as Traktor grid markers; a grid built from the file's BPM
+/// tag is not.
+bool nmlGridIsPrepared(const Track& track);
 
 /// Grid markers, hotcues (buttons 1-8 on their button, the rest buttonless),
 /// loops, Load, Fade-In and Fade-Out of the track, in ascending START order.

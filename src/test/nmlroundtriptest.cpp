@@ -5,6 +5,7 @@
 #include <cmath>
 
 #include "library/dao/playlistdao.h"
+#include "library/nml/nmlconstants.h"
 #include "library/nml/nmlcues.h"
 #include "library/nml/nmldocument.h"
 #include "library/nml/nmlexport.h"
@@ -204,7 +205,7 @@ TEST_F(NmlRoundTripTest, Mp3WithDecoderDelayComesBackIdentical) {
 TEST_F(NmlRoundTripTest, ConstantGridComesBackWithOneMarker) {
     const TrackPointer pTrack = addTrack(QStringLiteral("cover-test.ogg"));
     pTrack->trySetBeats(Beats::fromConstTempo(
-            pTrack->getSampleRate(), frameAtMillis(pTrack, 300), Bpm(128.0)));
+            pTrack->getSampleRate(), frameAtMillis(pTrack, 300), Bpm(128.0), kBeatsSubVersion));
     const QList<TrackPointer> back = roundTrip({pTrack});
     ASSERT_EQ(1, back.size());
     ASSERT_TRUE(back.first());
@@ -226,7 +227,7 @@ TEST_F(NmlRoundTripTest, DecoderDelayIsSubtractedOnExportAndAddedBackOnImport) {
             audio::kInvalidFramePos,
             RgbColor(0xFA4B35));
     pTrack->trySetBeats(Beats::fromConstTempo(
-            pTrack->getSampleRate(), frameAtMillis(pTrack, 500), Bpm(125.0)));
+            pTrack->getSampleRate(), frameAtMillis(pTrack, 500), Bpm(125.0), kBeatsSubVersion));
 
     NmlWriteEntry written;
     fillNmlPreparation(&written, *pTrack, converter);

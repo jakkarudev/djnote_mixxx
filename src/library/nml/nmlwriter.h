@@ -30,6 +30,7 @@ struct NmlWriteEntry {
     QString artist;
     QString album;
     QString trackNumber; // ALBUM@TRACK, empty: omitted
+    QString trackTotal;  // ALBUM@OF_TRACKS, empty: omitted
     QString genre;
     QString comment;
     QString label;

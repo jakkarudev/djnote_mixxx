@@ -9,6 +9,7 @@
 
 #include "library/nml/nmlwriter.h"
 
+class Track;
 class TrackCollectionManager;
 
 // DJNote: GUI-free NML export.
@@ -60,6 +61,9 @@ QString nmlNumberedFileName(const QString& fileName, int n);
 
 /// Human-readable summary of an export.
 QString nmlExportSummary(const NmlExportResult& result);
+
+/// The one place that turns a Track into an NmlWriteEntry (tags and preparation).
+NmlWriteEntry nmlWriteEntryFromTrack(const Track& track);
 
 /// Playlist `playlistId` as write entries (playlist order, repeats kept).
 /// Each entry carries the preparation (grid, cues, key, colour, rating,
