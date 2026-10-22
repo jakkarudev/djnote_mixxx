@@ -139,6 +139,10 @@ class KeyMatchCellTest : public LibraryTest {
     void setHighlight(Highlight highlight) {
         mixxx::keymatch::Settings settings;
         settings.highlight = highlight;
+        storeSettings(settings);
+    }
+
+    void storeSettings(const mixxx::keymatch::Settings& settings) {
         mixxx::keymatch::saveSettings(config(), settings);
         m_pMatcher->reloadSettings();
     }
@@ -266,5 +270,61 @@ TEST_F(KeyMatchCellTest, ChangingTheSettingRepaints) {
     trackKeyIs(QStringLiteral("8A"));
     QSignalSpy repainted(m_pModel.get(), &QAbstractItemModel::dataChanged);
     setHighlight(Highlight::Off);
+    EXPECT_GE(repainted.count(), 1);
+}
+
+// Which columns are coloured (ticket #99).
+using mixxx::keymatch::ColumnIdentity;
+
+TEST_F(KeyMatchCellTest, TickedColumnsAreColouredAndUntickedKeepMixxxColours) {
+    referenceIs(QStringLiteral("8A"));
+    trackKeyIs(QStringLiteral("8A"));
+    mixxx::keymatch::Settings settings;
+    settings.columns = {ColumnIdentity::Title, ColumnIdentity::Bpm};
+    storeSettings(settings);
+    EXPECT_EQ(QVariant::fromValue(kGreen),
+            cell(ColumnCache::COLUMN_LIBRARYTABLE_TITLE).data(Qt::ForegroundRole));
+    EXPECT_EQ(QVariant::fromValue(kGreen),
+            cell(ColumnCache::COLUMN_LIBRARYTABLE_BPM).data(Qt::ForegroundRole));
+    EXPECT_FALSE(cell(ColumnCache::COLUMN_LIBRARYTABLE_ARTIST).data(Qt::ForegroundRole).isValid());
+    EXPECT_FALSE(keyColor().isValid());
+}
+
+TEST_F(KeyMatchCellTest, WholeRowColoursEveryTextColumnButNoOthers) {
+    referenceIs(QStringLiteral("8A"));
+    trackKeyIs(QStringLiteral("9A"));
+    mixxx::keymatch::Settings settings;
+    settings.wholeRow = true;
+    storeSettings(settings);
+    for (ColumnCache::Column column : {ColumnCache::COLUMN_LIBRARYTABLE_KEY,
+                 ColumnCache::COLUMN_LIBRARYTABLE_ARTIST,
+                 ColumnCache::COLUMN_LIBRARYTABLE_TITLE,
+                 ColumnCache::COLUMN_LIBRARYTABLE_BPM,
+                 ColumnCache::COLUMN_TRACKLOCATIONSTABLE_LOCATION}) {
+        EXPECT_EQ(QVariant::fromValue(kGreen), cell(column).data(Qt::ForegroundRole)) << column;
+    }
+    for (ColumnCache::Column column : {ColumnCache::COLUMN_LIBRARYTABLE_COVERART,
+                 ColumnCache::COLUMN_LIBRARYTABLE_COLOR,
+                 ColumnCache::COLUMN_LIBRARYTABLE_PLAYED}) {
+        EXPECT_FALSE(cell(column).data(Qt::ForegroundRole).isValid()) << column;
+    }
+}
+
+TEST_F(KeyMatchCellTest, AColumnTheListLacksIsSkipped) {
+    referenceIs(QStringLiteral("8A"));
+    trackKeyIs(QStringLiteral("8A"));
+    mixxx::keymatch::Settings settings;
+    settings.columns = {ColumnIdentity::Genre, ColumnIdentity::Key};
+    storeSettings(settings);
+    EXPECT_EQ(QVariant::fromValue(kGreen), keyColor());
+}
+
+TEST_F(KeyMatchCellTest, ChangingTheColumnsRepaints) {
+    referenceIs(QStringLiteral("8A"));
+    trackKeyIs(QStringLiteral("8A"));
+    QSignalSpy repainted(m_pModel.get(), &QAbstractItemModel::dataChanged);
+    mixxx::keymatch::Settings settings;
+    settings.wholeRow = true;
+    storeSettings(settings);
     EXPECT_GE(repainted.count(), 1);
 }

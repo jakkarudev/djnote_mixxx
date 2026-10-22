@@ -7,6 +7,7 @@
 #include <optional>
 
 #include "library/columncache.h"
+#include "library/keymatch/keymatchsettings.h"
 #include "proto/keys.pb.h"
 
 // What a track list cell looks like under key matching (GLOSSARY.md, "Key
@@ -15,14 +16,8 @@
 namespace mixxx {
 namespace keymatch {
 
-// A column's identity, shared by all track list types. Later tickets let the DJ
-// choose which identities are coloured; today only Key is.
-enum class ColumnIdentity {
-    Key,
-    // Cover, Color, Rating, Played, Preview and the like: never coloured.
-    NotColoured,
-};
-
+// The identity (see keymatchsettings.h) of a library column; NotColoured for
+// Cover, Color, Rating, Played, Preview and the like.
 ColumnIdentity columnIdentity(ColumnCache::Column column);
 
 // Everything the cell helper needs about the cell's row and column.
