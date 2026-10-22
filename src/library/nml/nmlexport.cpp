@@ -10,6 +10,7 @@
 #include <QSqlQuery>
 #include <QStandardPaths>
 
+#include "library/nml/nmlexportpreparation.h"
 #include "library/trackcollection.h"
 #include "library/trackcollectionmanager.h"
 #include "track/track.h"
@@ -127,6 +128,7 @@ NmlWriteEntry nmlWriteEntryFromTrack(const Track& track) {
     entry.releaseDate = track.getYear();
     entry.playtimeSeconds = track.getDuration();
     entry.bitrateBitsPerSecond = track.getBitrate() * 1000;
+    fillNmlPreparation(&entry, track); // DJNote #116
     return entry;
 }
 } // namespace
