@@ -19,6 +19,8 @@ enum class Highlight {
 // something, so a new setting applies live without more plumbing.
 struct Settings {
     Highlight highlight = Highlight::StrictAndFuzzy;
+    // Coloured cells are bold.
+    bool boldMatchedText = true;
 };
 
 // Missing keys fall back to the defaults above.

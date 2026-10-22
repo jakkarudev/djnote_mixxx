@@ -137,10 +137,26 @@ class KeyMatchCellTest : public LibraryTest {
     }
 
     void setHighlight(Highlight highlight) {
-        mixxx::keymatch::Settings settings;
+        mixxx::keymatch::Settings settings = mixxx::keymatch::loadSettings(config());
         settings.highlight = highlight;
         mixxx::keymatch::saveSettings(config(), settings);
         m_pMatcher->reloadSettings();
+    }
+
+    void setBoldMatchedText(bool bold) {
+        mixxx::keymatch::Settings settings = mixxx::keymatch::loadSettings(config());
+        settings.boldMatchedText = bold;
+        mixxx::keymatch::saveSettings(config(), settings);
+        m_pMatcher->reloadSettings();
+    }
+
+    QVariant fontOf(ColumnCache::Column column) const {
+        return cell(column).data(Qt::FontRole);
+    }
+
+    bool keyIsBold() const {
+        const QVariant font = fontOf(ColumnCache::COLUMN_LIBRARYTABLE_KEY);
+        return font.isValid() && font.value<QFont>().bold();
     }
 
     ControlObject m_numDecks;
@@ -267,4 +283,73 @@ TEST_F(KeyMatchCellTest, ChangingTheSettingRepaints) {
     QSignalSpy repainted(m_pModel.get(), &QAbstractItemModel::dataChanged);
     setHighlight(Highlight::Off);
     EXPECT_GE(repainted.count(), 1);
+}
+
+// Bold matched text (ticket #100).
+TEST_F(KeyMatchCellTest, MatchedKeysAreBoldInEveryTier) {
+    referenceIs(QStringLiteral("8A"));
+    for (const char* key : {"8A", "9A", "10A"}) {
+        trackKeyIs(QString::fromLatin1(key));
+        EXPECT_TRUE(keyIsBold()) << key;
+    }
+}
+
+TEST_F(KeyMatchCellTest, UnmatchedKeysAndOtherCellsKeepTheirFont) {
+    referenceIs(QStringLiteral("8A"));
+    trackKeyIs(QStringLiteral("2A"));
+    EXPECT_FALSE(fontOf(ColumnCache::COLUMN_LIBRARYTABLE_KEY).isValid());
+    trackKeyIs(QStringLiteral("8A"));
+    for (ColumnCache::Column column : {ColumnCache::COLUMN_LIBRARYTABLE_ARTIST,
+                 ColumnCache::COLUMN_LIBRARYTABLE_TITLE,
+                 ColumnCache::COLUMN_LIBRARYTABLE_BPM}) {
+        EXPECT_FALSE(fontOf(column).isValid()) << column;
+    }
+}
+
+TEST_F(KeyMatchCellTest, PlayedMatchesStayBold) {
+    referenceIs(QStringLiteral("8A"));
+    m_pTrack->updatePlayCounter(true);
+    trackKeyIs(QStringLiteral("8A"));
+    ASSERT_EQ(Qt::Checked,
+            cell(ColumnCache::COLUMN_LIBRARYTABLE_PLAYED).data(Qt::CheckStateRole).toInt());
+    EXPECT_TRUE(keyIsBold());
+}
+
+TEST_F(KeyMatchCellTest, BoldOffChangesNoFont) {
+    referenceIs(QStringLiteral("8A"));
+    trackKeyIs(QStringLiteral("8A"));
+    setBoldMatchedText(false);
+    EXPECT_FALSE(fontOf(ColumnCache::COLUMN_LIBRARYTABLE_KEY).isValid());
+    // The colour stays.
+    EXPECT_EQ(QVariant::fromValue(kGreen), keyColor());
+}
+
+TEST_F(KeyMatchCellTest, HighlightOffIsNotBoldEvenWithBoldOn) {
+    referenceIs(QStringLiteral("8A"));
+    trackKeyIs(QStringLiteral("8A"));
+    setHighlight(Highlight::Off);
+    EXPECT_FALSE(keyIsBold());
+}
+
+TEST_F(KeyMatchCellTest, ChangingBoldRepaints) {
+    referenceIs(QStringLiteral("8A"));
+    trackKeyIs(QStringLiteral("8A"));
+    QSignalSpy repainted(m_pModel.get(), &QAbstractItemModel::dataChanged);
+    setBoldMatchedText(false);
+    EXPECT_GE(repainted.count(), 1);
+}
+
+TEST_F(KeyMatchCellTest, AMissingTrackIsNeverBold) {
+    referenceIs(QStringLiteral("8A"));
+    trackKeyIs(QStringLiteral("8A"));
+    ASSERT_TRUE(keyIsBold());
+    QSqlQuery query(dbConnection());
+    ASSERT_TRUE(query.exec(QStringLiteral("UPDATE track_locations SET fs_deleted=1")));
+    m_pTrackSource->buildIndex();
+    MissingTableModel missingModel(nullptr, trackCollectionManager());
+    missingModel.select();
+    ASSERT_EQ(1, missingModel.rowCount());
+    const QModelIndex missingKey = missingModel.index(
+            0, missingModel.fieldIndex(ColumnCache::COLUMN_LIBRARYTABLE_KEY));
+    EXPECT_FALSE(missingKey.data(Qt::FontRole).isValid());
 }

@@ -68,7 +68,10 @@ CellStyle cellStyle(const CellInput& input) {
         return {};
     }
     CellStyle style;
-    style.color = colorOf(pMatcher->match(input.key));
+    const std::optional<QColor> color = colorOf(pMatcher->match(input.key));
+    style.color = color;
+    // Every coloured cell is bold, played or not.
+    style.bold = color.has_value() && pMatcher->settings().boldMatchedText;
     return style;
 }
 

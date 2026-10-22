@@ -259,6 +259,13 @@ QComboBox* highlightComboBox(DlgPrefDJNote* pPage) {
     return pComboBox;
 }
 
+QCheckBox* boldCheckBox(DlgPrefDJNote* pPage) {
+    auto* pCheckBox = pPage->findChild<QCheckBox*>(
+            QStringLiteral("keyMatchingBoldCheckBox"));
+    EXPECT_NE(nullptr, pCheckBox);
+    return pCheckBox;
+}
+
 void storeHighlight(const UserSettingsPointer& pConfig, Highlight highlight) {
     mixxx::keymatch::Settings settings;
     settings.highlight = highlight;
@@ -343,4 +350,73 @@ TEST_F(DlgPrefDJNoteTest, KeyMatchingSettingsRoundTripAndFallBack) {
     }
     config()->setValue(ConfigKey("[DJNote]", "KeyMatchingHighlight"), QStringLiteral("bogus"));
     EXPECT_EQ(Highlight::StrictAndFuzzy, mixxx::keymatch::loadSettings(config()).highlight);
+}
+
+// Bold matched text (ticket #100).
+TEST_F(DlgPrefDJNoteTest, BoldMatchedTextIsOnByDefault) {
+    auto pPage = openPage();
+    auto* pBold = boldCheckBox(pPage.get());
+    ASSERT_NE(nullptr, pBold);
+    EXPECT_EQ(QStringLiteral("Bold matched text"), pBold->text());
+    EXPECT_TRUE(pBold->isChecked());
+    EXPECT_TRUE(pBold->isEnabled());
+    EXPECT_TRUE(mixxx::keymatch::loadSettings(config()).boldMatchedText);
+}
+
+TEST_F(DlgPrefDJNoteTest, BoldMatchedTextShowsTheStoredSetting) {
+    mixxx::keymatch::Settings settings;
+    settings.boldMatchedText = false;
+    mixxx::keymatch::saveSettings(config(), settings);
+    auto pPage = openPage();
+    EXPECT_FALSE(boldCheckBox(pPage.get())->isChecked());
+}
+
+TEST_F(DlgPrefDJNoteTest, BoldMatchedTextAppliesLiveAndTellsTheMatcher) {
+    PlayerInfo::create();
+    {
+        auto pPage = openPage();
+        mixxx::keymatch::KeyMatcher matcher(config());
+        boldCheckBox(pPage.get())->setChecked(false);
+        EXPECT_FALSE(mixxx::keymatch::loadSettings(config()).boldMatchedText);
+        EXPECT_FALSE(matcher.settings().boldMatchedText);
+        boldCheckBox(pPage.get())->setChecked(true);
+        EXPECT_TRUE(matcher.settings().boldMatchedText);
+    }
+    PlayerInfo::destroy();
+}
+
+TEST_F(DlgPrefDJNoteTest, BoldMatchedTextIsGreyedOutWhenHighlightIsOff) {
+    auto pPage = openPage();
+    auto* pHighlight = highlightComboBox(pPage.get());
+    pHighlight->setCurrentIndex(pHighlight->findText(QStringLiteral("Off")));
+    EXPECT_FALSE(boldCheckBox(pPage.get())->isEnabled());
+    pHighlight->setCurrentIndex(pHighlight->findText(QStringLiteral("Strict only")));
+    EXPECT_TRUE(boldCheckBox(pPage.get())->isEnabled());
+}
+
+TEST_F(DlgPrefDJNoteTest, BoldMatchedTextStartsGreyedOutWhenStoredHighlightIsOff) {
+    storeHighlight(config(), Highlight::Off);
+    auto pPage = openPage();
+    EXPECT_FALSE(boldCheckBox(pPage.get())->isEnabled());
+}
+
+TEST_F(DlgPrefDJNoteTest, ResetRestoresBoldMatchedText) {
+    mixxx::keymatch::Settings settings;
+    settings.highlight = Highlight::Off;
+    settings.boldMatchedText = false;
+    mixxx::keymatch::saveSettings(config(), settings);
+    auto pPage = openPage();
+    pPage->slotResetToDefaults();
+    EXPECT_TRUE(boldCheckBox(pPage.get())->isChecked());
+    EXPECT_TRUE(boldCheckBox(pPage.get())->isEnabled());
+    EXPECT_TRUE(mixxx::keymatch::loadSettings(config()).boldMatchedText);
+}
+
+TEST_F(DlgPrefDJNoteTest, BoldMatchedTextSettingRoundTripsAndFallsBack) {
+    mixxx::keymatch::Settings settings;
+    settings.boldMatchedText = false;
+    mixxx::keymatch::saveSettings(config(), settings);
+    EXPECT_FALSE(mixxx::keymatch::loadSettings(config()).boldMatchedText);
+    config()->setValue(ConfigKey("[DJNote]", "KeyMatchingBold"), QStringLiteral("bogus"));
+    EXPECT_TRUE(mixxx::keymatch::loadSettings(config()).boldMatchedText);
 }

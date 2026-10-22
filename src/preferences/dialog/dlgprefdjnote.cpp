@@ -19,7 +19,8 @@ DlgPrefDJNote::DlgPrefDJNote(QWidget* pParent, UserSettingsPointer pConfig)
           m_pKnobReadoutMode(nullptr),
           m_pKnobReadoutStyleLabel(nullptr),
           m_pKnobReadoutStyle(nullptr),
-          m_pKeyMatchingHighlight(nullptr) {
+          m_pKeyMatchingHighlight(nullptr),
+          m_pKeyMatchingBold(nullptr) {
     auto* pPageLayout = new QVBoxLayout(this);
     pPageLayout->setContentsMargins(0, 0, 0, 0);
     createKnobReadoutGroup();
@@ -179,6 +180,16 @@ void DlgPrefDJNote::createKeyMatchingGroup() {
     pGrid->addWidget(m_pKeyMatchingHighlight, row, 1, Qt::AlignLeft);
     pGrid->setColumnStretch(1, 1);
 
+    // Sits under the column checklist once that exists.
+    m_pKeyMatchingBold = new QCheckBox(tr("Bold matched text"), pGroup);
+    m_pKeyMatchingBold->setObjectName(QStringLiteral("keyMatchingBoldCheckBox"));
+    m_pKeyMatchingBold->setToolTip(tr("Show the highlighted cells in bold."));
+    pGrid->addWidget(m_pKeyMatchingBold, pGrid->rowCount(), 0, 1, 2);
+    connect(m_pKeyMatchingBold,
+            &QCheckBox::toggled,
+            this,
+            &DlgPrefDJNote::slotKeyMatchingControlChanged);
+
     // Every change applies live.
     connect(m_pKeyMatchingHighlight,
             QOverload<int>::of(&QComboBox::currentIndexChanged),
@@ -192,6 +203,8 @@ void DlgPrefDJNote::slotKeyMatchingControlChanged() {
     if (m_showingKeyMatchingSettings) {
         return;
     }
+    m_pKeyMatchingBold->setEnabled(m_pKeyMatchingHighlight->currentData().toInt() !=
+            static_cast<int>(mixxx::keymatch::Highlight::Off));
     mixxx::keymatch::saveSettings(m_pConfig, keyMatchingSettingsFromControls());
     // The key matcher reloads the stored settings and repaints the track lists.
     if (auto* pMatcher = mixxx::keymatch::KeyMatcher::instance()) {
@@ -203,6 +216,8 @@ void DlgPrefDJNote::showKeyMatchingSettings(const mixxx::keymatch::Settings& set
     m_showingKeyMatchingSettings = true;
     m_pKeyMatchingHighlight->setCurrentIndex(
             m_pKeyMatchingHighlight->findData(static_cast<int>(settings.highlight)));
+    m_pKeyMatchingBold->setChecked(settings.boldMatchedText);
+    m_pKeyMatchingBold->setEnabled(settings.highlight != mixxx::keymatch::Highlight::Off);
     m_showingKeyMatchingSettings = false;
 }
 
@@ -210,5 +225,6 @@ mixxx::keymatch::Settings DlgPrefDJNote::keyMatchingSettingsFromControls() const
     mixxx::keymatch::Settings settings;
     settings.highlight = static_cast<mixxx::keymatch::Highlight>(
             m_pKeyMatchingHighlight->currentData().toInt());
+    settings.boldMatchedText = m_pKeyMatchingBold->isChecked();
     return settings;
 }
