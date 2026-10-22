@@ -55,6 +55,14 @@ QString nmlRowStatusText(const NmlPlanTrack& track) {
     return nmlStatusText(track.status);
 }
 
+QString nmlKeepRowStatusText(const NmlPlanTrack& track, bool missingInPlaylist) {
+    if (track.status == NmlTrackStatus::NotFound && !missingInPlaylist &&
+            !track.reuseTrackId.isValid()) {
+        return tr("already in playlist");
+    }
+    return nmlRowStatusText(track);
+}
+
 namespace {
 void fillPlanTracks(NmlImportPlan* pPlan, int playlistIndex) {
     NmlImportPlan& plan = *pPlan;

@@ -96,6 +96,11 @@ QString nmlStatusText(NmlTrackStatus status);
 /// The status plus the reuse wording: "reuse existing track", "kept separate: ...".
 QString nmlRowStatusText(const NmlPlanTrack& track);
 
+/// The row wording in Keep mode of the re-read: a not-found row whose Playlist
+/// entry is not missing reads "already in playlist"; everything else as
+/// nmlRowStatusText.
+QString nmlKeepRowStatusText(const NmlPlanTrack& track, bool missingInPlaylist);
+
 /// Fills existingTrack/comparison on every row of the plan (looks up the
 /// library; writes nothing). Call after planning and after the find-missing
 /// operations change rows.

@@ -42,6 +42,12 @@ NmlRereadPlan planNmlReread(int playlistId,
         TrackCollectionManager* pTrackCollectionManager,
         const QString& nmlPathOverride = QString());
 
+/// True when row `row` of the plan is a Playlist entry that is missing: its
+/// recorded path is a library track flagged missing and that track is in the
+/// Playlist. Other not-found rows are fine in the Playlist (Keep mode ignores them).
+bool nmlRereadEntryMissing(
+        const NmlRereadPlan& plan, int row, TrackCollectionManager* pTrackCollectionManager);
+
 /// Replace mode: how many tracks the re-read adds to and removes from the Playlist.
 struct NmlRereadCounts {
     int added = 0;
@@ -58,6 +64,8 @@ struct NmlRereadResult {
     QStringList relinked;       // missing tracks whose file was found (labels)
     int newLibraryTracks = 0;   // Replace: tracks new to the library
     QStringList missingTracks;  // items still missing after the re-read
+    QStringList usedExistingTracks; // found file is already a library track: the list uses that one
+    QStringList failedRelinks;  // found again but the library row could not be pointed at the file
     QStringList reusedTracks;   // Replace: copies that came in as the library track they duplicate
     int droppedCues = 0;
     int existingTracksUpdated = 0;

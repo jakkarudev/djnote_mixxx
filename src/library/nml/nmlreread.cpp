@@ -217,6 +217,19 @@ NmlRereadPlan planNmlReread(int playlistId,
     return result;
 }
 
+bool nmlRereadEntryMissing(
+        const NmlRereadPlan& plan, int row, TrackCollectionManager* pTrackCollectionManager) {
+    if (row < 0 || row >= plan.plan.tracks.size()) {
+        return false;
+    }
+    const TrackPointer pTrack = trackAtPath(pTrackCollectionManager, plan.plan.tracks.at(row).recordedPath);
+    if (!pTrack || !isFlaggedMissing(pTrackCollectionManager, pTrack->getId())) {
+        return false;
+    }
+    const QList<TrackId> ids = tracksInOrder(pTrackCollectionManager, plan.playlistId);
+    return ids.contains(pTrack->getId());
+}
+
 NmlRereadCounts nmlRereadCounts(
         const NmlRereadPlan& plan, TrackCollectionManager* pTrackCollectionManager) {
     QHash<QString, int> current;
@@ -320,10 +333,27 @@ NmlRereadResult applyNmlReread(const NmlRereadPlan& rereadPlan,
             bool relinked = false;
             bool isNew = false;
             bool reused = false;
+            bool usedExisting = false;
             TrackPointer pTrack = trackAtPath(pManager, item.resolvedPath);
             if (pTrack) {
                 if (isFlaggedMissing(pManager, pTrack->getId())) {
                     relinked = relinkLibraryTrack(pManager, pTrack->getId(), item.resolvedPath);
+                    if (!relinked) {
+                        result.failedRelinks.append(label);
+                    }
+                } else {
+                    // The found file is already a library track. A missing track
+                    // at the recorded path stands in for it in the list.
+                    const TrackPointer pOld = trackAtPath(pManager, item.recordedPath);
+                    if (pOld && pOld->getId() != pTrack->getId() &&
+                            isFlaggedMissing(pManager, pOld->getId())) {
+                        if (replace) {
+                            usedExisting = true;
+                        } else if (currentSet.contains(pOld->getId())) {
+                            swaps.insert(pOld->getId(), pTrack->getId());
+                            usedExisting = true;
+                        }
+                    }
                 }
             } else {
                 TrackPointer pMissing = trackAtPath(pManager, item.recordedPath);
@@ -335,6 +365,8 @@ NmlRereadResult applyNmlReread(const NmlRereadPlan& rereadPlan,
                     if (relinkLibraryTrack(pManager, missingId, item.resolvedPath)) {
                         relinked = true;
                         pTrack = pManager->getTrackById(missingId);
+                    } else {
+                        result.failedRelinks.append(label);
                     }
                 } else if (replace && item.reuseTrackId.isValid() && item.reuseAccepted &&
                         pManager->getTrackById(item.reuseTrackId)) {
@@ -355,7 +387,7 @@ NmlRereadResult applyNmlReread(const NmlRereadPlan& rereadPlan,
                 continue;
             }
             id = pTrack->getId();
-            if (!replace && !currentSet.contains(id)) {
+            if (!replace && !currentSet.contains(id) && !usedExisting) {
                 continue; // Keep: only tracks already in the list are looked at
             }
             if (!reused && !handled.contains(id) && pEntry) {
@@ -364,7 +396,7 @@ NmlRereadResult applyNmlReread(const NmlRereadPlan& rereadPlan,
                     applyNmlPreparation(pTrack.get(), *pEntry);
                     result.droppedCues += applyNmlCues(pTrack.get(), *pEntry);
                     applyNmlColorAndRating(pTrack.get(), *pEntry);
-                } else if (relinked || replace) {
+                } else if (relinked || replace || usedExisting) {
                     if (relinked) {
                         refreshStreamInfo(pTrack);
                     }
@@ -379,6 +411,9 @@ NmlRereadResult applyNmlReread(const NmlRereadPlan& rereadPlan,
             }
             if (relinked && !handled.contains(id)) {
                 result.relinked.append(label);
+            }
+            if (usedExisting && !handled.contains(id)) {
+                result.usedExistingTracks.append(label);
             }
         }
         handled.insert(id);
@@ -436,6 +471,19 @@ QString nmlRereadSummary(
                     .arg(QString::number(r.relinked.size()));
     if (!r.relinked.isEmpty()) {
         text += QStringLiteral("\n") + r.relinked.join(QLatin1Char('\n'));
+    }
+    if (!r.usedExistingTracks.isEmpty()) {
+        text += QStringLiteral("\n\n") +
+                tr("%1 missing tracks were found again; the file is already in the library, "
+                   "so the playlist uses the track already in the library:")
+                        .arg(QString::number(r.usedExistingTracks.size())) +
+                QStringLiteral("\n") + r.usedExistingTracks.join(QLatin1Char('\n'));
+    }
+    if (!r.failedRelinks.isEmpty()) {
+        text += QStringLiteral("\n\n") +
+                tr("%1 tracks were found again but could not be relinked:")
+                        .arg(QString::number(r.failedRelinks.size())) +
+                QStringLiteral("\n") + r.failedRelinks.join(QLatin1Char('\n'));
     }
     if (!r.reusedTracks.isEmpty()) {
         text += QStringLiteral("\n\n") +
