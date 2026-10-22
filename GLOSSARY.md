@@ -188,3 +188,7 @@ _Avoid_: deleted track, broken track, lost track
 **Source NML**:
 The `.nml` file a Playlist was imported from. DJNote remembers it so the Playlist can be re-read from it later. A Playlist made in DJNote, or duplicated from an imported one, has none.
 _Avoid_: linked NML, origin file, NML link
+
+**Grid marker**:
+A beat grid's anchor in an NML: a Traktor `TYPE="4"` cue with its BPM, one per tempo section, and beat 1 of a bar. A constant grid is exported with one marker at its stored anchor, never moved to the track's first beat, so Traktor's bars keep their phase. A flexible grid is exported with one marker per real tempo change, each with the BPM of its whole section. A grid DJNote only built from the file's BPM tag is not exported as grid markers.
+_Avoid_: AutoGrid, beat marker
