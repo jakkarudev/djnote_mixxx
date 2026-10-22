@@ -48,6 +48,13 @@ struct NmlPlanTrack {
     // is the per-part comparison of that track with the NML entry.
     bool existingTrack = false;
     NmlPreparationComparison comparison;
+    // #112 (nmlreuse.h): a found file that is a copy of a library track with
+    // identical preparation. reuseTrackId is that track; the tick box is
+    // reuseAccepted. keptSeparate: a copy of a library track whose
+    // preparation differs (listed in the summary).
+    TrackId reuseTrackId;
+    bool reuseAccepted = true;
+    bool keptSeparate = false;
 };
 
 struct NmlImportPlan {
@@ -77,6 +84,11 @@ struct NmlImportResult {
     int existingTracksUpdated = 0;
     // #109: tracks whose BPM-locked grid kept the NML's different grid out (either mode).
     QStringList lockedGridTracks;
+    // #112: copies that came in as the library track they duplicate.
+    QStringList reusedTrackLabels;
+    // #112: copies of a library track added as their own track (preparation
+    // differs, or the DJ unticked the reuse row).
+    QStringList keptSeparateLabels;
 };
 
 /// #109: fills existingTrack/comparison on every row of the plan (looks up the
