@@ -62,6 +62,8 @@ struct Settings {
         return column != ColumnIdentity::NotColoured &&
                 (wholeRow || columns.count(column) > 0);
     }
+    // Coloured cells are bold.
+    bool boldMatchedText = true;
 };
 
 // Missing keys fall back to the defaults above.

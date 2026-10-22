@@ -10,6 +10,7 @@ namespace {
 const QString kDJNoteGroup = QStringLiteral("[DJNote]");
 
 const ConfigKey kHighlightCfgKey(kDJNoteGroup, QStringLiteral("KeyMatchingHighlight"));
+const ConfigKey kBoldMatchedTextCfgKey(kDJNoteGroup, QStringLiteral("KeyMatchingBold"));
 
 const ConfigKey kColumnsCfgKey(kDJNoteGroup, QStringLiteral("KeyMatchingColumns"));
 const ConfigKey kWholeRowCfgKey(kDJNoteGroup, QStringLiteral("KeyMatchingWholeRow"));
@@ -97,6 +98,12 @@ Settings loadSettings(const UserSettingsPointer& pConfig) {
         }
     }
     settings.wholeRow = pConfig->getValue(kWholeRowCfgKey, settings.wholeRow);
+    const QString bold = pConfig->getValueString(kBoldMatchedTextCfgKey);
+    if (bold == QLatin1String("true")) {
+        settings.boldMatchedText = true;
+    } else if (bold == QLatin1String("false")) {
+        settings.boldMatchedText = false;
+    }
     return settings;
 }
 
@@ -112,6 +119,8 @@ void saveSettings(const UserSettingsPointer& pConfig, const Settings& settings) 
     pConfig->setValue(kColumnsCfgKey,
             names.isEmpty() ? QStringLiteral("-") : names.join(QLatin1Char(',')));
     pConfig->setValue(kWholeRowCfgKey, settings.wholeRow);
+    pConfig->setValue(kBoldMatchedTextCfgKey,
+            settings.boldMatchedText ? QStringLiteral("true") : QStringLiteral("false"));
 }
 
 } // namespace keymatch

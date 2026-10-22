@@ -63,6 +63,7 @@ class DlgPrefDJNote : public DlgPreferencePage {
 
     QComboBox* m_pKeyMatchingHighlight;
     QListWidget* m_pKeyMatchingColumns;
+    QCheckBox* m_pKeyMatchingBold;
     // Same as m_showingKnobReadoutSettings, for the key matching group.
     bool m_showingKeyMatchingSettings = false;
 };

@@ -106,7 +106,8 @@ CellStyle cellStyle(const CellInput& input) {
         return {};
     }
     CellStyle style;
-    style.color = colorOf(pMatcher->match(input.key));
+    const std::optional<QColor> color = colorOf(pMatcher->match(input.key));
+    style.color = color;
     // A played match is mixed 50/50 with the played colour.
     if (style.color && input.played && input.playedColor) {
         const QColor& a = *style.color;
@@ -115,6 +116,8 @@ CellStyle cellStyle(const CellInput& input) {
                 (a.green() + b.green() + 1) / 2,
                 (a.blue() + b.blue() + 1) / 2);
     }
+    // Every coloured cell is bold, played or not.
+    style.bold = color.has_value() && pMatcher->settings().boldMatchedText;
     return style;
 }
 
