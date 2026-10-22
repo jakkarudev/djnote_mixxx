@@ -6,12 +6,12 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QGridLayout>
-#include <QMessageBox>
 #include <QProgressDialog>
 
 #include "library/dao/playlistdao.h"
 #include "library/nml/nmlexport.h"
 #include "library/nml/nmlsettings.h"
+#include "library/nml/nmlsummarydialog.h"
 #include "library/nml/nmlsupport.h"
 #include "library/trackcollection.h"
 #include "library/trackcollectionmanager.h"
@@ -79,10 +79,10 @@ bool runNmlExportFlow(QWidget* pParent,
     const NmlExportResult& result = worker.result();
     const QString title = tr("Export NML");
     if (!result.error.isEmpty()) {
-        QMessageBox::warning(pParent, title, nmlExportSummary(result));
+        showNmlSummary(pParent, title, nmlExportSummary(result), true);
         return false;
     }
-    QMessageBox::information(pParent, title, nmlExportSummary(result));
+    showNmlSummary(pParent, title, nmlExportSummary(result));
     return !result.canceled;
 }
 

@@ -8,6 +8,7 @@
 #include "library/nml/dlgnmlreread.h"
 #include "library/nml/nmlreread.h"
 #include "library/nml/nmlsettings.h"
+#include "library/nml/nmlsummarydialog.h"
 #include "library/nml/nmlsupport.h"
 #include "library/trackcollection.h"
 #include "library/trackcollectionmanager.h"
@@ -64,8 +65,7 @@ bool runNmlRereadFlow(QWidget* pParent,
         QMessageBox::warning(pParent, tr("Re-read NML"), result.error);
         return false;
     }
-    QMessageBox::information(
-            pParent, tr("Re-read NML"), nmlRereadSummary(playlistName, mode, result));
+    showNmlSummary(pParent, tr("Re-read NML"), nmlRereadSummary(playlistName, mode, result));
     return true;
 }
 

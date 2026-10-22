@@ -11,6 +11,7 @@
 #include "library/nml/nmlimport.h"
 #include "library/nml/nmlreuse.h"
 #include "library/nml/nmlsettings.h"
+#include "library/nml/nmlsummarydialog.h"
 #include "library/nml/nmlsupport.h"
 #include "library/trackcollection.h"
 #include "library/trackcollectionmanager.h"
@@ -132,9 +133,10 @@ int runNmlImportFlow(QWidget* pParent,
                     r.keptSeparateLabels));
             lastPlaylistId = r.playlistId;
         }
-        QMessageBox::information(pParent,
+        showNmlSummary(pParent,
                 tr("Import NML"),
-                lines.join(QStringLiteral("\n\n")));
+                tr("Imported %1 playlists.").arg(QString::number(multi.results.size())) +
+                        QStringLiteral("\n\n") + lines.join(QStringLiteral("\n\n")));
         return lastPlaylistId;
     }
 
@@ -149,7 +151,7 @@ int runNmlImportFlow(QWidget* pParent,
         QMessageBox::warning(pParent, tr("Import NML"), result.error);
         return kInvalidPlaylistId;
     }
-    QMessageBox::information(pParent,
+    showNmlSummary(pParent,
             tr("Import NML"),
             nmlImportSummary(dialog.playlistName(),
                     result.tracksInPlaylist,
