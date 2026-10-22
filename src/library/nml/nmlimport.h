@@ -61,13 +61,52 @@ QString nextFreePlaylistName(const PlaylistDAO& dao, const QString& base);
 
 NmlImportPlan planNmlImport(const QString& nmlPath,
         const PlaylistDAO& dao,
-        int playlistIndex = 0);
+        int playlistIndex = -1); // -1: the first importable playlist
 
 /// Creates the Playlist `playlistName` and fills it. Not-found items become
 /// library tracks flagged missing (titled from the NML, no preparation) and are
 /// listed in `missingTracks`; files the library refuses are listed in `skipped`.
 NmlImportResult applyNmlImport(const NmlImportPlan& plan,
         const QString& playlistName,
+        TrackCollectionManager* pTrackCollectionManager);
+
+// ---- Several playlists in one file (#113) ----
+
+/// Indexes into document.playlists of the playlists worth importing. Skipped:
+/// Traktor's special lists (names starting with '_': _LOOPS, _RECORDINGS) and
+/// the Preparation list when the file has other lists (a lone playlist named
+/// Preparation is the DJ's own export and is kept). Smartlists and Remix Deck
+/// sets are never parsed as playlists. Folders are flattened (folderPath is
+/// ignored).
+QList<int> importableNmlPlaylists(const NmlDocument& document);
+
+/// One row of the multi-playlist review: tick box + editable name.
+struct NmlPlaylistChoice {
+    int playlistIndex = -1; // into document.playlists
+    QString name;           // editable
+    int trackCount = 0;
+    bool selected = true;
+};
+
+/// One choice per importable playlist. A file with exactly one importable
+/// playlist keeps the first slice's default (plan.defaultName, from the file
+/// name); otherwise each default is the playlist's own name. Defaults get the
+/// numeric suffix when taken in the library or by an earlier row.
+QList<NmlPlaylistChoice> nmlPlaylistChoices(const NmlImportPlan& plan, const PlaylistDAO& dao);
+
+/// plan.document re-planned for another of its playlists (writes nothing).
+NmlImportPlan selectNmlPlaylist(const NmlImportPlan& plan, int playlistIndex);
+
+struct NmlMultiImportResult {
+    QString error; // plan unusable
+    // One entry per ticked choice, in order. A name taken meanwhile (or by an
+    // earlier row) gets the numeric suffix instead of failing.
+    QList<NmlImportResult> results;
+    QStringList playlistNames; // final names, parallel to results
+};
+
+NmlMultiImportResult applyNmlImportPlaylists(const NmlImportPlan& plan,
+        const QList<NmlPlaylistChoice>& choices,
         TrackCollectionManager* pTrackCollectionManager);
 
 } // namespace nml

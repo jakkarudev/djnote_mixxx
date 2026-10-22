@@ -8,6 +8,7 @@
 
 #include "library/dao/playlistdao.h"
 #include "library/nml/dlgnmlimport.h"
+#include "library/nml/dlgnmlimportplaylists.h"
 #include "library/nml/nmlimport.h"
 #include "library/nml/nmlsettings.h"
 #include "library/trackcollection.h"
@@ -68,6 +69,35 @@ int runNmlImportFlow(QWidget* pParent,
                 tr("Import Traktor Playlist"),
                 tr("The file could not be imported: %1").arg(plan.error));
         return kInvalidPlaylistId;
+    }
+
+    // #113: a file with several playlists gets the tick-box review instead.
+    const QList<NmlPlaylistChoice> choices = nmlPlaylistChoices(plan, dao);
+    if (choices.size() > 1) {
+        DlgNmlImportPlaylists multiDialog(choices, pParent);
+        if (multiDialog.exec() != QDialog::Accepted) {
+            return kInvalidPlaylistId;
+        }
+        const NmlMultiImportResult multi = applyNmlImportPlaylists(
+                plan, multiDialog.choices(), pTrackCollectionManager);
+        QStringList lines;
+        int lastPlaylistId = kInvalidPlaylistId;
+        for (int i = 0; i < multi.results.size(); ++i) {
+            const NmlImportResult& r = multi.results.at(i);
+            if (!r.error.isEmpty() && r.playlistId == kInvalidPlaylistId) {
+                lines.append(multi.playlistNames.at(i) + QStringLiteral(": ") + r.error);
+                continue;
+            }
+            lines.append(nmlImportSummary(multi.playlistNames.at(i),
+                    r.tracksInPlaylist,
+                    r.newLibraryTracks,
+                    r.skipped));
+            lastPlaylistId = r.playlistId;
+        }
+        QMessageBox::information(pParent,
+                tr("Import Traktor Playlist"),
+                lines.join(QStringLiteral("\n\n")));
+        return lastPlaylistId;
     }
 
     DlgNmlImport dialog(plan, dao, pParent);
