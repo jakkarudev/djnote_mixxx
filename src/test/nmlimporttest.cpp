@@ -1,11 +1,16 @@
 #include <gtest/gtest.h>
 
+#include <QDialogButtonBox>
 #include <QDir>
+#include <QLineEdit>
+#include <QPushButton>
 #include <QSqlQuery>
 #include <QTemporaryDir>
 
 #include "library/dao/playlistdao.h"
+#include "library/nml/dlgnmlimport.h"
 #include "library/nml/nmlimport.h"
+#include "library/nml/nmlimportflow.h"
 #include "test/librarytest.h"
 #include "test/nmltestutils.h"
 #include "track/track.h"
@@ -201,6 +206,38 @@ TEST_F(NmlImportTest, UnreadableFileGivesPlanError) {
             m_nmlDir.filePath(QStringLiteral("nope.nml")), playlistDao());
     EXPECT_FALSE(plan.error.isEmpty());
     EXPECT_TRUE(plan.tracks.isEmpty());
+}
+
+TEST_F(NmlImportTest, ReviewDialogProposesDefaultNameAndBlocksTakenOrEmptyName) {
+    const NmlImportPlan plan = planNmlImport(v20NextToNml(), playlistDao());
+    playlistDao().createPlaylist(QStringLiteral("Taken"));
+    DlgNmlImport dialog(plan, playlistDao());
+    EXPECT_EQ(QStringLiteral("My Set"), dialog.playlistName());
+    auto* pOk = dialog.findChild<QDialogButtonBox*>()->button(QDialogButtonBox::Ok);
+    EXPECT_TRUE(pOk->isEnabled());
+    auto* pEdit = dialog.findChild<QLineEdit*>();
+    pEdit->setText(QStringLiteral("Taken"));
+    EXPECT_FALSE(pOk->isEnabled());
+    pEdit->setText(QStringLiteral("  "));
+    EXPECT_FALSE(pOk->isEnabled());
+    pEdit->setText(QStringLiteral("Fresh"));
+    EXPECT_TRUE(pOk->isEnabled());
+    EXPECT_EQ(QStringLiteral("Fresh"), dialog.playlistName());
+}
+
+TEST_F(NmlImportTest, ReviewDialogStatusTexts) {
+    EXPECT_EQ(QStringLiteral("found"), DlgNmlImport::statusText(NmlTrackStatus::Found));
+    EXPECT_EQ(QStringLiteral("found next to the .nml"),
+            DlgNmlImport::statusText(NmlTrackStatus::FoundNextToNml));
+}
+
+TEST_F(NmlImportTest, SummaryListsSkippedTracks) {
+    const QString text = nmlImportSummary(
+            QStringLiteral("Set"), 3, 2, {QStringLiteral("A - B")});
+    EXPECT_TRUE(text.contains(QStringLiteral("\"Set\"")));
+    EXPECT_TRUE(text.contains(QStringLiteral("A - B")));
+    EXPECT_FALSE(nmlImportSummary(QStringLiteral("Set"), 3, 2, {})
+                    .contains(QStringLiteral("skipped")));
 }
 
 } // namespace

@@ -5,6 +5,7 @@
 #include <QtDebug>
 
 #include "library/library.h"
+#include "library/nml/nmlimportflow.h" // DJNote
 #include "library/parser.h"
 #include "library/playlisttablemodel.h"
 #include "library/queryutil.h"
@@ -50,6 +51,15 @@ void PlaylistFeature::onRightClick(const QPoint& globalPos) {
     menu.addAction(m_pCreatePlaylistAction);
     menu.addSeparator();
     menu.addAction(m_pCreateImportPlaylistAction);
+    // DJNote: Traktor NML import (src/library/nml/)
+    menu.addAction(tr("Import Traktor Playlist (.nml)..."), this, [this]() {
+        const int playlistId = mixxx::nml::runNmlImportFlow(m_pSidebarWidget,
+                m_pLibrary->trackCollectionManager(),
+                m_pConfig);
+        if (playlistId != kInvalidPlaylistId) {
+            activatePlaylist(playlistId);
+        }
+    });
     menu.exec(globalPos);
 }
 

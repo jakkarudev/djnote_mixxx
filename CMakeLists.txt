@@ -995,8 +995,10 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/library/keymatch/keymatchcell.cpp
   src/library/keymatch/keymatcher.cpp
   src/library/keymatch/keymatchsettings.cpp
+  src/library/nml/dlgnmlimport.cpp
   src/library/nml/nmldocument.cpp
   src/library/nml/nmlimport.cpp
+  src/library/nml/nmlimportflow.cpp
   src/library/library_prefs.cpp
   src/library/library.cpp
   src/library/librarycontrol.cpp
