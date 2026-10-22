@@ -8,7 +8,7 @@
 
 class TrackCollectionManager;
 
-// DJNote (#111): GUI-free operations on the import plan that find tracks the
+// DJNote: GUI-free operations on the import plan that find tracks the
 // plan marked NotFound. The review dialog only calls these and re-reads the
 // rows. Both act on NotFound rows only and update them in place.
 

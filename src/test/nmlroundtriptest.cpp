@@ -19,7 +19,7 @@
 #include "track/track.h"
 #include "util/color/predefinedcolorpalettes.h"
 
-// DJNote: NML export -> import round trip (#116). The export copies the files,
+// DJNote: NML export -> import round trip. The export copies the files,
 // so the import creates NEW library rows for the copies: nothing of the
 // original's state can leak into the result. Seams: nmlExportItemsForPlaylist +
 // NmlExportWorker on one side, planNmlImport/applyNmlImport on the other.

@@ -1,6 +1,5 @@
 #include "library/nml/nmlreread.h"
 
-#include <QCoreApplication>
 #include <QFileInfo>
 #include <QHash>
 #include <QSet>
@@ -11,6 +10,8 @@
 #include "library/nml/nmlcues.h"
 #include "library/nml/nmlkeepreplace.h"
 #include "library/nml/nmlpreparation.h"
+#include "library/nml/nmlreuse.h"
+#include "library/nml/nmlsupport.h"
 #include "library/trackcollection.h"
 #include "library/trackcollectionmanager.h"
 #include "sources/soundsourceproxy.h"
@@ -24,24 +25,8 @@ namespace nml {
 
 namespace {
 
-QString tr(const char* text) {
-    return QCoreApplication::translate("NmlReread", text);
-}
-
-QSqlDatabase databaseOf(TrackCollectionManager* pManager) {
-    return pManager->internalCollection()->database();
-}
-
 PlaylistDAO& playlistDaoOf(TrackCollectionManager* pManager) {
     return pManager->internalCollection()->getPlaylistDAO();
-}
-
-QString labelOf(const NmlPlanTrack& item) {
-    if (item.title.isEmpty()) {
-        return item.primaryKey;
-    }
-    return item.artist.isEmpty() ? item.title
-                                 : item.artist + QStringLiteral(" - ") + item.title;
 }
 
 TrackPointer trackAtPath(TrackCollectionManager* pManager, const QString& path) {
@@ -53,7 +38,7 @@ TrackPointer trackAtPath(TrackCollectionManager* pManager, const QString& path) 
     }
     // A file that is not there has no canonical location, so TrackRef is not
     // usable: look the (missing) row up by its stored location.
-    QSqlQuery query(databaseOf(pManager));
+    QSqlQuery query(nmlDatabase(pManager));
     query.prepare(QStringLiteral(
             "SELECT library.id FROM library "
             "JOIN track_locations ON track_locations.id = library.location "
@@ -66,7 +51,7 @@ TrackPointer trackAtPath(TrackCollectionManager* pManager, const QString& path) 
 }
 
 bool isFlaggedMissing(TrackCollectionManager* pManager, TrackId id) {
-    QSqlQuery query(databaseOf(pManager));
+    QSqlQuery query(nmlDatabase(pManager));
     query.prepare(QStringLiteral(
             "SELECT track_locations.fs_deleted FROM library "
             "JOIN track_locations ON track_locations.id = library.location "
@@ -79,7 +64,7 @@ bool isFlaggedMissing(TrackCollectionManager* pManager, TrackId id) {
 // missing flag. Cached Track objects are relocated too.
 bool relinkLibraryTrack(TrackCollectionManager* pManager, TrackId id, const QString& newPath) {
     const mixxx::FileInfo fileInfo(newPath);
-    QSqlQuery query(databaseOf(pManager));
+    QSqlQuery query(nmlDatabase(pManager));
     query.prepare(QStringLiteral(
             "UPDATE track_locations SET location=:location, directory=:directory, "
             "filename=:filename, filesize=:filesize, fs_deleted=0, needs_verification=0 "
@@ -108,41 +93,8 @@ void refreshStreamInfo(const TrackPointer& pTrack) {
     }
 }
 
-// Flags the library row of a not-found item as missing (or finds the row that
-// already is). Mirrors the import's missing-track rule.
-bool ensureMissingTrack(
-        TrackCollectionManager* pManager, const NmlPlanTrack& item, TrackId* pId) {
-    if (item.recordedPath.isEmpty()) {
-        return false;
-    }
-    bool alreadyInLibrary = false;
-    const TrackPointer pTrack = pManager->getOrAddTrack(
-            TrackRef::fromFilePath(item.recordedPath), &alreadyInLibrary);
-    if (!pTrack || !pTrack->getId().isValid()) {
-        return false;
-    }
-    if (!alreadyInLibrary) {
-        if (!item.title.isEmpty()) {
-            pTrack->setTitle(item.title);
-        }
-        if (!item.artist.isEmpty()) {
-            pTrack->setArtist(item.artist);
-        }
-        QSqlQuery query(databaseOf(pManager));
-        query.prepare(QStringLiteral(
-                "UPDATE track_locations SET fs_deleted=1 WHERE id="
-                "(SELECT location FROM library WHERE id=:id)"));
-        query.bindValue(QStringLiteral(":id"), pTrack->getId().toVariant());
-        if (!query.exec()) {
-            return false;
-        }
-    }
-    *pId = pTrack->getId();
-    return true;
-}
-
 QList<TrackId> tracksInOrder(TrackCollectionManager* pManager, int playlistId) {
-    QSqlQuery query(databaseOf(pManager));
+    QSqlQuery query(nmlDatabase(pManager));
     query.prepare(QStringLiteral(
             "SELECT track_id FROM PlaylistTracks WHERE playlist_id = :id ORDER BY position"));
     query.bindValue(QStringLiteral(":id"), playlistId);
@@ -156,7 +108,7 @@ QList<TrackId> tracksInOrder(TrackCollectionManager* pManager, int playlistId) {
 }
 
 QList<int> positionsInPlaylist(TrackCollectionManager* pManager, int playlistId) {
-    QSqlQuery query(databaseOf(pManager));
+    QSqlQuery query(nmlDatabase(pManager));
     query.prepare(QStringLiteral(
             "SELECT position FROM PlaylistTracks WHERE playlist_id = :id"));
     query.bindValue(QStringLiteral(":id"), playlistId);
@@ -192,6 +144,9 @@ TrackId libraryIdForItem(TrackCollectionManager* pManager, const NmlPlanTrack& i
             return pTrack->getId();
         }
     }
+    if (item.reuseTrackId.isValid() && item.reuseAccepted) {
+        return item.reuseTrackId;
+    }
     return TrackId();
 }
 
@@ -208,19 +163,19 @@ NmlRereadPlan planNmlReread(int playlistId,
     NmlRereadPlan result;
     result.playlistId = playlistId;
     PlaylistDAO& dao = playlistDaoOf(pTrackCollectionManager);
-    const std::optional<NmlSourceLink> link =
-            loadNmlSourceLink(databaseOf(pTrackCollectionManager), playlistId);
-    if (!link) {
-        result.error = tr("This playlist was not imported from a Traktor .nml");
+    const std::optional<SourceNml> sourceNml =
+            loadSourceNml(nmlDatabase(pTrackCollectionManager), playlistId);
+    if (!sourceNml) {
+        result.error = tr("This playlist was not imported from an .nml");
         return result;
     }
-    result.link = *link;
+    result.sourceNml = *sourceNml;
     if (dao.isPlaylistLocked(playlistId)) {
         result.locked = true;
         result.error = tr("The playlist is locked. Unlock it to re-read the .nml.");
         return result;
     }
-    const QString nmlPath = nmlPathOverride.isEmpty() ? link->nmlPath : nmlPathOverride;
+    const QString nmlPath = nmlPathOverride.isEmpty() ? sourceNml->nmlPath : nmlPathOverride;
     if (!QFileInfo::exists(nmlPath)) {
         result.nmlFileMissing = true;
         result.error = tr("The .nml file was not found at %1").arg(nmlPath);
@@ -234,9 +189,9 @@ NmlRereadPlan planNmlReread(int playlistId,
     }
     int index = -1;
     const auto& playlists = probe.document.playlists;
-    if (!link->uuid.isEmpty()) {
+    if (!sourceNml->uuid.isEmpty()) {
         for (int i = 0; i < static_cast<int>(playlists.size()); ++i) {
-            if (playlists.at(i).uuid == link->uuid) {
+            if (playlists.at(i).uuid == sourceNml->uuid) {
                 index = i;
                 break;
             }
@@ -244,19 +199,21 @@ NmlRereadPlan planNmlReread(int playlistId,
     }
     if (index < 0) {
         for (int i = 0; i < static_cast<int>(playlists.size()); ++i) {
-            if (playlists.at(i).name == link->name) {
+            if (playlists.at(i).name == sourceNml->name) {
                 index = i;
                 break;
             }
         }
     }
     if (index < 0) {
-        result.error = tr("The playlist \"%1\" is not in the .nml any more").arg(link->name);
+        result.error = tr("The playlist \"%1\" is not in the .nml any more").arg(sourceNml->name);
         return result;
     }
     result.plan = selectNmlPlaylist(probe, index);
     result.plan.nmlPath = nmlPath;
     updateNmlPlanComparisons(&result.plan, pTrackCollectionManager);
+    // Rows whose file is a copy of a library track may reuse it, as in the import.
+    proposeNmlReuse(&result.plan, pTrackCollectionManager);
     return result;
 }
 
@@ -314,8 +271,9 @@ NmlRereadResult applyNmlReread(const NmlRereadPlan& rereadPlan,
 
     QList<TrackId> targetIds;
     QSet<TrackId> handled; // a repeat of a track is prepared once
+    QHash<TrackId, TrackId> swaps; // Keep: missing track in the list -> accepted library match
     for (const NmlPlanTrack& item : plan.tracks) {
-        const QString label = labelOf(item);
+        const QString label = nmlPlanTrackLabel(item);
         const NmlEntry* pEntry = item.entryIndex >= 0
                 ? &plan.document.entries.at(item.entryIndex)
                 : nullptr;
@@ -325,7 +283,15 @@ NmlRereadResult applyNmlReread(const NmlRereadPlan& rereadPlan,
                 pManager->getTrackById(item.libraryTrackId);
         if (matched) {
             id = item.libraryTrackId;
-            if (replace && pEntry && !handled.contains(id)) {
+            if (!replace) {
+                // Keep: the match stands in for the missing track already in the list.
+                const TrackPointer pOld = trackAtPath(pManager, item.recordedPath);
+                if (!pOld || pOld->getId() == id || !currentSet.contains(pOld->getId())) {
+                    continue;
+                }
+                swaps.insert(pOld->getId(), id);
+            }
+            if (pEntry && !handled.contains(id)) {
                 const TrackPointer pTrack = pManager->getTrackById(id);
                 const NmlKeepReplaceOutcome outcome =
                         applyNmlToExistingTrack(pTrack.get(), *pEntry, plan.preparationMode);
@@ -340,7 +306,7 @@ NmlRereadResult applyNmlReread(const NmlRereadPlan& rereadPlan,
             if (const TrackPointer pTrack = trackAtPath(pManager, item.recordedPath)) {
                 id = pTrack->getId();
             } else if (replace) {
-                if (!ensureMissingTrack(pManager, item, &id)) {
+                if (!ensureNmlMissingTrack(pManager, item, &id)) {
                     continue;
                 }
             }
@@ -353,6 +319,7 @@ NmlRereadResult applyNmlReread(const NmlRereadPlan& rereadPlan,
         } else {
             bool relinked = false;
             bool isNew = false;
+            bool reused = false;
             TrackPointer pTrack = trackAtPath(pManager, item.resolvedPath);
             if (pTrack) {
                 if (isFlaggedMissing(pManager, pTrack->getId())) {
@@ -369,6 +336,14 @@ NmlRereadResult applyNmlReread(const NmlRereadPlan& rereadPlan,
                         relinked = true;
                         pTrack = pManager->getTrackById(missingId);
                     }
+                } else if (replace && item.reuseTrackId.isValid() && item.reuseAccepted &&
+                        pManager->getTrackById(item.reuseTrackId)) {
+                    // An identical copy of a library track is that track.
+                    pTrack = pManager->getTrackById(item.reuseTrackId);
+                    reused = true;
+                    if (!handled.contains(pTrack->getId())) {
+                        result.reusedTracks.append(label);
+                    }
                 } else if (replace) {
                     bool alreadyInLibrary = false;
                     pTrack = pManager->getOrAddTrack(
@@ -383,7 +358,7 @@ NmlRereadResult applyNmlReread(const NmlRereadPlan& rereadPlan,
             if (!replace && !currentSet.contains(id)) {
                 continue; // Keep: only tracks already in the list are looked at
             }
-            if (!handled.contains(id) && pEntry) {
+            if (!reused && !handled.contains(id) && pEntry) {
                 if (isNew) {
                     ++result.newLibraryTracks;
                     applyNmlPreparation(pTrack.get(), *pEntry);
@@ -410,27 +385,37 @@ NmlRereadResult applyNmlReread(const NmlRereadPlan& rereadPlan,
         targetIds.append(id);
     }
 
-    if (replace) {
+    const auto rewritePlaylist = [&](const QList<TrackId>& ids) {
         const QList<int> positions = positionsInPlaylist(pManager, playlistId);
         if (!positions.isEmpty()) {
             dao.removeTracksFromPlaylist(playlistId, positions);
         }
-        if (!targetIds.isEmpty() && !dao.appendTracksToPlaylist(targetIds, playlistId)) {
+        if (!ids.isEmpty() && !dao.appendTracksToPlaylist(ids, playlistId)) {
             result.error = tr("Could not add the tracks to the playlist");
         }
+    };
+    if (replace) {
+        rewritePlaylist(targetIds);
         result.tracksInPlaylist = targetIds.size();
     } else {
+        if (!swaps.isEmpty()) {
+            QList<TrackId> swapped = currentIds;
+            for (TrackId& id : swapped) {
+                id = swaps.value(id, id);
+            }
+            rewritePlaylist(swapped);
+        }
         result.tracksInPlaylist = currentIds.size();
     }
 
     // Remember where the .nml is now, and refresh the NML playlist's identity.
-    NmlSourceLink link = rereadPlan.link;
-    link.nmlPath = plan.nmlPath;
+    SourceNml sourceNml = rereadPlan.sourceNml;
+    sourceNml.nmlPath = plan.nmlPath;
     if (plan.playlistIndex >= 0 && plan.playlistIndex < plan.document.playlists.size()) {
-        link.uuid = plan.document.playlists.at(plan.playlistIndex).uuid;
-        link.name = plan.document.playlists.at(plan.playlistIndex).name;
+        sourceNml.uuid = plan.document.playlists.at(plan.playlistIndex).uuid;
+        sourceNml.name = plan.document.playlists.at(plan.playlistIndex).name;
     }
-    saveNmlSourceLink(databaseOf(pManager), link);
+    saveSourceNml(nmlDatabase(pManager), sourceNml);
     return result;
 }
 
@@ -451,6 +436,12 @@ QString nmlRereadSummary(
                     .arg(QString::number(r.relinked.size()));
     if (!r.relinked.isEmpty()) {
         text += QStringLiteral("\n") + r.relinked.join(QLatin1Char('\n'));
+    }
+    if (!r.reusedTracks.isEmpty()) {
+        text += QStringLiteral("\n\n") +
+                tr("%1 tracks are copies of tracks already in the library and use those:")
+                        .arg(QString::number(r.reusedTracks.size())) +
+                QStringLiteral("\n") + r.reusedTracks.join(QLatin1Char('\n'));
     }
     if (!r.missingTracks.isEmpty()) {
         text += QStringLiteral("\n\n") +

@@ -11,10 +11,10 @@
 
 class TrackCollectionManager;
 
-// DJNote: GUI-free NML export (spec #105, ticket #115).
+// DJNote: GUI-free NML export.
 //
-//   nmlExportItemsForPlaylist - Playlist -> NmlWriteEntry list (tags now,
-//                               preparation in #116), playlist order, repeats kept.
+//   nmlExportItemsForPlaylist - Playlist -> NmlWriteEntry list (tags and
+//                               preparation), playlist order, repeats kept.
 //   NmlExportWorker           - copies the tracks flat next to the .nml (optional),
 //                               then writes the .nml LAST; no .nml after a cancel.
 //
@@ -62,7 +62,7 @@ QString nmlNumberedFileName(const QString& fileName, int n);
 QString nmlExportSummary(const NmlExportResult& result);
 
 /// Playlist `playlistId` as write entries (playlist order, repeats kept).
-/// This is where #116 adds the preparation (grid, cues, key, colour, rating,
+/// Each entry carries the preparation (grid, cues, key, colour, rating,
 /// lock): see nmlWriteEntryFromTrack().
 QList<NmlWriteEntry> nmlExportItemsForPlaylist(
         TrackCollectionManager* pTrackCollectionManager, int playlistId);

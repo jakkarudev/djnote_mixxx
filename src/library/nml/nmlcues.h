@@ -12,7 +12,7 @@ class Track;
 
 // DJNote: turns the cues, colour and rating of an NmlEntry into Track state.
 // The cue step is split in a pure part (entry -> CueInfo list, easy to test)
-// and an apply part, so the keep/replace ticket can call applyNmlCues() for
+// and an apply part, so the keep/replace rule can call applyNmlCues() for
 // tracks it replaces.
 
 namespace mixxx {

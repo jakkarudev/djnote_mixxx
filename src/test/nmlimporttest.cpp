@@ -7,7 +7,12 @@
 #include <QSqlQuery>
 #include <QTemporaryDir>
 
+#include "library/basetrackcache.h"
+#include "library/columncache.h"
 #include "library/dao/playlistdao.h"
+#include "library/dao/trackschema.h"
+#include "library/librarytablemodel.h"
+#include "library/missing_hidden/missingtablemodel.h"
 #include "library/nml/dlgnmlimport.h"
 #include "library/nml/nmlimport.h"
 #include "library/nml/nmlimportflow.h"
@@ -184,6 +189,64 @@ TEST_F(NmlImportTest, NotFoundBecomesMissingTrackAtItsPosition) {
     EXPECT_TRUE(result.missingTracks.at(0).contains(QStringLiteral("Bumpy")));
 }
 
+TEST_F(NmlImportTest, MissingTrackIsHiddenFromTracksAndListedInMissing) {
+    const QString nml = v20NextToNml();
+    QFile::remove(m_nmlDir.filePath(QStringLiteral("cover-test.flac")));
+    const NmlImportPlan plan = planNmlImport(nml, playlistDao());
+    const NmlImportResult result =
+            applyNmlImport(plan, plan.defaultName, trackCollectionManager());
+    ASSERT_TRUE(result.error.isEmpty());
+    const QList<TrackId> ids = tracksInOrder(result.playlistId);
+    ASSERT_EQ(4, ids.size());
+    const TrackId missingId = ids.at(1);
+    ASSERT_TRUE(isFlaggedMissing(missingId));
+
+    // What the Tracks feature gives the library: the track source the lists read from.
+    const QStringList columns = {LIBRARYTABLE_ID,
+            LIBRARYTABLE_ARTIST,
+            LIBRARYTABLE_TITLE,
+            TRACKLOCATIONSTABLE_LOCATION,
+            TRACKLOCATIONSTABLE_FSDELETED,
+            LIBRARYTABLE_MIXXXDELETED};
+    QStringList qualified;
+    for (const auto& col : columns) {
+        qualified.append(mixxx::trackschema::tableForColumn(col) + QLatin1Char('.') + col);
+    }
+    QSqlQuery query(internalCollection()->database());
+    ASSERT_TRUE(query.exec(QStringLiteral(
+            "CREATE TEMPORARY VIEW IF NOT EXISTS library_cache_view AS "
+            "SELECT %1 FROM library "
+            "INNER JOIN track_locations ON library.location = track_locations.id")
+                                   .arg(qualified.join(","))));
+    const auto pTrackSource = QSharedPointer<BaseTrackCache>(new BaseTrackCache(
+            internalCollection(),
+            QStringLiteral("library_cache_view"),
+            LIBRARYTABLE_ID,
+            columns,
+            {LIBRARYTABLE_ARTIST, LIBRARYTABLE_TITLE},
+            true));
+    internalCollection()->connectTrackSource(pTrackSource);
+
+    const auto idsIn = [](BaseSqlTableModel& model) {
+        model.select();
+        QList<TrackId> found;
+        for (int row = 0; row < model.rowCount(); ++row) {
+            found.append(model.getTrackId(model.index(row, 0)));
+        }
+        return found;
+    };
+    LibraryTableModel tracksModel(nullptr, trackCollectionManager(), "nml-test");
+    tracksModel.setTableModel();
+    MissingTableModel missingModel(nullptr, trackCollectionManager());
+    const QList<TrackId> inTracks = idsIn(tracksModel);
+    const QList<TrackId> inMissing = idsIn(missingModel);
+
+    EXPECT_FALSE(inTracks.contains(missingId));
+    EXPECT_TRUE(inTracks.contains(ids.at(0)));
+    EXPECT_TRUE(inMissing.contains(missingId));
+    EXPECT_FALSE(inMissing.contains(ids.at(0)));
+}
+
 TEST_F(NmlImportTest, NewTracksTakeTagsFromAudioNotNml) {
     const NmlImportPlan plan = planNmlImport(v20NextToNml(), playlistDao());
     const NmlImportResult result =
@@ -254,13 +317,13 @@ TEST_F(NmlImportTest, ReviewDialogProposesDefaultNameAndBlocksTakenOrEmptyName) 
 }
 
 TEST_F(NmlImportTest, ReviewDialogStatusTexts) {
-    EXPECT_EQ(QStringLiteral("found"), DlgNmlImport::statusText(NmlTrackStatus::Found));
+    EXPECT_EQ(QStringLiteral("found"), nmlStatusText(NmlTrackStatus::Found));
     EXPECT_EQ(QStringLiteral("found next to the .nml"),
-            DlgNmlImport::statusText(NmlTrackStatus::FoundNextToNml));
+            nmlStatusText(NmlTrackStatus::FoundNextToNml));
 }
 
 TEST_F(NmlImportTest, ReviewDialogSaysMissingForNotFound) {
-    EXPECT_EQ(QStringLiteral("missing"), DlgNmlImport::statusText(NmlTrackStatus::NotFound));
+    EXPECT_EQ(QStringLiteral("missing"), nmlStatusText(NmlTrackStatus::NotFound));
 }
 
 TEST_F(NmlImportTest, SummaryListsSkippedTracks) {

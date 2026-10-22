@@ -1,6 +1,5 @@
 #include "library/nml/nmlexport.h"
 
-#include <QCoreApplication>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -11,6 +10,7 @@
 #include <QStandardPaths>
 
 #include "library/nml/nmlexportpreparation.h"
+#include "library/nml/nmlsupport.h"
 #include "library/trackcollection.h"
 #include "library/trackcollectionmanager.h"
 #include "track/track.h"
@@ -20,10 +20,6 @@ namespace mixxx {
 namespace nml {
 
 namespace {
-
-QString tr(const char* text) {
-    return QCoreApplication::translate("NmlExport", text);
-}
 
 QString safeFileName(const QString& name) {
     QString out = name;
@@ -113,7 +109,7 @@ QString nmlExportSummary(const NmlExportResult& result) {
 }
 
 namespace {
-// #116: this is the one place that turns a Track into an NmlWriteEntry. Add
+// this is the one place that turns a Track into an NmlWriteEntry. Add
 // the preparation here (bpm/cues/key/colour/rating/locked); the writer and
 // the worker need no change.
 NmlWriteEntry nmlWriteEntryFromTrack(const Track& track) {
@@ -128,7 +124,7 @@ NmlWriteEntry nmlWriteEntryFromTrack(const Track& track) {
     entry.releaseDate = track.getYear();
     entry.playtimeSeconds = track.getDuration();
     entry.bitrateBitsPerSecond = track.getBitrate() * 1000;
-    fillNmlPreparation(&entry, track); // DJNote #116
+    fillNmlPreparation(&entry, track); // DJNote
     return entry;
 }
 } // namespace
@@ -136,7 +132,7 @@ NmlWriteEntry nmlWriteEntryFromTrack(const Track& track) {
 QList<NmlWriteEntry> nmlExportItemsForPlaylist(
         TrackCollectionManager* pTrackCollectionManager, int playlistId) {
     QList<NmlWriteEntry> items;
-    QSqlQuery query(pTrackCollectionManager->internalCollection()->database());
+    QSqlQuery query(nmlDatabase(pTrackCollectionManager));
     query.prepare(QStringLiteral(
             "SELECT track_id FROM PlaylistTracks WHERE playlist_id=:id ORDER BY position"));
     query.bindValue(QStringLiteral(":id"), playlistId);

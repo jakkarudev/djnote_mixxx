@@ -7,9 +7,10 @@
 #include <memory>
 
 #include "library/dao/playlistdao.h"
+#include "library/nml/nmlfindmissing.h"
 #include "library/nml/nmlimport.h"
 #include "library/nml/nmlreread.h"
-#include "library/nml/nmlsourcelink.h"
+#include "library/nml/sourcenml.h"
 #include "test/librarytest.h"
 #include "test/nmltestutils.h"
 #include "track/track.h"
@@ -18,7 +19,7 @@ using namespace mixxx::nml;
 
 namespace {
 
-// #114: source NML link lifecycle and "Re-read NML" at the import seam
+// source NML sourceNml lifecycle and "Re-read NML" at the import seam
 // (planNmlReread / applyNmlReread), against the v20 fixture
 // (mp3 "Connected", flac "Bumpy", ogg "A Wee Dub", mp3 repeated).
 class NmlRereadTest : public LibraryTest {
@@ -26,7 +27,7 @@ class NmlRereadTest : public LibraryTest {
     void SetUp() override {
         ASSERT_TRUE(m_dir.isValid());
         m_nmlDir = QDir(m_dir.path());
-        m_keeper = std::make_unique<NmlSourceLinkKeeper>(&playlistDao(), database(), nullptr);
+        m_keeper = std::make_unique<SourceNmlKeeper>(&playlistDao(), database(), nullptr);
     }
 
     PlaylistDAO& playlistDao() const {
@@ -96,50 +97,50 @@ class NmlRereadTest : public LibraryTest {
     QTemporaryDir m_dir;
     QDir m_nmlDir;
     QString m_nml;
-    std::unique_ptr<NmlSourceLinkKeeper> m_keeper;
+    std::unique_ptr<SourceNmlKeeper> m_keeper;
 };
 
-// ---- the link ----
+// ---- the sourceNml ----
 
-TEST_F(NmlRereadTest, ImportedPlaylistHasALinkWithPathUuidAndName) {
+TEST_F(NmlRereadTest, ImportedPlaylistHasASourceNmlWithPathUuidAndName) {
     const int playlistId = importSet();
-    const auto link = loadNmlSourceLink(database(), playlistId);
-    ASSERT_TRUE(link.has_value());
-    EXPECT_EQ(m_nml, link->nmlPath);
-    EXPECT_EQ(QStringLiteral("338613851b2e4bddb2926ac6a11ed148"), link->uuid);
-    EXPECT_EQ(QStringLiteral("Preparation"), link->name);
+    const auto sourceNml = loadSourceNml(database(), playlistId);
+    ASSERT_TRUE(sourceNml.has_value());
+    EXPECT_EQ(m_nml, sourceNml->nmlPath);
+    EXPECT_EQ(QStringLiteral("338613851b2e4bddb2926ac6a11ed148"), sourceNml->uuid);
+    EXPECT_EQ(QStringLiteral("Preparation"), sourceNml->name);
 }
 
-TEST_F(NmlRereadTest, RenameKeepsTheLink) {
+TEST_F(NmlRereadTest, RenameKeepsTheSourceNml) {
     const int playlistId = importSet();
     playlistDao().renamePlaylist(playlistId, QStringLiteral("Renamed"));
-    EXPECT_TRUE(loadNmlSourceLink(database(), playlistId).has_value());
+    EXPECT_TRUE(loadSourceNml(database(), playlistId).has_value());
 }
 
-TEST_F(NmlRereadTest, DeleteRemovesTheLink) {
+TEST_F(NmlRereadTest, DeleteRemovesTheSourceNml) {
     const int playlistId = importSet();
     playlistDao().deletePlaylist(playlistId);
-    EXPECT_FALSE(loadNmlSourceLink(database(), playlistId).has_value());
+    EXPECT_FALSE(loadSourceNml(database(), playlistId).has_value());
 }
 
-TEST_F(NmlRereadTest, BulkDeleteRemovesTheLink) {
+TEST_F(NmlRereadTest, BulkDeleteRemovesTheSourceNml) {
     const int playlistId = importSet();
     playlistDao().deletePlaylists(QStringList{QString::number(playlistId)}); // ids as text
-    EXPECT_FALSE(loadNmlSourceLink(database(), playlistId).has_value());
+    EXPECT_FALSE(loadSourceNml(database(), playlistId).has_value());
 }
 
-TEST_F(NmlRereadTest, ADuplicateHasNoLink) {
+TEST_F(NmlRereadTest, ADuplicateHasNoSourceNml) {
     const int playlistId = importSet();
     const int copyId = playlistDao().createPlaylist(QStringLiteral("Copy"));
     ASSERT_NE(kInvalidPlaylistId, copyId);
     playlistDao().copyPlaylistTracks(playlistId, copyId);
-    EXPECT_FALSE(loadNmlSourceLink(database(), copyId).has_value());
-    EXPECT_TRUE(loadNmlSourceLink(database(), playlistId).has_value());
+    EXPECT_FALSE(loadSourceNml(database(), copyId).has_value());
+    EXPECT_TRUE(loadSourceNml(database(), playlistId).has_value());
 }
 
-TEST_F(NmlRereadTest, OrdinaryPlaylistHasNoLink) {
+TEST_F(NmlRereadTest, OrdinaryPlaylistHasNoSourceNml) {
     const int playlistId = playlistDao().createPlaylist(QStringLiteral("Plain"));
-    EXPECT_FALSE(loadNmlSourceLink(database(), playlistId).has_value());
+    EXPECT_FALSE(loadSourceNml(database(), playlistId).has_value());
     EXPECT_FALSE(planNmlReread(playlistId, trackCollectionManager()).error.isEmpty());
 }
 
@@ -235,13 +236,98 @@ TEST_F(NmlRereadTest, ReplaceRelinksAMissingTrackInsteadOfAddingASecondOne) {
             trackCollectionManager()->getTrackById(imported.at(2))->getLocation());
 }
 
+// ---- reuse and library matches (ADR 0008) ----
+
+TEST_F(NmlRereadTest, ReplaceReusesALibraryTrackInsteadOfAddingAnIdenticalCopy) {
+    const int playlistId = importSet();
+    const QList<TrackId> imported = tracksInOrder(playlistId);
+    const int rowsBefore = libraryRowCount();
+
+    // The same NML next to copies of the audio files (the DJ moved the set).
+    QTemporaryDir copies;
+    ASSERT_TRUE(copies.isValid());
+    const QDir copyDir(copies.path());
+    for (const char* f : {"cover-test-vbr.mp3", "cover-test.flac", "cover-test.ogg"}) {
+        nmltest::copyAudio(getTestDir(), QString::fromLatin1(f), copyDir);
+    }
+    const QString movedNml = nmltest::writeFixture(getTestDir(),
+            QStringLiteral("traktor-v20-playlist.nml"),
+            copyDir,
+            QStringLiteral("Moved.nml"));
+    QString nmlText;
+    {
+        QFile in(movedNml);
+        ASSERT_TRUE(in.open(QIODevice::ReadOnly));
+        nmlText = QString::fromUtf8(in.readAll());
+    }
+    // The fixture's PLAYTIME does not match the test audio; use the real ones.
+    const QList<QPair<QString, QString>> files = {{"138", "cover-test-vbr.mp3"},
+            {"142", "cover-test.flac"},
+            {"116", "cover-test.ogg"}};
+    for (const auto& file : files) {
+        const TrackPointer pOriginal = trackCollectionManager()->getTrackByRef(
+                TrackRef::fromFilePath(m_nmlDir.filePath(file.second)));
+        ASSERT_TRUE(pOriginal);
+        nmlText.replace(QStringLiteral("PLAYTIME=\"%1\"").arg(file.first),
+                QStringLiteral("PLAYTIME=\"%1\"").arg(qRound(pOriginal->getDuration())));
+    }
+    {
+        QFile out(movedNml);
+        ASSERT_TRUE(out.open(QIODevice::WriteOnly | QIODevice::Truncate));
+        out.write(nmlText.toUtf8());
+    }
+
+    const NmlRereadPlan plan = planNmlReread(playlistId, trackCollectionManager(), movedNml);
+    ASSERT_TRUE(plan.error.isEmpty()) << plan.error.toStdString();
+    ASSERT_EQ(4, plan.plan.tracks.size());
+    for (const NmlPlanTrack& item : plan.plan.tracks) {
+        EXPECT_TRUE(item.reuseTrackId.isValid()) << item.title.toStdString();
+    }
+    const NmlRereadResult result =
+            applyNmlReread(plan, NmlRereadMode::Replace, trackCollectionManager());
+    ASSERT_TRUE(result.error.isEmpty()) << result.error.toStdString();
+    EXPECT_EQ(imported, tracksInOrder(playlistId)); // the library's own tracks
+    EXPECT_EQ(rowsBefore, libraryRowCount());       // no copy was added
+}
+
+TEST_F(NmlRereadTest, KeepSwapsAMissingTrackForTheAcceptedLibraryMatch) {
+    const int playlistId = importSet({QStringLiteral("cover-test.flac")});
+    const QList<TrackId> before = tracksInOrder(playlistId);
+    ASSERT_EQ(4, before.size());
+    const TrackId missingId = before.at(1);
+    ASSERT_TRUE(isFlaggedMissing(missingId));
+
+    // The file is in the library under another path.
+    QTemporaryDir other;
+    ASSERT_TRUE(other.isValid());
+    const QDir otherDir(other.path());
+    nmltest::copyAudio(getTestDir(), QStringLiteral("cover-test.flac"), otherDir);
+    const TrackPointer pMatch =
+            getOrAddTrackByLocation(otherDir.filePath(QStringLiteral("cover-test.flac")));
+    ASSERT_TRUE(pMatch);
+
+    NmlRereadPlan plan = planNmlReread(playlistId, trackCollectionManager());
+    ASSERT_TRUE(plan.error.isEmpty()) << plan.error.toStdString();
+    ASSERT_EQ(NmlTrackStatus::NotFound, plan.plan.tracks.at(1).status);
+    plan.plan.document.entries[plan.plan.tracks.at(1).entryIndex].playtimeSeconds =
+            pMatch->getDuration();
+    ASSERT_EQ(1, findNmlMissingInLibrary(&plan.plan, trackCollectionManager()));
+
+    const NmlRereadResult result =
+            applyNmlReread(plan, NmlRereadMode::Keep, trackCollectionManager());
+    ASSERT_TRUE(result.error.isEmpty()) << result.error.toStdString();
+    QList<TrackId> expected = before;
+    expected[1] = pMatch->getId();
+    EXPECT_EQ(expected, tracksInOrder(playlistId));
+}
+
 // ---- finding the playlist, moved .nml, lock ----
 
 TEST_F(NmlRereadTest, FallsBackToTheNameWhenTheUuidIsGone) {
     const int playlistId = importSet();
-    NmlSourceLink link = *loadNmlSourceLink(database(), playlistId);
-    link.uuid = QStringLiteral("0000000000000000000000000000dead");
-    ASSERT_TRUE(saveNmlSourceLink(database(), link));
+    SourceNml sourceNml = *loadSourceNml(database(), playlistId);
+    sourceNml.uuid = QStringLiteral("0000000000000000000000000000dead");
+    ASSERT_TRUE(saveSourceNml(database(), sourceNml));
     const NmlRereadPlan plan = planNmlReread(playlistId, trackCollectionManager());
     EXPECT_TRUE(plan.error.isEmpty()) << plan.error.toStdString();
     EXPECT_EQ(4, plan.plan.tracks.size());
@@ -249,10 +335,10 @@ TEST_F(NmlRereadTest, FallsBackToTheNameWhenTheUuidIsGone) {
 
 TEST_F(NmlRereadTest, ErrorsWhenNeitherUuidNorNameIsInTheNml) {
     const int playlistId = importSet();
-    NmlSourceLink link = *loadNmlSourceLink(database(), playlistId);
-    link.uuid = QStringLiteral("0000000000000000000000000000dead");
-    link.name = QStringLiteral("Not there");
-    ASSERT_TRUE(saveNmlSourceLink(database(), link));
+    SourceNml sourceNml = *loadSourceNml(database(), playlistId);
+    sourceNml.uuid = QStringLiteral("0000000000000000000000000000dead");
+    sourceNml.name = QStringLiteral("Not there");
+    ASSERT_TRUE(saveSourceNml(database(), sourceNml));
     EXPECT_FALSE(planNmlReread(playlistId, trackCollectionManager()).error.isEmpty());
 }
 
@@ -273,7 +359,7 @@ TEST_F(NmlRereadTest, MovedNmlAsksForABrowseAndRemembersTheNewPath) {
     const NmlRereadResult result =
             applyNmlReread(plan, NmlRereadMode::Keep, trackCollectionManager());
     ASSERT_TRUE(result.error.isEmpty());
-    EXPECT_EQ(moved, loadNmlSourceLink(database(), playlistId)->nmlPath);
+    EXPECT_EQ(moved, loadSourceNml(database(), playlistId)->nmlPath);
     // The next re-read needs no browse.
     EXPECT_FALSE(planNmlReread(playlistId, trackCollectionManager()).nmlFileMissing);
 }

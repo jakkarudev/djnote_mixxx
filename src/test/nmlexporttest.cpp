@@ -14,7 +14,7 @@
 #include "test/librarytest.h"
 #include "test/nmltestutils.h"
 
-// DJNote: NML export (#115). Seams: writeNml() (bytes), NmlExportWorker (a
+// DJNote: NML export. Seams: writeNml() (bytes), NmlExportWorker (a
 // temporary folder, like trackexport_test), nmlExportItemsForPlaylist().
 
 using namespace mixxx::nml;

@@ -1,7 +1,6 @@
 #include "library/nml/nmlexportflow.h"
 
 #include <QCheckBox>
-#include <QCoreApplication>
 #include <QDir>
 #include <QEventLoop>
 #include <QFileDialog>
@@ -12,18 +11,13 @@
 
 #include "library/dao/playlistdao.h"
 #include "library/nml/nmlexport.h"
-#include "library/nml/nmlexportsettings.h"
+#include "library/nml/nmlsettings.h"
+#include "library/nml/nmlsupport.h"
 #include "library/trackcollection.h"
 #include "library/trackcollectionmanager.h"
 
 namespace mixxx {
 namespace nml {
-
-namespace {
-QString tr(const char* text) {
-    return QCoreApplication::translate("NmlExportFlow", text);
-}
-} // namespace
 
 bool runNmlExportFlow(QWidget* pParent,
         TrackCollectionManager* pTrackCollectionManager,
@@ -38,7 +32,7 @@ bool runNmlExportFlow(QWidget* pParent,
 
     // A non-native save dialog so the tick box can sit inside it.
     QFileDialog dialog(pParent,
-            tr("Export as Traktor Playlist"),
+            tr("Export NML"),
             defaultPath,
             tr("Traktor Collection (*.nml)"));
     dialog.setAcceptMode(QFileDialog::AcceptSave);
@@ -83,7 +77,7 @@ bool runNmlExportFlow(QWidget* pParent,
     progress.close();
 
     const NmlExportResult& result = worker.result();
-    const QString title = tr("Export as Traktor Playlist");
+    const QString title = tr("Export NML");
     if (!result.error.isEmpty()) {
         QMessageBox::warning(pParent, title, nmlExportSummary(result));
         return false;

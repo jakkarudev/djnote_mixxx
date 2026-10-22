@@ -2,14 +2,13 @@
 
 #include <QDir>
 #include <QFileInfo>
-#include <QSqlDatabase>
-#include <QSqlQuery>
 #include <QSet>
 
 #include "library/dao/playlistdao.h"
 #include "library/nml/nmlcues.h"
 #include "library/nml/nmlpreparation.h"
-#include "library/nml/nmlsourcelink.h" // DJNote (#114)
+#include "library/nml/nmlsupport.h"
+#include "library/nml/sourcenml.h"
 #include "library/trackcollection.h"
 #include "library/trackcollectionmanager.h"
 #include "track/track.h"
@@ -17,41 +16,6 @@
 
 namespace mixxx {
 namespace nml {
-
-namespace {
-
-// DJNote: flags the library row of `pTrack` as missing (track_locations.fs_deleted)
-// and gives it its NML title/artist; a file that is not there can't be read.
-bool addMissingTrack(TrackCollectionManager* pManager,
-        const NmlPlanTrack& item,
-        TrackId* pId) {
-    if (item.recordedPath.isEmpty()) {
-        return false;
-    }
-    bool alreadyInLibrary = false;
-    const TrackPointer pTrack = pManager->getOrAddTrack(
-            TrackRef::fromFilePath(item.recordedPath), &alreadyInLibrary);
-    if (!pTrack || !pTrack->getId().isValid()) {
-        return false;
-    }
-    if (!alreadyInLibrary) {
-        if (!item.title.isEmpty()) {
-            pTrack->setTitle(item.title);
-        }
-        if (!item.artist.isEmpty()) {
-            pTrack->setArtist(item.artist);
-        }
-    }
-    *pId = pTrack->getId();
-    QSqlQuery query(pManager->internalCollection()->database());
-    query.prepare(QStringLiteral(
-            "UPDATE track_locations SET fs_deleted=1 WHERE id="
-            "(SELECT location FROM library WHERE id=:id)"));
-    query.bindValue(QStringLiteral(":id"), pTrack->getId().toVariant());
-    return query.exec();
-}
-
-} // namespace
 
 QString nextFreePlaylistName(const PlaylistDAO& dao, const QString& base) {
     QString name = base;
@@ -61,6 +25,34 @@ QString nextFreePlaylistName(const PlaylistDAO& dao, const QString& base) {
         ++i;
     }
     return name;
+}
+
+QString nmlStatusText(NmlTrackStatus status) {
+    switch (status) {
+    case NmlTrackStatus::Found:
+        return tr("found");
+    case NmlTrackStatus::FoundNextToNml:
+        return tr("found next to the .nml");
+    case NmlTrackStatus::FoundInBrowsedFolder:
+        return tr("found in browsed folder");
+    case NmlTrackStatus::MatchedInLibrary:
+        return tr("matched in library");
+    case NmlTrackStatus::NotFound:
+        break;
+    }
+    return tr("missing");
+}
+
+QString nmlRowStatusText(const NmlPlanTrack& track) {
+    if (track.reuseTrackId.isValid()) {
+        return track.reuseAccepted
+                ? tr("reuse existing track")
+                : tr("kept separate: untick of reuse existing track");
+    }
+    if (track.keptSeparate) {
+        return tr("%1, kept separate: preparation differs").arg(nmlStatusText(track.status));
+    }
+    return nmlStatusText(track.status);
 }
 
 namespace {
@@ -101,7 +93,7 @@ void fillPlanTracks(NmlImportPlan* pPlan, int playlistIndex) {
         plan.tracks.append(track);
     }
 }
-// DJNote (#109)
+// DJNote
 void applyKeepReplace(Track* pTrack,
         const NmlImportPlan& plan,
         const NmlPlanTrack& item,
@@ -172,8 +164,8 @@ QList<int> importableNmlPlaylists(const NmlDocument& document) {
         }
         others.append(i);
     }
-    if (others.isEmpty() && preparation >= 0) {
-        others.append(preparation);
+    if (preparation >= 0) {
+        others.append(preparation); // last, so the first list is never Preparation
     }
     return others;
 }
@@ -222,6 +214,8 @@ QList<NmlPlaylistChoice> nmlPlaylistChoices(const NmlImportPlan& plan, const Pla
         NmlPlaylistChoice choice;
         choice.playlistIndex = index;
         choice.trackCount = static_cast<int>(playlist.primaryKeys.size());
+        // Preparation is offered, but only ticked when it is the file's one list.
+        choice.selected = importable.size() == 1 || playlist.name != QLatin1String("Preparation");
         if (importable.size() == 1) {
             choice.name = plan.defaultName;
         } else {
@@ -302,39 +296,47 @@ NmlImportResult applyNmlImport(const NmlImportPlan& plan,
     }
 
     QList<TrackId> ids;
-    QSet<TrackId> newIds;
+    QSet<TrackId> counted; // a track repeated in the playlist is counted and prepared once
     for (const NmlPlanTrack& item : plan.tracks) {
-        const QString label = item.title.isEmpty()
-                ? item.primaryKey
-                : (item.artist.isEmpty() ? item.title : item.artist + QStringLiteral(" - ") + item.title);
-        // DJNote (#111): an accepted library match puts that track in the Playlist;
+        const QString label = nmlPlanTrackLabel(item);
+        // DJNote: an accepted library match puts that track in the Playlist;
         // an unticked one is applied like a missing row. The existing track's
         // preparation is the keep/replace rule's business, not touched here.
         if (item.status == NmlTrackStatus::MatchedInLibrary && item.accepted &&
                 pTrackCollectionManager->getTrackById(item.libraryTrackId)) {
-            // DJNote (#109): the keep/replace rule for the existing track.
-            applyKeepReplace(pTrackCollectionManager->getTrackById(item.libraryTrackId).get(),
-                    plan, item, label, &result);
             ids.append(item.libraryTrackId);
-            ++result.matchedLibraryTracks;
-            result.matchedLibraryLabels.append(label);
+            if (!counted.contains(item.libraryTrackId)) {
+                counted.insert(item.libraryTrackId);
+                // DJNote: the keep/replace rule for the existing track.
+                applyKeepReplace(pTrackCollectionManager->getTrackById(item.libraryTrackId).get(),
+                        plan, item, label, &result);
+                ++result.matchedLibraryTracks;
+                result.matchedLibraryLabels.append(label);
+            }
             continue;
         }
-        // DJNote (#112): a copy identical to a library track is that track.
+        // DJNote: a copy identical to a library track is that track.
         if (item.reuseTrackId.isValid() && item.reuseAccepted &&
                 pTrackCollectionManager->getTrackById(item.reuseTrackId)) {
             ids.append(item.reuseTrackId);
-            result.reusedTrackLabels.append(label);
+            if (!counted.contains(item.reuseTrackId)) {
+                counted.insert(item.reuseTrackId);
+                result.reusedTrackLabels.append(label);
+            }
             continue;
         }
-        if (item.keptSeparate || item.reuseTrackId.isValid()) {
-            result.keptSeparateLabels.append(label);
-        }
+        const bool keptSeparate = item.keptSeparate || item.reuseTrackId.isValid();
         if (item.status == NmlTrackStatus::NotFound ||
                 item.status == NmlTrackStatus::MatchedInLibrary) {
             TrackId missingId;
-            if (addMissingTrack(pTrackCollectionManager, item, &missingId)) {
-                result.missingTracks.append(label);
+            if (ensureNmlMissingTrack(pTrackCollectionManager, item, &missingId)) {
+                if (!counted.contains(missingId)) {
+                    counted.insert(missingId);
+                    result.missingTracks.append(label);
+                    if (keptSeparate) {
+                        result.keptSeparateLabels.append(label);
+                    }
+                }
                 ids.append(missingId);
             } else {
                 result.skipped.append(label);
@@ -349,21 +351,26 @@ NmlImportResult applyNmlImport(const NmlImportPlan& plan,
             continue;
         }
         if (!alreadyInLibrary) {
-            newIds.insert(pTrack->getId()); // a repeat of it later in the list is not "existing"
             ++result.newLibraryTracks;
             // Preparation (grid, key, lock) applies to tracks new to the
-            // library only; existing ones belong to the keep/replace ticket.
+            // library only; existing ones follow the keep/replace rule.
             if (item.entryIndex >= 0) {
                 const NmlEntry& entry = plan.document.entries.at(item.entryIndex);
                 applyNmlPreparation(pTrack.get(), entry);
-                // DJNote #108: cues, colour, rating (one step per part for #109).
+                // DJNote: cues, colour, rating (one step per part).
                 result.droppedCues += applyNmlCues(pTrack.get(), entry);
                 applyNmlColorAndRating(pTrack.get(), entry);
             }
         }
-        if (alreadyInLibrary && !newIds.contains(pTrack->getId())) {
-            // DJNote (#109): the keep/replace rule for the existing track.
-            applyKeepReplace(pTrack.get(), plan, item, label, &result);
+        if (!counted.contains(pTrack->getId())) {
+            counted.insert(pTrack->getId());
+            if (keptSeparate) {
+                result.keptSeparateLabels.append(label);
+            }
+            if (alreadyInLibrary) {
+                // DJNote: the keep/replace rule for the existing track.
+                applyKeepReplace(pTrack.get(), plan, item, label, &result);
+            }
         }
         ids.append(pTrack->getId());
     }
@@ -378,14 +385,14 @@ NmlImportResult applyNmlImport(const NmlImportPlan& plan,
     }
     result.playlistId = playlistId;
     result.tracksInPlaylist = ids.size();
-    // DJNote (#114): remember the source NML so the Playlist can be re-read.
+    // DJNote: remember the source NML so the Playlist can be re-read.
     if (plan.playlistIndex >= 0 && plan.playlistIndex < plan.document.playlists.size()) {
-        NmlSourceLink link;
-        link.playlistId = playlistId;
-        link.nmlPath = plan.nmlPath;
-        link.uuid = plan.document.playlists.at(plan.playlistIndex).uuid;
-        link.name = plan.document.playlists.at(plan.playlistIndex).name;
-        saveNmlSourceLink(pTrackCollectionManager->internalCollection()->database(), link);
+        SourceNml sourceNml;
+        sourceNml.playlistId = playlistId;
+        sourceNml.nmlPath = plan.nmlPath;
+        sourceNml.uuid = plan.document.playlists.at(plan.playlistIndex).uuid;
+        sourceNml.name = plan.document.playlists.at(plan.playlistIndex).name;
+        saveSourceNml(nmlDatabase(pTrackCollectionManager), sourceNml);
     }
     return result;
 }

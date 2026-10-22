@@ -19,7 +19,7 @@
 #include "track/track.h"
 #include "util/color/predefinedcolorpalettes.h"
 
-// DJNote: NML export preparation (#116). Seams: the pure Track -> NmlWriteEntry
+// DJNote: NML export preparation. Seams: the pure Track -> NmlWriteEntry
 // step (nmlWriteEntryFromTrackPreparation and the small mappings), the written
 // bytes, and the round trip export -> import into a fresh library.
 

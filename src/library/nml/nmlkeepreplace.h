@@ -6,7 +6,7 @@
 
 class Track;
 
-// DJNote (#109, ADR 0008): the keep/replace rule for NML import rows that land
+// DJNote (ADR 0008): the keep/replace rule for NML import rows that land
 // on a track DJNote already has (same path, or a library match the DJ accepted).
 // A track keeps ONE preparation; the NML's parts are taken per part, all or
 // nothing:
@@ -15,7 +15,8 @@ class Track;
 // Keep (default): a part is taken from the NML only if the track has none of it.
 // Replace: every part the NML carries overwrites the track's (cues: the whole
 // group), except that a BPM-locked grid is never replaced.
-// #112 reuses NmlPreparationComparison::identical(); #114 reuses
+// Reusing an existing track (nmlreuse.h) relies on
+// NmlPreparationComparison::identical(); Re-read NML uses
 // applyNmlToExistingTrack() as the whole rule.
 
 namespace mixxx {
@@ -59,7 +60,7 @@ struct NmlPreparationComparison {
         return grid.conflicts() || key.conflicts() || cues.conflicts() ||
                 color.conflicts() || rating.conflicts();
     }
-    /// Every part the NML can carry is identical to the track's (#112).
+    /// Every part the NML can carry is identical to the track's.
     bool identical() const {
         return grid.same && key.same && cues.same && color.same && rating.same;
     }
@@ -69,14 +70,14 @@ struct NmlPreparationComparison {
     }
 };
 
-/// DJNote (#112): tolerances of a comparison. The defaults (negative) keep the
+/// DJNote: tolerances of a comparison. The defaults (negative) keep the
 /// keep/replace behaviour: positions within 1.5 frames, BPM not compared on its own.
 struct NmlCompareTolerance {
     double bpm = -1.0;            // >= 0: grid BPMs must also be within this
     double positionMillis = -1.0; // >= 0: beats and cues within this instead of 1.5 frames
 };
 
-/// DJNote (#112): "identical" for reusing a library track: BPM within 0.01,
+/// DJNote: "identical" for reusing a library track: BPM within 0.01,
 /// beats and cues within 10 ms.
 constexpr NmlCompareTolerance kNmlIdenticalTolerance{0.01, 10.0};
 

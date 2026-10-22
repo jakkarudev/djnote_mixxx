@@ -6,7 +6,7 @@
 
 class TrackCollectionManager;
 
-// DJNote (#112, ADR 0008): "reuse existing track". A found file that is a COPY
+// DJNote (ADR 0008): "reuse existing track". A found file that is a COPY
 // (another path) of a track already in the library is put in the Playlist as
 // that library track, instead of being added, when the copy's NML preparation
 // is identical to the library track's (kNmlIdenticalTolerance, per part, a

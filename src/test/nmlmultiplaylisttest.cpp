@@ -16,7 +16,7 @@
 
 using namespace mixxx::nml;
 
-// DJNote: NML files with several playlists (#113), tested at the Plan/Apply seam.
+// DJNote: NML files with several playlists, tested at the Plan/Apply seam.
 
 namespace {
 
@@ -59,20 +59,34 @@ class NmlMultiPlaylistTest : public LibraryTest {
     QDir m_nmlDir;
 };
 
-TEST_F(NmlMultiPlaylistTest, OffersOnlyRealPlaylistsNamedAsInTheFile) {
+TEST_F(NmlMultiPlaylistTest, OffersRealPlaylistsAndPreparationUntickedNamedAsInTheFile) {
     const QString nml = fixture(QStringLiteral("traktor-multi-playlist.nml"), "collection.nml");
     const NmlImportPlan plan = planNmlImport(nml, playlistDao());
     ASSERT_TRUE(plan.error.isEmpty()) << plan.error.toStdString();
     // Two playlists inside a folder, one smartlist, _LOOPS, _RECORDINGS and
-    // Preparation: exactly the two real playlists remain.
+    // Preparation: the two real playlists (ticked) and Preparation (unticked).
     const QList<NmlPlaylistChoice> choices = nmlPlaylistChoices(plan, playlistDao());
-    ASSERT_EQ(2, choices.size());
+    ASSERT_EQ(3, choices.size());
     EXPECT_EQ(QStringLiteral("Warmup"), choices.at(0).name);
     EXPECT_EQ(2, choices.at(0).trackCount);
     EXPECT_EQ(QStringLiteral("Peak"), choices.at(1).name);
     EXPECT_EQ(3, choices.at(1).trackCount);
     EXPECT_TRUE(choices.at(0).selected);
     EXPECT_TRUE(choices.at(1).selected);
+    EXPECT_EQ(QStringLiteral("Preparation"), choices.at(2).name);
+    EXPECT_FALSE(choices.at(2).selected);
+}
+
+TEST_F(NmlMultiPlaylistTest, TickingPreparationImportsIt) {
+    const QString nml = fixture(QStringLiteral("traktor-multi-playlist.nml"), "collection.nml");
+    const NmlImportPlan plan = planNmlImport(nml, playlistDao());
+    QList<NmlPlaylistChoice> choices = nmlPlaylistChoices(plan, playlistDao());
+    ASSERT_EQ(3, choices.size());
+    choices[2].selected = true;
+    const NmlMultiImportResult multi =
+            applyNmlImportPlaylists(plan, choices, trackCollectionManager());
+    ASSERT_EQ(3, multi.results.size());
+    EXPECT_NE(kInvalidPlaylistId, playlistDao().getPlaylistIdFromName("Preparation"));
 }
 
 TEST_F(NmlMultiPlaylistTest, FirstPlanIsTheFirstImportablePlaylist) {

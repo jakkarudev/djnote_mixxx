@@ -16,12 +16,11 @@ namespace mixxx {
 namespace nml {
 
 /// DJNote: review dialog between Plan and Apply. Shows the editable Playlist
-/// name and one row per playlist item with its status. Later tickets add
-/// columns/choices here.
+/// name and one row per playlist item with its status.
 class DlgNmlImport : public QDialog {
     Q_OBJECT
   public:
-    // `pManager` (optional) enables the "Find in library" button (#111).
+    // `pManager` (optional) enables the "Find in library" button.
     DlgNmlImport(const NmlImportPlan& plan,
             const PlaylistDAO& dao,
             QWidget* parent = nullptr,
@@ -33,13 +32,9 @@ class DlgNmlImport : public QDialog {
         return m_plan;
     }
 
-    // DJNote (#112): status plus the reuse existing track wording.
-    static QString rowStatusText(const NmlPlanTrack& track);
-    static QString statusText(NmlTrackStatus status);
-
   private slots:
     void updateOkEnabled();
-    void refreshRows(); // #111: rows from m_plan
+    void refreshRows(); // rows from m_plan
     void onItemChanged(QTableWidgetItem* pItem);
 
   private:

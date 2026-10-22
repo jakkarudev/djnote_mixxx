@@ -8,7 +8,7 @@ class TrackCollectionManager;
 namespace mixxx {
 namespace nml {
 
-/// DJNote: the interactive flow behind "Export as Traktor Playlist (.nml)...":
+/// DJNote: the interactive flow that makes an NML export of a Playlist:
 /// save dialog (default <last folder>/<Playlist name>/<Playlist name>.nml with
 /// a remembered "Copy tracks" tick box) -> export worker with progress and
 /// cancel -> summary. Returns true if a .nml was written.

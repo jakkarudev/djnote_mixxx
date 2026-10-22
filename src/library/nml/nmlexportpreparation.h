@@ -12,7 +12,7 @@
 
 class Track;
 
-// DJNote: the export side of the preparation (#116): the reverse of
+// DJNote: the export side of the preparation: the reverse of
 // nmlpreparation.h (grid, key, lock) and nmlcues.h (cues, colour, rating).
 // Positions go through the same NmlPositionConverter as the import, so the
 // decoder delay is subtracted here and added back there.

@@ -7,7 +7,7 @@
 #include <optional>
 
 // DJNote: GUI-free model of a Traktor .nml file (VERSION 19 and 20), read side.
-// It keeps what the import, grid/key/cue, browse and re-read tickets need;
+// It keeps what the import, grid/key/cue, browse and re-read need;
 // fields are optional/empty when the file does not carry them. Positions are
 // milliseconds, as in the file.
 

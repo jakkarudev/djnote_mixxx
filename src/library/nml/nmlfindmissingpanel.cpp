@@ -19,7 +19,7 @@ NmlFindMissingPanel::NmlFindMissingPanel(PlansProvider plansProvider,
           m_startFolder(startFolder) {
     auto* pLayout = new QHBoxLayout(this);
     pLayout->setContentsMargins(0, 0, 0, 0);
-    auto* pBrowse = new QPushButton(tr("Browse for the moved folder…"), this);
+    auto* pBrowse = new QPushButton(tr("Browse for the moved folder..."), this);
     connect(pBrowse, &QPushButton::clicked, this, &NmlFindMissingPanel::browse);
     pLayout->addWidget(pBrowse);
     if (m_pManager) {

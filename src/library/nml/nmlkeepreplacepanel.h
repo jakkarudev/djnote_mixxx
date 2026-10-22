@@ -12,7 +12,7 @@ class TrackCollectionManager;
 namespace mixxx {
 namespace nml {
 
-/// DJNote (#109): the "Keep DJNote's preparation / Replace with the NML's"
+/// DJNote: the "Keep DJNote's preparation / Replace with the NML's"
 /// choice shared by both import review dialogs. Hidden unless at least one row
 /// of the plans lands on an existing track that has preparation. It sets
 /// NmlImportPlan::preparationMode on every plan of `allPlans`.
