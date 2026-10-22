@@ -162,18 +162,27 @@ QByteArray writeNml(const NmlWriteDocument& doc) {
         attr(&out, "GENRE", e.genre);
         attr(&out, "LABEL", e.label);
         attr(&out, "COMMENT", e.comment);
+        // Order verified against Traktor 4.0.2's collection.nml and test.nml:
+        // KEY, PLAYCOUNT, PLAYTIME, PLAYTIME_FLOAT, RANKING, IMPORT_DATE,
+        // LAST_PLAYED. COLOR has no sample anywhere; it follows RANKING.
+        attr(&out, "KEY", e.keyText);
+        if (e.playCount > 0) {
+            attr(&out, "PLAYCOUNT", QString::number(e.playCount));
+        }
+        if (e.playtimeSeconds > 0.0) {
+            attr(&out, "PLAYTIME", QString::number(static_cast<int>(std::ceil(e.playtimeSeconds))));
+            attr(&out, "PLAYTIME_FLOAT", nmlFloat(e.playtimeSeconds));
+        }
         if (e.ranking) {
             attr(&out, "RANKING", QString::number(*e.ranking));
         }
         if (e.color) {
             attr(&out, "COLOR", QString::number(*e.color));
         }
-        attr(&out, "KEY", e.keyText);
-        if (e.playtimeSeconds > 0.0) {
-            attr(&out, "PLAYTIME", QString::number(static_cast<int>(std::ceil(e.playtimeSeconds))));
-            attr(&out, "PLAYTIME_FLOAT", nmlFloat(e.playtimeSeconds));
-        }
         attr(&out, "IMPORT_DATE", today);
+        if (e.lastPlayed.isValid()) {
+            attr(&out, "LAST_PLAYED", dateText(e.lastPlayed));
+        }
         attr(&out, "RELEASE_DATE", nmlReleaseDate(e.releaseDate));
         attr(&out, "FLAGS", QStringLiteral("12"));
         out += QStringLiteral("></INFO>\n");
