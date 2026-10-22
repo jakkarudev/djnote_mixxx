@@ -3,6 +3,8 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QGroupBox>
+#include <QListWidget>
+#include <set>
 #include <memory>
 
 #include "library/keymatch/keymatcher.h"
@@ -259,6 +261,13 @@ QComboBox* highlightComboBox(DlgPrefDJNote* pPage) {
     return pComboBox;
 }
 
+QCheckBox* boldCheckBox(DlgPrefDJNote* pPage) {
+    auto* pCheckBox = pPage->findChild<QCheckBox*>(
+            QStringLiteral("keyMatchingBoldCheckBox"));
+    EXPECT_NE(nullptr, pCheckBox);
+    return pCheckBox;
+}
+
 void storeHighlight(const UserSettingsPointer& pConfig, Highlight highlight) {
     mixxx::keymatch::Settings settings;
     settings.highlight = highlight;
@@ -334,6 +343,135 @@ TEST_F(DlgPrefDJNoteTest, ResetRestoresStrictAndFuzzy) {
     EXPECT_EQ(Highlight::StrictAndFuzzy, mixxx::keymatch::loadSettings(config()).highlight);
 }
 
+// Colour these columns (ticket #99): a checklist with Whole row first.
+namespace {
+
+using mixxx::keymatch::ColumnIdentity;
+
+QListWidget* columnsList(DlgPrefDJNote* pPage) {
+    auto* pList = pPage->findChild<QListWidget*>(QStringLiteral("keyMatchingColumnsList"));
+    EXPECT_NE(nullptr, pList);
+    return pList;
+}
+
+QListWidgetItem* columnItem(DlgPrefDJNote* pPage, const QString& text) {
+    auto* pList = columnsList(pPage);
+    const auto items = pList->findItems(text, Qt::MatchExactly);
+    EXPECT_EQ(1, items.size()) << text.toStdString();
+    return items.isEmpty() ? nullptr : items.first();
+}
+
+bool isTicked(QListWidgetItem* pItem) {
+    return pItem->checkState() == Qt::Checked;
+}
+
+bool isGreyedOut(QListWidgetItem* pItem) {
+    return !pItem->flags().testFlag(Qt::ItemIsEnabled);
+}
+
+} // namespace
+
+TEST_F(DlgPrefDJNoteTest, ColumnsChecklistStartsWithWholeRowThenTextColumns) {
+    auto pPage = openPage();
+    auto* pList = columnsList(pPage.get());
+    ASSERT_GT(pList->count(), 4);
+    EXPECT_EQ(QStringLiteral("Whole row"), pList->item(0)->text());
+    EXPECT_EQ(QStringLiteral("Key"), pList->item(1)->text());
+    for (const char* text : {"Title", "Artist", "BPM"}) {
+        EXPECT_EQ(1, pList->findItems(QString::fromLatin1(text), Qt::MatchExactly).size()) << text;
+    }
+    for (const char* text : {"Cover", "Color", "Rating", "Played", "Preview"}) {
+        EXPECT_TRUE(pList->findItems(QString::fromLatin1(text), Qt::MatchExactly).isEmpty())
+                << text;
+    }
+}
+
+TEST_F(DlgPrefDJNoteTest, OnlyKeyIsTickedByDefault) {
+    auto pPage = openPage();
+    auto* pList = columnsList(pPage.get());
+    for (int i = 0; i < pList->count(); ++i) {
+        EXPECT_EQ(pList->item(i)->text() == QStringLiteral("Key"), isTicked(pList->item(i)))
+                << pList->item(i)->text().toStdString();
+    }
+}
+
+TEST_F(DlgPrefDJNoteTest, ColumnsShowTheStoredSetting) {
+    mixxx::keymatch::Settings settings;
+    settings.columns = {ColumnIdentity::Title};
+    settings.wholeRow = true;
+    mixxx::keymatch::saveSettings(config(), settings);
+    auto pPage = openPage();
+    EXPECT_TRUE(isTicked(columnItem(pPage.get(), QStringLiteral("Whole row"))));
+    EXPECT_TRUE(isTicked(columnItem(pPage.get(), QStringLiteral("Title"))));
+    EXPECT_FALSE(isTicked(columnItem(pPage.get(), QStringLiteral("Key"))));
+}
+
+TEST_F(DlgPrefDJNoteTest, TickingColumnsAppliesLive) {
+    auto pPage = openPage();
+    columnItem(pPage.get(), QStringLiteral("Title"))->setCheckState(Qt::Checked);
+    columnItem(pPage.get(), QStringLiteral("Key"))->setCheckState(Qt::Unchecked);
+    auto settings = mixxx::keymatch::loadSettings(config());
+    EXPECT_EQ((std::set<ColumnIdentity>{ColumnIdentity::Title}), settings.columns);
+    EXPECT_FALSE(settings.wholeRow);
+    columnItem(pPage.get(), QStringLiteral("Whole row"))->setCheckState(Qt::Checked);
+    EXPECT_TRUE(mixxx::keymatch::loadSettings(config()).wholeRow);
+}
+
+TEST_F(DlgPrefDJNoteTest, WholeRowGreysOutTheOtherColumns) {
+    auto pPage = openPage();
+    EXPECT_FALSE(isGreyedOut(columnItem(pPage.get(), QStringLiteral("Title"))));
+    columnItem(pPage.get(), QStringLiteral("Whole row"))->setCheckState(Qt::Checked);
+    EXPECT_FALSE(isGreyedOut(columnItem(pPage.get(), QStringLiteral("Whole row"))));
+    EXPECT_TRUE(isGreyedOut(columnItem(pPage.get(), QStringLiteral("Title"))));
+    EXPECT_TRUE(isGreyedOut(columnItem(pPage.get(), QStringLiteral("Key"))));
+    columnItem(pPage.get(), QStringLiteral("Whole row"))->setCheckState(Qt::Unchecked);
+    EXPECT_FALSE(isGreyedOut(columnItem(pPage.get(), QStringLiteral("Title"))));
+}
+
+TEST_F(DlgPrefDJNoteTest, ChecklistIsGreyedOutWhileHighlightIsOff) {
+    auto pPage = openPage();
+    EXPECT_TRUE(columnsList(pPage.get())->isEnabled());
+    auto* pHighlight = highlightComboBox(pPage.get());
+    pHighlight->setCurrentIndex(pHighlight->findText(QStringLiteral("Off")));
+    EXPECT_FALSE(columnsList(pPage.get())->isEnabled());
+    pHighlight->setCurrentIndex(pHighlight->findText(QStringLiteral("Strict only")));
+    EXPECT_TRUE(columnsList(pPage.get())->isEnabled());
+}
+
+TEST_F(DlgPrefDJNoteTest, ChecklistIsGreyedOutWhenStoredHighlightIsOff) {
+    storeHighlight(config(), Highlight::Off);
+    auto pPage = openPage();
+    EXPECT_FALSE(columnsList(pPage.get())->isEnabled());
+}
+
+TEST_F(DlgPrefDJNoteTest, ResetRestoresKeyOnly) {
+    mixxx::keymatch::Settings settings;
+    settings.columns = {ColumnIdentity::Title};
+    settings.wholeRow = true;
+    mixxx::keymatch::saveSettings(config(), settings);
+    auto pPage = openPage();
+    pPage->slotResetToDefaults();
+    EXPECT_TRUE(isTicked(columnItem(pPage.get(), QStringLiteral("Key"))));
+    EXPECT_FALSE(isTicked(columnItem(pPage.get(), QStringLiteral("Title"))));
+    EXPECT_FALSE(isTicked(columnItem(pPage.get(), QStringLiteral("Whole row"))));
+    const auto stored = mixxx::keymatch::loadSettings(config());
+    EXPECT_EQ((std::set<ColumnIdentity>{ColumnIdentity::Key}), stored.columns);
+    EXPECT_FALSE(stored.wholeRow);
+}
+
+TEST_F(DlgPrefDJNoteTest, ColumnSettingsRoundTripIncludingNoColumns) {
+    mixxx::keymatch::Settings settings;
+    settings.columns = {ColumnIdentity::Artist, ColumnIdentity::Bpm};
+    settings.wholeRow = true;
+    mixxx::keymatch::saveSettings(config(), settings);
+    auto loaded = mixxx::keymatch::loadSettings(config());
+    EXPECT_EQ(settings.columns, loaded.columns);
+    EXPECT_TRUE(loaded.wholeRow);
+    settings.columns.clear();
+    mixxx::keymatch::saveSettings(config(), settings);
+    EXPECT_TRUE(mixxx::keymatch::loadSettings(config()).columns.empty());
+}
+
 TEST_F(DlgPrefDJNoteTest, KeyMatchingSettingsRoundTripAndFallBack) {
     EXPECT_EQ(Highlight::StrictAndFuzzy, mixxx::keymatch::loadSettings(config()).highlight);
     for (Highlight highlight :
@@ -343,4 +481,73 @@ TEST_F(DlgPrefDJNoteTest, KeyMatchingSettingsRoundTripAndFallBack) {
     }
     config()->setValue(ConfigKey("[DJNote]", "KeyMatchingHighlight"), QStringLiteral("bogus"));
     EXPECT_EQ(Highlight::StrictAndFuzzy, mixxx::keymatch::loadSettings(config()).highlight);
+}
+
+// Bold matched text (ticket #100).
+TEST_F(DlgPrefDJNoteTest, BoldMatchedTextIsOnByDefault) {
+    auto pPage = openPage();
+    auto* pBold = boldCheckBox(pPage.get());
+    ASSERT_NE(nullptr, pBold);
+    EXPECT_EQ(QStringLiteral("Bold matched text"), pBold->text());
+    EXPECT_TRUE(pBold->isChecked());
+    EXPECT_TRUE(pBold->isEnabled());
+    EXPECT_TRUE(mixxx::keymatch::loadSettings(config()).boldMatchedText);
+}
+
+TEST_F(DlgPrefDJNoteTest, BoldMatchedTextShowsTheStoredSetting) {
+    mixxx::keymatch::Settings settings;
+    settings.boldMatchedText = false;
+    mixxx::keymatch::saveSettings(config(), settings);
+    auto pPage = openPage();
+    EXPECT_FALSE(boldCheckBox(pPage.get())->isChecked());
+}
+
+TEST_F(DlgPrefDJNoteTest, BoldMatchedTextAppliesLiveAndTellsTheMatcher) {
+    PlayerInfo::create();
+    {
+        auto pPage = openPage();
+        mixxx::keymatch::KeyMatcher matcher(config());
+        boldCheckBox(pPage.get())->setChecked(false);
+        EXPECT_FALSE(mixxx::keymatch::loadSettings(config()).boldMatchedText);
+        EXPECT_FALSE(matcher.settings().boldMatchedText);
+        boldCheckBox(pPage.get())->setChecked(true);
+        EXPECT_TRUE(matcher.settings().boldMatchedText);
+    }
+    PlayerInfo::destroy();
+}
+
+TEST_F(DlgPrefDJNoteTest, BoldMatchedTextIsGreyedOutWhenHighlightIsOff) {
+    auto pPage = openPage();
+    auto* pHighlight = highlightComboBox(pPage.get());
+    pHighlight->setCurrentIndex(pHighlight->findText(QStringLiteral("Off")));
+    EXPECT_FALSE(boldCheckBox(pPage.get())->isEnabled());
+    pHighlight->setCurrentIndex(pHighlight->findText(QStringLiteral("Strict only")));
+    EXPECT_TRUE(boldCheckBox(pPage.get())->isEnabled());
+}
+
+TEST_F(DlgPrefDJNoteTest, BoldMatchedTextStartsGreyedOutWhenStoredHighlightIsOff) {
+    storeHighlight(config(), Highlight::Off);
+    auto pPage = openPage();
+    EXPECT_FALSE(boldCheckBox(pPage.get())->isEnabled());
+}
+
+TEST_F(DlgPrefDJNoteTest, ResetRestoresBoldMatchedText) {
+    mixxx::keymatch::Settings settings;
+    settings.highlight = Highlight::Off;
+    settings.boldMatchedText = false;
+    mixxx::keymatch::saveSettings(config(), settings);
+    auto pPage = openPage();
+    pPage->slotResetToDefaults();
+    EXPECT_TRUE(boldCheckBox(pPage.get())->isChecked());
+    EXPECT_TRUE(boldCheckBox(pPage.get())->isEnabled());
+    EXPECT_TRUE(mixxx::keymatch::loadSettings(config()).boldMatchedText);
+}
+
+TEST_F(DlgPrefDJNoteTest, BoldMatchedTextSettingRoundTripsAndFallsBack) {
+    mixxx::keymatch::Settings settings;
+    settings.boldMatchedText = false;
+    mixxx::keymatch::saveSettings(config(), settings);
+    EXPECT_FALSE(mixxx::keymatch::loadSettings(config()).boldMatchedText);
+    config()->setValue(ConfigKey("[DJNote]", "KeyMatchingBold"), QStringLiteral("bogus"));
+    EXPECT_TRUE(mixxx::keymatch::loadSettings(config()).boldMatchedText);
 }

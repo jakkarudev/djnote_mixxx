@@ -387,7 +387,9 @@ QVariant BaseTrackTableModel::data(
         // missing colour below.
         const QVariant keyMatchColor = mixxx::keymatch::cellData(mapColumn(index.column()),
                 role,
-                [&](ColumnCache::Column column) { return rawSiblingValue(index, column); });
+                [&](ColumnCache::Column column) { return rawSiblingValue(index, column); },
+                s_bApplyPlayedTrackColor ? std::optional<QColor>(m_trackPlayedColor)
+                                         : std::nullopt);
         if (keyMatchColor.isValid()) {
             return keyMatchColor;
         }

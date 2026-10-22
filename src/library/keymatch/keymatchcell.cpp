@@ -32,10 +32,6 @@ std::optional<QColor> colorOf(KeyMatchTier tier) {
     return std::nullopt;
 }
 
-bool isColoured(ColumnIdentity column) {
-    return column == ColumnIdentity::Key;
-}
-
 mixxx::track::io::key::ChromaticKey rowKey(
         const std::function<QVariant(ColumnCache::Column)>& siblingValue) {
     const QVariant keyId = siblingValue(ColumnCache::COLUMN_LIBRARYTABLE_KEY_ID);
@@ -57,18 +53,71 @@ mixxx::track::io::key::ChromaticKey rowKey(
 } // namespace
 
 ColumnIdentity columnIdentity(ColumnCache::Column column) {
-    return column == ColumnCache::COLUMN_LIBRARYTABLE_KEY ? ColumnIdentity::Key
-                                                          : ColumnIdentity::NotColoured;
+    switch (column) {
+    case ColumnCache::COLUMN_LIBRARYTABLE_KEY:
+        return ColumnIdentity::Key;
+    case ColumnCache::COLUMN_LIBRARYTABLE_TITLE:
+        return ColumnIdentity::Title;
+    case ColumnCache::COLUMN_LIBRARYTABLE_ARTIST:
+        return ColumnIdentity::Artist;
+    case ColumnCache::COLUMN_LIBRARYTABLE_ALBUM:
+        return ColumnIdentity::Album;
+    case ColumnCache::COLUMN_LIBRARYTABLE_ALBUMARTIST:
+        return ColumnIdentity::AlbumArtist;
+    case ColumnCache::COLUMN_LIBRARYTABLE_YEAR:
+        return ColumnIdentity::Year;
+    case ColumnCache::COLUMN_LIBRARYTABLE_GENRE:
+        return ColumnIdentity::Genre;
+    case ColumnCache::COLUMN_LIBRARYTABLE_COMPOSER:
+        return ColumnIdentity::Composer;
+    case ColumnCache::COLUMN_LIBRARYTABLE_GROUPING:
+        return ColumnIdentity::Grouping;
+    case ColumnCache::COLUMN_LIBRARYTABLE_TRACKNUMBER:
+        return ColumnIdentity::TrackNumber;
+    case ColumnCache::COLUMN_LIBRARYTABLE_FILETYPE:
+        return ColumnIdentity::FileType;
+    case ColumnCache::COLUMN_LIBRARYTABLE_COMMENT:
+        return ColumnIdentity::Comment;
+    case ColumnCache::COLUMN_LIBRARYTABLE_DURATION:
+        return ColumnIdentity::Duration;
+    case ColumnCache::COLUMN_LIBRARYTABLE_BITRATE:
+        return ColumnIdentity::Bitrate;
+    case ColumnCache::COLUMN_LIBRARYTABLE_BPM:
+        return ColumnIdentity::Bpm;
+    case ColumnCache::COLUMN_LIBRARYTABLE_REPLAYGAIN:
+        return ColumnIdentity::ReplayGain;
+    case ColumnCache::COLUMN_TRACKLOCATIONSTABLE_LOCATION:
+        return ColumnIdentity::Location;
+    case ColumnCache::COLUMN_LIBRARYTABLE_TIMESPLAYED:
+        return ColumnIdentity::TimesPlayed;
+    case ColumnCache::COLUMN_LIBRARYTABLE_DATETIMEADDED:
+        return ColumnIdentity::DateAdded;
+    case ColumnCache::COLUMN_LIBRARYTABLE_LAST_PLAYED_AT:
+        return ColumnIdentity::LastPlayed;
+    default:
+        return ColumnIdentity::NotColoured;
+    }
 }
 
 CellStyle cellStyle(const CellInput& input) {
     const KeyMatcher* pMatcher = KeyMatcher::instance();
     // A missing track keeps Mixxx's missing colour and is never highlighted.
-    if (!pMatcher || input.missing || !isColoured(input.column)) {
+    if (!pMatcher || input.missing || !pMatcher->settings().colours(input.column)) {
         return {};
     }
     CellStyle style;
-    style.color = colorOf(pMatcher->match(input.key));
+    const std::optional<QColor> color = colorOf(pMatcher->match(input.key));
+    style.color = color;
+    // A played match is mixed 50/50 with the played colour.
+    if (style.color && input.played && input.playedColor) {
+        const QColor& a = *style.color;
+        const QColor& b = *input.playedColor;
+        style.color = QColor((a.red() + b.red() + 1) / 2,
+                (a.green() + b.green() + 1) / 2,
+                (a.blue() + b.blue() + 1) / 2);
+    }
+    // Every coloured cell is bold, played or not.
+    style.bold = color.has_value() && pMatcher->settings().boldMatchedText;
     return style;
 }
 
@@ -87,9 +136,11 @@ QVariant roleData(const CellStyle& style, int role) {
 
 QVariant cellData(ColumnCache::Column column,
         int role,
-        const std::function<QVariant(ColumnCache::Column)>& siblingValue) {
+        const std::function<QVariant(ColumnCache::Column)>& siblingValue,
+        const std::optional<QColor>& playedColor) {
     const ColumnIdentity identity = columnIdentity(column);
-    if (!isColoured(identity) || !KeyMatcher::instance()) {
+    const KeyMatcher* pMatcher = KeyMatcher::instance();
+    if (!pMatcher || !pMatcher->settings().colours(identity)) {
         return QVariant();
     }
     CellInput input;
@@ -99,6 +150,7 @@ QVariant cellData(ColumnCache::Column column,
     input.missing = !missing.isNull() && missing.toBool();
     const QVariant played = siblingValue(ColumnCache::COLUMN_LIBRARYTABLE_PLAYED);
     input.played = !played.isNull() && played.toBool();
+    input.playedColor = playedColor;
 
     return roleData(cellStyle(input), role);
 }

@@ -8,6 +8,7 @@
 class QCheckBox;
 class QComboBox;
 class QLabel;
+class QListWidget;
 
 // The DJNote preferences page: settings of DJNote features that have no
 // upstream page to live on. Built in code (no .ui file).
@@ -44,6 +45,9 @@ class DlgPrefDJNote : public DlgPreferencePage {
     mixxx::knobreadout::Settings knobReadoutSettingsFromControls() const;
 
     void createKeyMatchingGroup();
+    // Greys out what means nothing in the current state: the checklist while
+    // Highlight is Off, the other columns while Whole row is ticked.
+    void updateKeyMatchingEnabled();
     void showKeyMatchingSettings(const mixxx::keymatch::Settings& settings);
     mixxx::keymatch::Settings keyMatchingSettingsFromControls() const;
 
@@ -58,6 +62,8 @@ class DlgPrefDJNote : public DlgPreferencePage {
     bool m_showingKnobReadoutSettings = false;
 
     QComboBox* m_pKeyMatchingHighlight;
+    QListWidget* m_pKeyMatchingColumns;
+    QCheckBox* m_pKeyMatchingBold;
     // Same as m_showingKnobReadoutSettings, for the key matching group.
     bool m_showingKeyMatchingSettings = false;
 };

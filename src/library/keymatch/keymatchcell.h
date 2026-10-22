@@ -7,6 +7,7 @@
 #include <optional>
 
 #include "library/columncache.h"
+#include "library/keymatch/keymatchsettings.h"
 #include "proto/keys.pb.h"
 
 // What a track list cell looks like under key matching (GLOSSARY.md, "Key
@@ -15,14 +16,8 @@
 namespace mixxx {
 namespace keymatch {
 
-// A column's identity, shared by all track list types. Later tickets let the DJ
-// choose which identities are coloured; today only Key is.
-enum class ColumnIdentity {
-    Key,
-    // Cover, Color, Rating, Played, Preview and the like: never coloured.
-    NotColoured,
-};
-
+// The identity (see keymatchsettings.h) of a library column; NotColoured for
+// Cover, Color, Rating, Played, Preview and the like.
 ColumnIdentity columnIdentity(ColumnCache::Column column);
 
 // Everything the cell helper needs about the cell's row and column.
@@ -32,6 +27,9 @@ struct CellInput {
     mixxx::track::io::key::ChromaticKey key = mixxx::track::io::key::INVALID;
     bool missing = false;
     bool played = false;
+    // The table view's played colour, set only while Mixxx colours played
+    // tracks.
+    std::optional<QColor> playedColor;
 };
 
 // The colour and font the cell takes from key matching. Unset colour and no
@@ -54,7 +52,8 @@ QVariant roleData(const CellStyle& style, int role);
 // normal look.
 QVariant cellData(ColumnCache::Column column,
         int role,
-        const std::function<QVariant(ColumnCache::Column)>& siblingValue);
+        const std::function<QVariant(ColumnCache::Column)>& siblingValue,
+        const std::optional<QColor>& playedColor = std::nullopt);
 
 // Makes the model repaint all its cells whenever key matching changes.
 void repaintOnChange(QAbstractItemModel* pModel);

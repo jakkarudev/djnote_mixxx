@@ -5,11 +5,68 @@
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QLabel>
+#include <QListWidget>
 #include <QVBoxLayout>
 
 #include "library/keymatch/keymatcher.h"
 
 #include "moc_dlgprefdjnote.cpp"
+
+namespace {
+
+// The Whole row item's data, apart from every ColumnIdentity.
+constexpr int kWholeRowItem = -1;
+
+QString columnLabel(mixxx::keymatch::ColumnIdentity identity) {
+    using mixxx::keymatch::ColumnIdentity;
+    switch (identity) {
+    case ColumnIdentity::Key:
+        return DlgPrefDJNote::tr("Key");
+    case ColumnIdentity::Title:
+        return DlgPrefDJNote::tr("Title");
+    case ColumnIdentity::Artist:
+        return DlgPrefDJNote::tr("Artist");
+    case ColumnIdentity::Album:
+        return DlgPrefDJNote::tr("Album");
+    case ColumnIdentity::AlbumArtist:
+        return DlgPrefDJNote::tr("Album Artist");
+    case ColumnIdentity::Year:
+        return DlgPrefDJNote::tr("Year");
+    case ColumnIdentity::Genre:
+        return DlgPrefDJNote::tr("Genre");
+    case ColumnIdentity::Composer:
+        return DlgPrefDJNote::tr("Composer");
+    case ColumnIdentity::Grouping:
+        return DlgPrefDJNote::tr("Grouping");
+    case ColumnIdentity::TrackNumber:
+        return DlgPrefDJNote::tr("Track #");
+    case ColumnIdentity::FileType:
+        return DlgPrefDJNote::tr("Type");
+    case ColumnIdentity::Comment:
+        return DlgPrefDJNote::tr("Comment");
+    case ColumnIdentity::Duration:
+        return DlgPrefDJNote::tr("Duration");
+    case ColumnIdentity::Bitrate:
+        return DlgPrefDJNote::tr("Bitrate");
+    case ColumnIdentity::Bpm:
+        return DlgPrefDJNote::tr("BPM");
+    case ColumnIdentity::ReplayGain:
+        return DlgPrefDJNote::tr("ReplayGain");
+    case ColumnIdentity::Location:
+        return DlgPrefDJNote::tr("Location");
+    case ColumnIdentity::TimesPlayed:
+        return DlgPrefDJNote::tr("Played times");
+    case ColumnIdentity::DateAdded:
+        return DlgPrefDJNote::tr("Date Added");
+    case ColumnIdentity::LastPlayed:
+        return DlgPrefDJNote::tr("Last Played");
+    case ColumnIdentity::NotColoured:
+        break;
+    }
+    return QString();
+}
+
+} // namespace
 
 DlgPrefDJNote::DlgPrefDJNote(QWidget* pParent, UserSettingsPointer pConfig)
         : DlgPreferencePage(pParent),
@@ -19,7 +76,9 @@ DlgPrefDJNote::DlgPrefDJNote(QWidget* pParent, UserSettingsPointer pConfig)
           m_pKnobReadoutMode(nullptr),
           m_pKnobReadoutStyleLabel(nullptr),
           m_pKnobReadoutStyle(nullptr),
-          m_pKeyMatchingHighlight(nullptr) {
+          m_pKeyMatchingHighlight(nullptr),
+          m_pKeyMatchingColumns(nullptr),
+          m_pKeyMatchingBold(nullptr) {
     auto* pPageLayout = new QVBoxLayout(this);
     pPageLayout->setContentsMargins(0, 0, 0, 0);
     createKnobReadoutGroup();
@@ -179,9 +238,47 @@ void DlgPrefDJNote::createKeyMatchingGroup() {
     pGrid->addWidget(m_pKeyMatchingHighlight, row, 1, Qt::AlignLeft);
     pGrid->setColumnStretch(1, 1);
 
+    // Colour these columns: Whole row first, then the text columns.
+    m_pKeyMatchingColumns = new QListWidget(pGroup);
+    m_pKeyMatchingColumns->setObjectName(QStringLiteral("keyMatchingColumnsList"));
+    m_pKeyMatchingColumns->setFixedHeight(140);
+    m_pKeyMatchingColumns->setToolTip(
+            tr("The columns that get the match colour. Whole row colours every "
+               "text column; Cover, Color, Rating, Played and Preview are "
+               "never coloured."));
+    auto addColumnItem = [this](const QString& text, int identity) {
+        auto* pItem = new QListWidgetItem(text, m_pKeyMatchingColumns);
+        pItem->setFlags(Qt::ItemIsEnabled | Qt::ItemIsUserCheckable);
+        pItem->setCheckState(Qt::Unchecked);
+        pItem->setData(Qt::UserRole, identity);
+    };
+    addColumnItem(tr("Whole row"), kWholeRowItem);
+    for (const auto identity : mixxx::keymatch::choosableColumns()) {
+        addColumnItem(columnLabel(identity), static_cast<int>(identity));
+    }
+    auto* pColumnsLabel = new QLabel(tr("Colour these columns"), pGroup);
+    pColumnsLabel->setBuddy(m_pKeyMatchingColumns);
+    pColumnsLabel->setAlignment(Qt::AlignTop);
+    const int columnsRow = pGrid->rowCount();
+    pGrid->addWidget(pColumnsLabel, columnsRow, 0);
+    pGrid->addWidget(m_pKeyMatchingColumns, columnsRow, 1);
+    // Sits under the column checklist once that exists.
+    m_pKeyMatchingBold = new QCheckBox(tr("Bold matched text"), pGroup);
+    m_pKeyMatchingBold->setObjectName(QStringLiteral("keyMatchingBoldCheckBox"));
+    m_pKeyMatchingBold->setToolTip(tr("Show the highlighted cells in bold."));
+    pGrid->addWidget(m_pKeyMatchingBold, pGrid->rowCount(), 0, 1, 2);
+    connect(m_pKeyMatchingBold,
+            &QCheckBox::toggled,
+            this,
+            &DlgPrefDJNote::slotKeyMatchingControlChanged);
+
     // Every change applies live.
     connect(m_pKeyMatchingHighlight,
             QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            &DlgPrefDJNote::slotKeyMatchingControlChanged);
+    connect(m_pKeyMatchingColumns,
+            &QListWidget::itemChanged,
             this,
             &DlgPrefDJNote::slotKeyMatchingControlChanged);
 
@@ -197,18 +294,60 @@ void DlgPrefDJNote::slotKeyMatchingControlChanged() {
     if (auto* pMatcher = mixxx::keymatch::KeyMatcher::instance()) {
         pMatcher->reloadSettings();
     }
+    updateKeyMatchingEnabled();
+}
+
+void DlgPrefDJNote::updateKeyMatchingEnabled() {
+    const bool wasShowing = m_showingKeyMatchingSettings;
+    m_showingKeyMatchingSettings = true; // changing flags emits itemChanged
+    const auto highlight = static_cast<mixxx::keymatch::Highlight>(
+            m_pKeyMatchingHighlight->currentData().toInt());
+    m_pKeyMatchingColumns->setEnabled(highlight != mixxx::keymatch::Highlight::Off);
+    m_pKeyMatchingBold->setEnabled(highlight != mixxx::keymatch::Highlight::Off);
+    const bool wholeRow =
+            m_pKeyMatchingColumns->item(0)->checkState() == Qt::Checked;
+    for (int i = 1; i < m_pKeyMatchingColumns->count(); ++i) {
+        auto* pItem = m_pKeyMatchingColumns->item(i);
+        Qt::ItemFlags flags = pItem->flags();
+        flags.setFlag(Qt::ItemIsEnabled, !wholeRow);
+        pItem->setFlags(flags);
+    }
+    m_showingKeyMatchingSettings = wasShowing;
 }
 
 void DlgPrefDJNote::showKeyMatchingSettings(const mixxx::keymatch::Settings& settings) {
     m_showingKeyMatchingSettings = true;
     m_pKeyMatchingHighlight->setCurrentIndex(
             m_pKeyMatchingHighlight->findData(static_cast<int>(settings.highlight)));
+    for (int i = 0; i < m_pKeyMatchingColumns->count(); ++i) {
+        auto* pItem = m_pKeyMatchingColumns->item(i);
+        const int identity = pItem->data(Qt::UserRole).toInt();
+        const bool ticked = identity == kWholeRowItem
+                ? settings.wholeRow
+                : settings.columns.count(
+                          static_cast<mixxx::keymatch::ColumnIdentity>(identity)) > 0;
+        pItem->setCheckState(ticked ? Qt::Checked : Qt::Unchecked);
+    }
+    m_pKeyMatchingBold->setChecked(settings.boldMatchedText);
     m_showingKeyMatchingSettings = false;
+    updateKeyMatchingEnabled();
 }
 
 mixxx::keymatch::Settings DlgPrefDJNote::keyMatchingSettingsFromControls() const {
     mixxx::keymatch::Settings settings;
     settings.highlight = static_cast<mixxx::keymatch::Highlight>(
             m_pKeyMatchingHighlight->currentData().toInt());
+    settings.columns.clear();
+    for (int i = 0; i < m_pKeyMatchingColumns->count(); ++i) {
+        const auto* pItem = m_pKeyMatchingColumns->item(i);
+        const int identity = pItem->data(Qt::UserRole).toInt();
+        const bool ticked = pItem->checkState() == Qt::Checked;
+        if (identity == kWholeRowItem) {
+            settings.wholeRow = ticked;
+        } else if (ticked) {
+            settings.columns.insert(static_cast<mixxx::keymatch::ColumnIdentity>(identity));
+        }
+    }
+    settings.boldMatchedText = m_pKeyMatchingBold->isChecked();
     return settings;
 }

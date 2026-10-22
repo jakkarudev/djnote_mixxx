@@ -10,6 +10,7 @@
 #include "library/dao/trackschema.h"
 #include "library/keymatch/keymatcher.h"
 #include "library/keymatch/keymatchsettings.h"
+#include "library/basetracktablemodel.h"
 #include "library/librarytablemodel.h"
 #include "library/missing_hidden/missingtablemodel.h"
 #include "library/queryutil.h"
@@ -30,6 +31,9 @@ using mixxx::keymatch::KeyMatcher;
 
 const QColor kGreen(QStringLiteral("#4ade80"));
 const QColor kYellow(QStringLiteral("#facc15"));
+// Each tier colour mixed 50/50 with the default played colour #555555.
+const QColor kPlayedGreen(80, 154, 107);
+const QColor kPlayedYellow(168, 145, 53);
 
 class KeyMatchCellTest : public LibraryTest {
   protected:
@@ -50,6 +54,7 @@ class KeyMatchCellTest : public LibraryTest {
         m_pModel->setTableModel();
     }
     ~KeyMatchCellTest() override {
+        BaseTrackTableModel::setApplyPlayedTrackColor(true);
         m_pModel.reset();
         m_pTrack.reset();
         m_pMatcher.reset();
@@ -136,11 +141,37 @@ class KeyMatchCellTest : public LibraryTest {
         return keyColor();
     }
 
+    void trackIsPlayed() {
+        m_pTrack->updatePlayedStatusKeepPlayCount(true);
+        trackCollectionManager()->saveTrack(m_pTrack);
+        m_pModel->select();
+    }
+
     void setHighlight(Highlight highlight) {
-        mixxx::keymatch::Settings settings;
+        mixxx::keymatch::Settings settings = mixxx::keymatch::loadSettings(config());
         settings.highlight = highlight;
+        storeSettings(settings);
+    }
+
+    void storeSettings(const mixxx::keymatch::Settings& settings) {
         mixxx::keymatch::saveSettings(config(), settings);
         m_pMatcher->reloadSettings();
+    }
+
+    void setBoldMatchedText(bool bold) {
+        mixxx::keymatch::Settings settings = mixxx::keymatch::loadSettings(config());
+        settings.boldMatchedText = bold;
+        mixxx::keymatch::saveSettings(config(), settings);
+        m_pMatcher->reloadSettings();
+    }
+
+    QVariant fontOf(ColumnCache::Column column) const {
+        return cell(column).data(Qt::FontRole);
+    }
+
+    bool keyIsBold() const {
+        const QVariant font = fontOf(ColumnCache::COLUMN_LIBRARYTABLE_KEY);
+        return font.isValid() && font.value<QFont>().bold();
     }
 
     ControlObject m_numDecks;
@@ -267,4 +298,171 @@ TEST_F(KeyMatchCellTest, ChangingTheSettingRepaints) {
     QSignalSpy repainted(m_pModel.get(), &QAbstractItemModel::dataChanged);
     setHighlight(Highlight::Off);
     EXPECT_GE(repainted.count(), 1);
+}
+
+TEST_F(KeyMatchCellTest, APlayedMatchIsMixedWithThePlayedColour) {
+    BaseTrackTableModel::setApplyPlayedTrackColor(true);
+    referenceIs(QStringLiteral("8A"));
+    trackIsPlayed();
+    EXPECT_EQ(QVariant::fromValue(kPlayedGreen), keyColorFor(QStringLiteral("8A")));
+    EXPECT_EQ(QVariant::fromValue(kPlayedYellow), keyColorFor(QStringLiteral("10A")));
+}
+
+TEST_F(KeyMatchCellTest, APlayedMatchIsNotDimmedWithoutPlayedColouring) {
+    BaseTrackTableModel::setApplyPlayedTrackColor(false);
+    referenceIs(QStringLiteral("8A"));
+    trackIsPlayed();
+    EXPECT_EQ(QVariant::fromValue(kGreen), keyColorFor(QStringLiteral("8A")));
+}
+
+TEST_F(KeyMatchCellTest, PlayedColumnsThatAreNotColouredKeepThePlayedGrey) {
+    BaseTrackTableModel::setApplyPlayedTrackColor(true);
+    referenceIs(QStringLiteral("8A"));
+    trackKeyIs(QStringLiteral("8A"));
+    trackIsPlayed();
+    EXPECT_EQ(QVariant::fromValue(QColor(WTrackTableView::kDefaultTrackPlayedColor)),
+            cell(ColumnCache::COLUMN_LIBRARYTABLE_ARTIST).data(Qt::ForegroundRole));
+}
+
+TEST_F(KeyMatchCellTest, AMissingPlayedTrackKeepsTheMissingColour) {
+    BaseTrackTableModel::setApplyPlayedTrackColor(true);
+    referenceIs(QStringLiteral("8A"));
+    trackKeyIs(QStringLiteral("8A"));
+    trackIsPlayed();
+    QSqlQuery query(dbConnection());
+    ASSERT_TRUE(query.exec(QStringLiteral("UPDATE track_locations SET fs_deleted=1")));
+    m_pTrackSource->buildIndex();
+    MissingTableModel missingModel(nullptr, trackCollectionManager());
+    missingModel.select();
+    ASSERT_EQ(1, missingModel.rowCount());
+    const QModelIndex missingKey = missingModel.index(
+            0, missingModel.fieldIndex(ColumnCache::COLUMN_LIBRARYTABLE_KEY));
+    EXPECT_EQ(QVariant::fromValue(QColor(WTrackTableView::kDefaultTrackMissingColor)),
+            missingKey.data(Qt::ForegroundRole));
+}
+
+// Which columns are coloured (ticket #99).
+using mixxx::keymatch::ColumnIdentity;
+
+TEST_F(KeyMatchCellTest, TickedColumnsAreColouredAndUntickedKeepMixxxColours) {
+    referenceIs(QStringLiteral("8A"));
+    trackKeyIs(QStringLiteral("8A"));
+    mixxx::keymatch::Settings settings;
+    settings.columns = {ColumnIdentity::Title, ColumnIdentity::Bpm};
+    storeSettings(settings);
+    EXPECT_EQ(QVariant::fromValue(kGreen),
+            cell(ColumnCache::COLUMN_LIBRARYTABLE_TITLE).data(Qt::ForegroundRole));
+    EXPECT_EQ(QVariant::fromValue(kGreen),
+            cell(ColumnCache::COLUMN_LIBRARYTABLE_BPM).data(Qt::ForegroundRole));
+    EXPECT_FALSE(cell(ColumnCache::COLUMN_LIBRARYTABLE_ARTIST).data(Qt::ForegroundRole).isValid());
+    EXPECT_FALSE(keyColor().isValid());
+}
+
+TEST_F(KeyMatchCellTest, WholeRowColoursEveryTextColumnButNoOthers) {
+    referenceIs(QStringLiteral("8A"));
+    trackKeyIs(QStringLiteral("9A"));
+    mixxx::keymatch::Settings settings;
+    settings.wholeRow = true;
+    storeSettings(settings);
+    for (ColumnCache::Column column : {ColumnCache::COLUMN_LIBRARYTABLE_KEY,
+                 ColumnCache::COLUMN_LIBRARYTABLE_ARTIST,
+                 ColumnCache::COLUMN_LIBRARYTABLE_TITLE,
+                 ColumnCache::COLUMN_LIBRARYTABLE_BPM,
+                 ColumnCache::COLUMN_TRACKLOCATIONSTABLE_LOCATION}) {
+        EXPECT_EQ(QVariant::fromValue(kGreen), cell(column).data(Qt::ForegroundRole)) << column;
+    }
+    for (ColumnCache::Column column : {ColumnCache::COLUMN_LIBRARYTABLE_COVERART,
+                 ColumnCache::COLUMN_LIBRARYTABLE_COLOR,
+                 ColumnCache::COLUMN_LIBRARYTABLE_PLAYED}) {
+        EXPECT_FALSE(cell(column).data(Qt::ForegroundRole).isValid()) << column;
+    }
+}
+
+TEST_F(KeyMatchCellTest, AColumnTheListLacksIsSkipped) {
+    referenceIs(QStringLiteral("8A"));
+    trackKeyIs(QStringLiteral("8A"));
+    mixxx::keymatch::Settings settings;
+    settings.columns = {ColumnIdentity::Genre, ColumnIdentity::Key};
+    storeSettings(settings);
+    EXPECT_EQ(QVariant::fromValue(kGreen), keyColor());
+}
+
+TEST_F(KeyMatchCellTest, ChangingTheColumnsRepaints) {
+    referenceIs(QStringLiteral("8A"));
+    trackKeyIs(QStringLiteral("8A"));
+    QSignalSpy repainted(m_pModel.get(), &QAbstractItemModel::dataChanged);
+    mixxx::keymatch::Settings settings;
+    settings.wholeRow = true;
+    storeSettings(settings);
+    EXPECT_GE(repainted.count(), 1);
+}
+
+// Bold matched text (ticket #100).
+TEST_F(KeyMatchCellTest, MatchedKeysAreBoldInEveryTier) {
+    referenceIs(QStringLiteral("8A"));
+    for (const char* key : {"8A", "9A", "10A"}) {
+        trackKeyIs(QString::fromLatin1(key));
+        EXPECT_TRUE(keyIsBold()) << key;
+    }
+}
+
+TEST_F(KeyMatchCellTest, UnmatchedKeysAndOtherCellsKeepTheirFont) {
+    referenceIs(QStringLiteral("8A"));
+    trackKeyIs(QStringLiteral("2A"));
+    EXPECT_FALSE(fontOf(ColumnCache::COLUMN_LIBRARYTABLE_KEY).isValid());
+    trackKeyIs(QStringLiteral("8A"));
+    for (ColumnCache::Column column : {ColumnCache::COLUMN_LIBRARYTABLE_ARTIST,
+                 ColumnCache::COLUMN_LIBRARYTABLE_TITLE,
+                 ColumnCache::COLUMN_LIBRARYTABLE_BPM}) {
+        EXPECT_FALSE(fontOf(column).isValid()) << column;
+    }
+}
+
+TEST_F(KeyMatchCellTest, PlayedMatchesStayBold) {
+    referenceIs(QStringLiteral("8A"));
+    trackKeyIs(QStringLiteral("8A"));
+    QSqlQuery query(dbConnection());
+    ASSERT_TRUE(query.exec(QStringLiteral("UPDATE library SET played=1")));
+    m_pTrackSource->buildIndex();
+    m_pModel->select();
+    EXPECT_TRUE(keyIsBold());
+}
+
+TEST_F(KeyMatchCellTest, BoldOffChangesNoFont) {
+    referenceIs(QStringLiteral("8A"));
+    trackKeyIs(QStringLiteral("8A"));
+    setBoldMatchedText(false);
+    EXPECT_FALSE(fontOf(ColumnCache::COLUMN_LIBRARYTABLE_KEY).isValid());
+    // The colour stays.
+    EXPECT_EQ(QVariant::fromValue(kGreen), keyColor());
+}
+
+TEST_F(KeyMatchCellTest, HighlightOffIsNotBoldEvenWithBoldOn) {
+    referenceIs(QStringLiteral("8A"));
+    trackKeyIs(QStringLiteral("8A"));
+    setHighlight(Highlight::Off);
+    EXPECT_FALSE(keyIsBold());
+}
+
+TEST_F(KeyMatchCellTest, ChangingBoldRepaints) {
+    referenceIs(QStringLiteral("8A"));
+    trackKeyIs(QStringLiteral("8A"));
+    QSignalSpy repainted(m_pModel.get(), &QAbstractItemModel::dataChanged);
+    setBoldMatchedText(false);
+    EXPECT_GE(repainted.count(), 1);
+}
+
+TEST_F(KeyMatchCellTest, AMissingTrackIsNeverBold) {
+    referenceIs(QStringLiteral("8A"));
+    trackKeyIs(QStringLiteral("8A"));
+    ASSERT_TRUE(keyIsBold());
+    QSqlQuery query(dbConnection());
+    ASSERT_TRUE(query.exec(QStringLiteral("UPDATE track_locations SET fs_deleted=1")));
+    m_pTrackSource->buildIndex();
+    MissingTableModel missingModel(nullptr, trackCollectionManager());
+    missingModel.select();
+    ASSERT_EQ(1, missingModel.rowCount());
+    const QModelIndex missingKey = missingModel.index(
+            0, missingModel.fieldIndex(ColumnCache::COLUMN_LIBRARYTABLE_KEY));
+    EXPECT_FALSE(missingKey.data(Qt::FontRole).isValid());
 }
