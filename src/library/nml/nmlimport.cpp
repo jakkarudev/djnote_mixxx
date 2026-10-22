@@ -319,6 +319,16 @@ NmlImportResult applyNmlImport(const NmlImportPlan& plan,
             result.matchedLibraryLabels.append(label);
             continue;
         }
+        // DJNote (#112): a copy identical to a library track is that track.
+        if (item.reuseTrackId.isValid() && item.reuseAccepted &&
+                pTrackCollectionManager->getTrackById(item.reuseTrackId)) {
+            ids.append(item.reuseTrackId);
+            result.reusedTrackLabels.append(label);
+            continue;
+        }
+        if (item.keptSeparate || item.reuseTrackId.isValid()) {
+            result.keptSeparateLabels.append(label);
+        }
         if (item.status == NmlTrackStatus::NotFound ||
                 item.status == NmlTrackStatus::MatchedInLibrary) {
             TrackId missingId;

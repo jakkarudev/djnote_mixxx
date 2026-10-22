@@ -67,15 +67,21 @@ bool cueGroupsEqual(QList<CueInfo> a, QList<CueInfo> b, double toleranceMillis) 
     return true;
 }
 
-bool gridsEqual(const Beats& a, const Beats& b) {
+bool gridsEqual(const Beats& a, const Beats& b, const NmlCompareTolerance& tolerance) {
+    if (tolerance.bpm >= 0.0 && std::abs(a.getLastMarkerBpm().value() - b.getLastMarkerBpm().value()) > tolerance.bpm) {
+        return false;
+    }
     // Beats extend over the whole track, so equal nearest beats at spread-out
     // points (within 1.5 frames) mean equal grids.
     const double rate = a.getSampleRate().isValid() ? a.getSampleRate().value() : 44100.0;
+    const double maxFrames = tolerance.positionMillis >= 0.0
+            ? tolerance.positionMillis * rate / 1000.0
+            : 1.5;
     for (double seconds : {0.0, 20.0, 90.0, 240.0}) {
         const audio::FramePos pos(seconds * rate);
         const audio::FramePos pa = a.findClosestBeat(pos);
         const audio::FramePos pb = b.findClosestBeat(pos);
-        if (!pa.isValid() || !pb.isValid() || std::abs(pa.value() - pb.value()) > 1.5) {
+        if (!pa.isValid() || !pb.isValid() || std::abs(pa.value() - pb.value()) > maxFrames) {
             return false;
         }
     }
@@ -109,7 +115,9 @@ void applyCueGroup(Track* pTrack, const NmlCueImport& imported, audio::SampleRat
 
 } // namespace
 
-NmlPreparationComparison compareNmlPreparation(const Track& track, const NmlEntry& entry) {
+NmlPreparationComparison compareNmlPreparation(const Track& track,
+        const NmlEntry& entry,
+        const NmlCompareTolerance& tolerance) {
     NmlPreparationComparison c;
     const NmlPositionConverter converter = NmlPositionConverter::forTrack(track);
     const audio::SampleRate sampleRate = converter.signalInfo().getSampleRate();
@@ -120,7 +128,7 @@ NmlPreparationComparison compareNmlPreparation(const Track& track, const NmlEntr
     const BeatsPointer pNmlBeats = beatsFromNmlEntry(entry, converter);
     c.grid.nmlCarries = static_cast<bool>(pNmlBeats);
     c.grid.same = (c.grid.trackHas == c.grid.nmlCarries) &&
-            (!c.grid.trackHas || gridsEqual(*pTrackBeats, *pNmlBeats));
+            (!c.grid.trackHas || gridsEqual(*pTrackBeats, *pNmlBeats, tolerance));
     c.gridLocked = c.grid.trackHas && track.isBpmLocked();
 
     // Key
@@ -140,8 +148,9 @@ NmlPreparationComparison compareNmlPreparation(const Track& track, const NmlEntr
     }
     c.cues.trackHas = !trackCues.isEmpty();
     c.cues.nmlCarries = !nmlCues.isEmpty();
-    const double toleranceMillis =
-            sampleRate.isValid() ? 1500.0 / sampleRate.value() : 0.1;
+    const double toleranceMillis = tolerance.positionMillis >= 0.0
+            ? tolerance.positionMillis
+            : (sampleRate.isValid() ? 1500.0 / sampleRate.value() : 0.1);
     c.cues.same = (c.cues.trackHas == c.cues.nmlCarries) &&
             (!c.cues.trackHas || cueGroupsEqual(trackCues, nmlCues, toleranceMillis));
 
