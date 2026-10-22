@@ -7,6 +7,9 @@
 #include "library/library.h"
 #include "library/nml/nmlexportflow.h" // DJNote
 #include "library/nml/nmlimportflow.h" // DJNote
+#include "library/nml/nmlreread.h" // DJNote (#114)
+#include "library/nml/nmlrereadflow.h" // DJNote (#114)
+#include "library/nml/nmlsourcelink.h" // DJNote (#114)
 #include "library/parser.h"
 #include "library/playlisttablemodel.h"
 #include "library/queryutil.h"
@@ -34,6 +37,11 @@ PlaylistFeature::PlaylistFeature(Library* pLibrary, UserSettingsPointer pConfig)
     std::unique_ptr<TreeItem> pRootItem = TreeItem::newRoot(this);
     m_pSidebarModel->setRootItem(std::move(pRootItem));
     constructChildModel(kInvalidPlaylistId);
+
+    // DJNote (#114): create the source-NML link table if missing, drop links of deleted Playlists.
+    new mixxx::nml::NmlSourceLinkKeeper(&m_playlistDao,
+            pLibrary->trackCollectionManager()->internalCollection()->database(),
+            this);
 
     m_pShufflePlaylistAction = new QAction(tr("Shuffle Playlist"), this);
     connect(m_pShufflePlaylistAction,
@@ -106,6 +114,18 @@ void PlaylistFeature::onRightClickChild(
                 m_pConfig,
                 playlistId);
     });
+    // DJNote (#114): only Playlists created by an NML import remember their source NML.
+    if (mixxx::nml::loadNmlSourceLink(
+                m_pLibrary->trackCollectionManager()->internalCollection()->database(),
+                playlistId)) {
+        QAction* pRereadAction = menu.addAction(tr("Re-read NML..."), this, [this, playlistId]() {
+            mixxx::nml::runNmlRereadFlow(m_pSidebarWidget,
+                    m_pLibrary->trackCollectionManager(),
+                    m_pConfig,
+                    playlistId);
+        });
+        pRereadAction->setEnabled(!locked);
+    }
     menu.exec(globalPos);
 }
 
