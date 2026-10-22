@@ -15,7 +15,7 @@
 // ENTRY and LOCATION on one line, 6-decimal floats, yyyy/M/d dates.
 //
 // GUI-free and Track-free: the caller fills NmlWriteDocument. The export
-// preparation ticket (#116) fills the optional fields of NmlWriteEntry (tempo,
+// preparation fills the optional fields of NmlWriteEntry (tempo,
 // key, ranking, colour, lock, cues); the writer already emits them in
 // Traktor's element order when they are set.
 
@@ -37,7 +37,7 @@ struct NmlWriteEntry {
     double playtimeSeconds = 0.0; // 0: PLAYTIME omitted
     int bitrateBitsPerSecond = 0; // 0: BITRATE omitted
 
-    // Preparation (#116). All optional.
+    // Preparation. All optional.
     bool locked = false;
     std::optional<double> bpm;      // TEMPO@BPM
     QString keyText;                // INFO@KEY

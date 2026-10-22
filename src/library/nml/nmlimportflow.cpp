@@ -1,6 +1,5 @@
 #include "library/nml/nmlimportflow.h"
 
-#include <QCoreApplication>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QMessageBox>
@@ -12,17 +11,12 @@
 #include "library/nml/nmlimport.h"
 #include "library/nml/nmlreuse.h"
 #include "library/nml/nmlsettings.h"
+#include "library/nml/nmlsupport.h"
 #include "library/trackcollection.h"
 #include "library/trackcollectionmanager.h"
 
 namespace mixxx {
 namespace nml {
-
-namespace {
-QString tr(const char* text) {
-    return QCoreApplication::translate("NmlImportFlow", text);
-}
-} // namespace
 
 QString nmlImportSummary(const QString& playlistName,
         int tracksInPlaylist,
@@ -51,19 +45,19 @@ QString nmlImportSummary(const QString& playlistName,
                         .arg(QString::number(matchedLibraryTracks.size())) +
                 QStringLiteral("\n") + matchedLibraryTracks.join(QLatin1Char('\n'));
     }
-    if (!reusedTracks.isEmpty()) { // DJNote (#112)
+    if (!reusedTracks.isEmpty()) { // DJNote
         text += QStringLiteral("\n\n") +
                 tr("%1 tracks reuse an existing track in the library (identical preparation):")
                         .arg(QString::number(reusedTracks.size())) +
                 QStringLiteral("\n") + reusedTracks.join(QLatin1Char('\n'));
     }
-    if (!keptSeparateTracks.isEmpty()) { // DJNote (#112)
+    if (!keptSeparateTracks.isEmpty()) { // DJNote
         text += QStringLiteral("\n\n") +
                 tr("%1 tracks kept separate: preparation differs:")
                         .arg(QString::number(keptSeparateTracks.size())) +
                 QStringLiteral("\n") + keptSeparateTracks.join(QLatin1Char('\n'));
     }
-    if (!lockedGridTracks.isEmpty()) { // DJNote (#109)
+    if (!lockedGridTracks.isEmpty()) { // DJNote
         text += QStringLiteral("\n\n") +
                 tr("%1 tracks have a BPM-locked grid; their grid was not replaced:")
                         .arg(QString::number(lockedGridTracks.size())) +
@@ -90,7 +84,7 @@ int runNmlImportFlow(QWidget* pParent,
     const QString startDir = pConfig->getValue(kNmlImportLastFolderKey,
             QStandardPaths::writableLocation(QStandardPaths::MusicLocation));
     const QString nmlPath = QFileDialog::getOpenFileName(pParent,
-            tr("Import Traktor Playlist"),
+            tr("Import NML"),
             startDir,
             tr("Traktor Collection (*.nml)"));
     if (nmlPath.isEmpty()) {
@@ -102,15 +96,14 @@ int runNmlImportFlow(QWidget* pParent,
     NmlImportPlan plan = planNmlImport(nmlPath, dao);
     if (!plan.error.isEmpty()) {
         QMessageBox::warning(pParent,
-                tr("Import Traktor Playlist"),
+                tr("Import NML"),
                 tr("The file could not be imported: %1").arg(plan.error));
         return kInvalidPlaylistId;
     }
 
-    updateNmlPlanComparisons(&plan, pTrackCollectionManager); // #109
-    proposeNmlReuse(&plan, pTrackCollectionManager);          // #112
-
-    // #113: a file with several playlists gets the tick-box review instead.
+    updateNmlPlanComparisons(&plan, pTrackCollectionManager);
+    proposeNmlReuse(&plan, pTrackCollectionManager);
+    // a file with several playlists gets the tick-box review instead.
     const QList<NmlPlaylistChoice> choices = nmlPlaylistChoices(plan, dao);
     if (choices.size() > 1) {
         DlgNmlImportPlaylists multiDialog(choices, plan, pTrackCollectionManager, pParent);
@@ -140,7 +133,7 @@ int runNmlImportFlow(QWidget* pParent,
             lastPlaylistId = r.playlistId;
         }
         QMessageBox::information(pParent,
-                tr("Import Traktor Playlist"),
+                tr("Import NML"),
                 lines.join(QStringLiteral("\n\n")));
         return lastPlaylistId;
     }
@@ -153,11 +146,11 @@ int runNmlImportFlow(QWidget* pParent,
     const NmlImportResult result =
             applyNmlImport(dialog.plan(), dialog.playlistName(), pTrackCollectionManager);
     if (!result.error.isEmpty() && result.playlistId == kInvalidPlaylistId) {
-        QMessageBox::warning(pParent, tr("Import Traktor Playlist"), result.error);
+        QMessageBox::warning(pParent, tr("Import NML"), result.error);
         return kInvalidPlaylistId;
     }
     QMessageBox::information(pParent,
-            tr("Import Traktor Playlist"),
+            tr("Import NML"),
             nmlImportSummary(dialog.playlistName(),
                     result.tracksInPlaylist,
                     result.newLibraryTracks,

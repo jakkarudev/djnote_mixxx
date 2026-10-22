@@ -6,12 +6,13 @@
 
 class QRadioButton;
 class QTableWidget;
+class QTableWidgetItem;
 class TrackCollectionManager;
 
 namespace mixxx {
 namespace nml {
 
-/// DJNote (#114): review dialog of "Re-read NML". Asks Replace or Keep, shows
+/// DJNote: review dialog of "Re-read NML". Asks Replace or Keep, shows
 /// every item of the NML playlist with its status, and offers the same
 /// find-missing and keep/replace-preparation panels as the import.
 class DlgNmlReread : public QDialog {
@@ -30,6 +31,7 @@ class DlgNmlReread : public QDialog {
 
   private slots:
     void refreshRows();
+    void onItemChanged(QTableWidgetItem* pItem);
 
   private:
     NmlRereadPlan m_plan;
@@ -37,6 +39,7 @@ class DlgNmlReread : public QDialog {
     QTableWidget* m_pTable;
     QRadioButton* m_pReplace;
     QRadioButton* m_pKeep;
+    bool m_refreshing = false;
 };
 
 } // namespace nml

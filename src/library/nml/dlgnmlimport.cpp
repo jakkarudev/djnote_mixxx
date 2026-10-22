@@ -7,48 +7,13 @@
 #include <QPushButton>
 #include <QTableWidget>
 #include <QVBoxLayout>
-
-#include <QFileDialog>
 #include <QFileInfo>
-#include <QHBoxLayout>
 
 #include "library/dao/playlistdao.h"
-#include "library/nml/nmlfindmissing.h"
-#include "library/nml/nmlfindmissingpanel.h"
-#include "library/nml/nmlkeepreplacepanel.h"
-#include "library/nml/nmlreuse.h" // #112
+#include "library/nml/nmlreviewwidgets.h"
 
 namespace mixxx {
 namespace nml {
-
-QString DlgNmlImport::statusText(NmlTrackStatus status) {
-    switch (status) {
-    case NmlTrackStatus::Found:
-        return tr("found");
-    case NmlTrackStatus::FoundNextToNml:
-        return tr("found next to the .nml");
-    case NmlTrackStatus::FoundInBrowsedFolder:
-        return tr("found in browsed folder");
-    case NmlTrackStatus::MatchedInLibrary:
-        return tr("matched in library");
-    case NmlTrackStatus::NotFound:
-        break;
-    }
-    return tr("missing");
-}
-
-// DJNote (#112)
-QString DlgNmlImport::rowStatusText(const NmlPlanTrack& track) {
-    if (nmlRowIsReuse(track)) {
-        return track.reuseAccepted
-                ? tr("reuse existing track")
-                : tr("kept separate: untick of reuse existing track");
-    }
-    if (track.keptSeparate) {
-        return tr("%1, kept separate: preparation differs").arg(statusText(track.status));
-    }
-    return statusText(track.status);
-}
 
 DlgNmlImport::DlgNmlImport(const NmlImportPlan& plan,
         const PlaylistDAO& dao,
@@ -58,7 +23,7 @@ DlgNmlImport::DlgNmlImport(const NmlImportPlan& plan,
           m_plan(plan),
           m_dao(dao),
           m_pManager(pManager) {
-    setWindowTitle(tr("Import Traktor Playlist"));
+    setWindowTitle(tr("Import NML"));
     setMinimumSize(560, 420);
 
     auto* pLayout = new QVBoxLayout(this);
@@ -78,25 +43,14 @@ DlgNmlImport::DlgNmlImport(const NmlImportPlan& plan,
     connect(m_pTable, &QTableWidget::itemChanged, this, &DlgNmlImport::onItemChanged);
     pLayout->addWidget(m_pTable, 1);
 
-    // DJNote (#111): act on the rows marked missing, updating them in place.
-    auto* pFindPanel = new NmlFindMissingPanel(
+    // DJNote: act on the rows marked missing, updating them in place.
+    auto* pPanels = new NmlReviewPanels(
             [this]() { return QList<NmlImportPlan*>{&m_plan}; },
             m_pManager,
             QFileInfo(m_plan.nmlPath).absolutePath(),
             this);
-    connect(pFindPanel, &NmlFindMissingPanel::changed, this, [this]() {
-        // DJNote (#112): rows found by the browse button may be copies too.
-        if (m_pManager) {
-            proposeNmlReuse(&m_plan, m_pManager);
-        }
-    });
-    connect(pFindPanel, &NmlFindMissingPanel::changed, this, &DlgNmlImport::refreshRows);
-    pLayout->addWidget(pFindPanel);
-    // DJNote (#109): keep/replace choice, shown only when a row hits an existing prepared track.
-    auto* pKeepReplace = new NmlKeepReplacePanel(
-            [this]() { return QList<NmlImportPlan*>{&m_plan}; }, m_pManager, this);
-    connect(pFindPanel, &NmlFindMissingPanel::changed, pKeepReplace, &NmlKeepReplacePanel::refresh);
-    pLayout->addWidget(pKeepReplace);
+    connect(pPanels, &NmlReviewPanels::changed, this, &DlgNmlImport::refreshRows);
+    pLayout->addWidget(pPanels);
     refreshRows();
 
     m_pButtons = new QDialogButtonBox(
@@ -121,15 +75,7 @@ void DlgNmlImport::refreshRows() {
         const NmlPlanTrack& t = m_plan.tracks.at(row);
         m_pTable->setItem(row, 0, new QTableWidgetItem(t.title.isEmpty() ? t.primaryKey : t.title));
         m_pTable->setItem(row, 1, new QTableWidgetItem(t.artist));
-        auto* pStatus = new QTableWidgetItem(rowStatusText(t));
-        if (nmlRowIsReuse(t)) { // DJNote (#112)
-            pStatus->setFlags(pStatus->flags() | Qt::ItemIsUserCheckable);
-            pStatus->setCheckState(t.reuseAccepted ? Qt::Checked : Qt::Unchecked);
-        } else if (t.status == NmlTrackStatus::MatchedInLibrary) {
-            pStatus->setFlags(pStatus->flags() | Qt::ItemIsUserCheckable);
-            pStatus->setCheckState(t.accepted ? Qt::Checked : Qt::Unchecked);
-        }
-        m_pTable->setItem(row, 2, pStatus);
+        m_pTable->setItem(row, 2, newNmlStatusItem(t));
     }
     m_pTable->resizeColumnsToContents();
     m_refreshing = false;
@@ -139,13 +85,11 @@ void DlgNmlImport::onItemChanged(QTableWidgetItem* pItem) {
     if (m_refreshing || pItem->column() != 2) {
         return;
     }
-    const bool ticked = pItem->checkState() == Qt::Checked;
-    setNmlMatchAccepted(&m_plan, pItem->row(), ticked);
-    setNmlReuseAccepted(&m_plan, pItem->row(), ticked); // #112
+    applyNmlStatusTick(&m_plan, pItem->row(), pItem->checkState() == Qt::Checked);
     // The label of an unticked reuse row changes (kept separate).
-    if (pItem->row() < m_plan.tracks.size() && nmlRowIsReuse(m_plan.tracks.at(pItem->row()))) {
+    if (pItem->row() < m_plan.tracks.size()) {
         m_refreshing = true;
-        pItem->setText(rowStatusText(m_plan.tracks.at(pItem->row())));
+        pItem->setText(nmlRowStatusText(m_plan.tracks.at(pItem->row())));
         m_refreshing = false;
     }
 }

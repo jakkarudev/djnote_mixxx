@@ -8,12 +8,8 @@
 #include <QTableWidget>
 #include <QVBoxLayout>
 
-#include "library/nml/dlgnmlimport.h"
-#include "library/nml/nmlfindmissing.h"
-#include "library/nml/nmlfindmissingpanel.h"
-#include "library/nml/nmlkeepreplacepanel.h"
-#include "library/nml/nmlreuse.h" // #112
-
+#include "library/nml/nmlreviewwidgets.h"
+#include "library/nml/nmlreuse.h"
 
 namespace mixxx {
 namespace nml {
@@ -41,7 +37,7 @@ DlgNmlImportPlaylists::DlgNmlImportPlaylists(const QList<NmlPlaylistChoice>& cho
 }
 
 void DlgNmlImportPlaylists::init(TrackCollectionManager* pManager) {
-    setWindowTitle(tr("Import Traktor Playlists"));
+    setWindowTitle(tr("Import NML"));
     setMinimumSize(520, 360);
 
     auto* pLayout = new QVBoxLayout(this);
@@ -68,13 +64,13 @@ void DlgNmlImportPlaylists::init(TrackCollectionManager* pManager) {
     }
     pLayout->addWidget(m_pTable, 1);
 
-    if (pManager) { // DJNote (#112)
+    if (pManager) {
         for (NmlImportPlan& plan : m_plans) {
             proposeNmlReuse(&plan, pManager);
         }
     }
     if (!m_plans.isEmpty()) {
-        // DJNote (#111): missing / matched rows of the ticked playlists.
+        // Missing / matched / reused rows of the ticked playlists.
         m_pRows = new QTableWidget(0, 4, this);
         m_pRows->setHorizontalHeaderLabels({tr("Playlist"), tr("Title"), tr("Artist"), tr("Status")});
         m_pRows->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -84,25 +80,10 @@ void DlgNmlImportPlaylists::init(TrackCollectionManager* pManager) {
         connect(m_pRows, &QTableWidget::itemChanged, this, &DlgNmlImportPlaylists::onRowChanged);
         pLayout->addWidget(new QLabel(tr("Tracks not found at their recorded path:"), this));
         pLayout->addWidget(m_pRows, 1);
-        auto* pFindPanel = new NmlFindMissingPanel(
-                [this]() {
-                    QList<NmlImportPlan*> ticked;
-                    for (int i = 0; i < m_plans.size(); ++i) {
-                        const QTableWidgetItem* pItem = m_pTable->item(i, kNameColumn);
-                        if (pItem && pItem->checkState() == Qt::Checked) {
-                            ticked.append(&m_plans[i]);
-                        }
-                    }
-                    return ticked;
-                },
+        auto* pPanels = new NmlReviewPanels([this]() { return tickedPlans(); },
                 pManager,
                 QFileInfo(m_plans.first().nmlPath).absolutePath(),
-                this);
-        connect(pFindPanel, &NmlFindMissingPanel::changed, this, &DlgNmlImportPlaylists::refreshRows);
-        pLayout->addWidget(pFindPanel);
-
-        // DJNote (#109): keep/replace choice for the ticked playlists' rows.
-        auto* pKeepReplace = new NmlKeepReplacePanel(
+                this,
                 [this]() {
                     QList<NmlImportPlan*> all;
                     for (NmlImportPlan& plan : m_plans) {
@@ -110,21 +91,10 @@ void DlgNmlImportPlaylists::init(TrackCollectionManager* pManager) {
                     }
                     return all;
                 },
-                pManager,
-                this,
-                [this]() {
-                    QList<NmlImportPlan*> ticked;
-                    for (int i = 0; i < m_plans.size(); ++i) {
-                        const QTableWidgetItem* pItem = m_pTable->item(i, kNameColumn);
-                        if (pItem && pItem->checkState() == Qt::Checked) {
-                            ticked.append(&m_plans[i]);
-                        }
-                    }
-                    return ticked;
-                });
-        connect(pFindPanel, &NmlFindMissingPanel::changed, pKeepReplace, &NmlKeepReplacePanel::refresh);
-        connect(m_pTable, &QTableWidget::itemChanged, pKeepReplace, &NmlKeepReplacePanel::refresh);
-        pLayout->addWidget(pKeepReplace);
+                [this]() { return tickedPlans(); });
+        connect(pPanels, &NmlReviewPanels::changed, this, &DlgNmlImportPlaylists::refreshRows);
+        connect(m_pTable, &QTableWidget::itemChanged, pPanels, &NmlReviewPanels::refresh);
+        pLayout->addWidget(pPanels);
     }
 
     m_pWarning = new QLabel(this);
@@ -168,15 +138,7 @@ void DlgNmlImportPlaylists::refreshRows() {
             m_pRows->setItem(row, 1,
                     new QTableWidgetItem(track.title.isEmpty() ? track.primaryKey : track.title));
             m_pRows->setItem(row, 2, new QTableWidgetItem(track.artist));
-            auto* pStatus = new QTableWidgetItem(DlgNmlImport::rowStatusText(track));
-            if (nmlRowIsReuse(track)) { // DJNote (#112)
-                pStatus->setFlags(pStatus->flags() | Qt::ItemIsUserCheckable);
-                pStatus->setCheckState(track.reuseAccepted ? Qt::Checked : Qt::Unchecked);
-            } else if (track.status == NmlTrackStatus::MatchedInLibrary) {
-                pStatus->setFlags(pStatus->flags() | Qt::ItemIsUserCheckable);
-                pStatus->setCheckState(track.accepted ? Qt::Checked : Qt::Unchecked);
-            }
-            m_pRows->setItem(row, 3, pStatus);
+            m_pRows->setItem(row, 3, newNmlStatusItem(track));
         }
     }
     m_pRows->resizeColumnsToContents();
@@ -189,8 +151,18 @@ void DlgNmlImportPlaylists::onRowChanged(QTableWidgetItem* pItem) {
     }
     const RowRef ref = m_rowRefs.at(pItem->row());
     const bool ticked = pItem->checkState() == Qt::Checked;
-    setNmlMatchAccepted(&m_plans[ref.plan], ref.track, ticked);
-    setNmlReuseAccepted(&m_plans[ref.plan], ref.track, ticked); // #112
+    applyNmlStatusTick(&m_plans[ref.plan], ref.track, ticked);
+}
+
+QList<NmlImportPlan*> DlgNmlImportPlaylists::tickedPlans() {
+    QList<NmlImportPlan*> ticked;
+    for (int i = 0; i < m_plans.size(); ++i) {
+        const QTableWidgetItem* pItem = m_pTable->item(i, kNameColumn);
+        if (pItem && pItem->checkState() == Qt::Checked) {
+            ticked.append(&m_plans[i]);
+        }
+    }
+    return ticked;
 }
 
 QList<NmlPlaylistChoice> DlgNmlImportPlaylists::choices() const {

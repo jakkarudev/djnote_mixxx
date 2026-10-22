@@ -13,7 +13,7 @@ class TrackCollectionManager;
 namespace mixxx {
 namespace nml {
 
-/// DJNote (#111): the "Browse for the moved folder…" and "Find in library"
+/// DJNote: the "Browse for the moved folder..." and "Find in library"
 /// buttons shared by both import review dialogs. They only call the GUI-free
 /// plan operations of nmlfindmissing.h on the plans `plansProvider` returns
 /// (one plan for a single playlist, the ticked playlists' plans otherwise) and

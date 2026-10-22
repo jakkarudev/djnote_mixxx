@@ -1014,7 +1014,10 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/library/nml/dlgnmlreread.cpp
   src/library/nml/nmlreread.cpp
   src/library/nml/nmlrereadflow.cpp
-  src/library/nml/nmlsourcelink.cpp
+  src/library/nml/nmlplaylistmenu.cpp
+  src/library/nml/nmlreviewwidgets.cpp
+  src/library/nml/nmlsupport.cpp
+  src/library/nml/sourcenml.cpp
   src/library/library_prefs.cpp
   src/library/library.cpp
   src/library/librarycontrol.cpp

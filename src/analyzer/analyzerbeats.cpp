@@ -181,7 +181,6 @@ bool AnalyzerBeats::shouldAnalyze(TrackPointer pTrack) const {
     QString subVersion = pBeats->getSubVersion();
     if (subVersion == mixxx::rekordboxconstants::beatsSubversion ||
             subVersion == mixxx::nml::kBeatsSubVersion) { // DJNote: Traktor NML import
-
         return m_bPreferencesReanalyzeImported;
     }
 

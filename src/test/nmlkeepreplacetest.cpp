@@ -262,6 +262,22 @@ TEST_F(NmlKeepReplaceTest, AcceptedLibraryMatchGoesThroughTheRule) {
     EXPECT_EQ(4, pTrack->getRating());
 }
 
+TEST_F(NmlKeepReplaceTest, ATrackRepeatedInThePlaylistIsCountedOnce) {
+    const TrackPointer pTrack = libraryTrack("cover-test-vbr.mp3");
+    setGrid(pTrack, 100.0, 0);
+    pTrack->setBpmLocked(true);
+
+    NmlImportPlan p = plan(NmlPreparationMode::Replace);
+    p.tracks.append(p.tracks.first()); // the same track again
+    p.tracks.append(p.tracks.first());
+    const NmlImportResult r = applyNmlImport(p, p.defaultName, trackCollectionManager());
+    ASSERT_TRUE(r.error.isEmpty()) << r.error.toStdString();
+
+    EXPECT_EQ(4, r.tracksInPlaylist);
+    EXPECT_EQ(1, r.lockedGridTracks.size());
+    EXPECT_EQ(1, r.existingTracksUpdated);
+}
+
 TEST_F(NmlKeepReplaceTest, NewTrackIsNotCountedAsExistingWhenItRepeats) {
     // A fresh import is the normal path; no existing-track update is reported.
     const NmlImportResult r = run(NmlPreparationMode::Replace);

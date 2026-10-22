@@ -182,7 +182,7 @@ TEST_F(NmlFindMissingTest, UntickedProposalStaysMissingAndTickedJoinsPlaylist) {
             applyNmlImport(plan, plan.defaultName, trackCollectionManager());
     ASSERT_TRUE(result.error.isEmpty());
     EXPECT_EQ(1, result.matchedLibraryTracks);
-    EXPECT_EQ(3, result.missingTracks.size()); // vbr twice, plus the unticked ogg
+    EXPECT_EQ(2, result.missingTracks.size()); // vbr (once, though repeated), the unticked ogg
     const QList<TrackId> ids = tracksInOrder(result.playlistId);
     ASSERT_EQ(4, ids.size());
     EXPECT_EQ(pFlac->getId(), ids.at(1));
@@ -199,7 +199,7 @@ TEST_F(NmlFindMissingTest, MissingAndHiddenLibraryTracksAreNotProposed) {
     EXPECT_EQ(0, findNmlMissingInLibrary(&plan, trackCollectionManager()));
 }
 
-// ---- Several playlists in one file (#111 on top of #113) ----
+// ---- Several playlists in one file ----
 
 TEST_F(NmlFindMissingTest, BrowseActsOnMissingRowsAcrossAllPlaylists) {
     const QString nml = nmltest::writeFixture(getTestDir(),
@@ -208,8 +208,9 @@ TEST_F(NmlFindMissingTest, BrowseActsOnMissingRowsAcrossAllPlaylists) {
             QStringLiteral("collection.nml"));
     const NmlImportPlan plan = planNmlImport(nml, playlistDao());
     const QList<NmlPlaylistChoice> choices = nmlPlaylistChoices(plan, playlistDao());
-    QList<NmlImportPlan> plans = nmlPlansForChoices(plan, choices);
-    ASSERT_EQ(2, plans.size()); // Warmup (vbr, flac), Peak (ogg, flac, vbr)
+    // Warmup (vbr, flac), Peak (ogg, flac, vbr); Preparation is offered unticked.
+    QList<NmlImportPlan> plans = nmlPlansForChoices(plan, choices.mid(0, 2));
+    ASSERT_EQ(2, plans.size());
     nmltest::copyAudio(getTestDir(), QStringLiteral("cover-test.flac"), m_otherDir);
     nmltest::copyAudio(getTestDir(), QStringLiteral("cover-test.ogg"), m_otherDir);
 

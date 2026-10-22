@@ -9,9 +9,7 @@
 #include <QTableWidget>
 #include <QVBoxLayout>
 
-#include "library/nml/dlgnmlimport.h"
-#include "library/nml/nmlfindmissingpanel.h"
-#include "library/nml/nmlkeepreplacepanel.h"
+#include "library/nml/nmlreviewwidgets.h"
 
 namespace mixxx {
 namespace nml {
@@ -47,20 +45,17 @@ DlgNmlReread::DlgNmlReread(const NmlRereadPlan& plan,
     m_pTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
     m_pTable->setSelectionMode(QAbstractItemView::NoSelection);
     m_pTable->verticalHeader()->setVisible(false);
+    connect(m_pTable, &QTableWidget::itemChanged, this, &DlgNmlReread::onItemChanged);
     m_pTable->horizontalHeader()->setStretchLastSection(true);
     pLayout->addWidget(m_pTable, 1);
 
-    auto* pFindPanel = new NmlFindMissingPanel(
+    auto* pPanels = new NmlReviewPanels(
             [this]() { return QList<NmlImportPlan*>{&m_plan.plan}; },
             m_pManager,
             QFileInfo(m_plan.plan.nmlPath).absolutePath(),
             this);
-    connect(pFindPanel, &NmlFindMissingPanel::changed, this, &DlgNmlReread::refreshRows);
-    pLayout->addWidget(pFindPanel);
-    auto* pKeepReplace = new NmlKeepReplacePanel(
-            [this]() { return QList<NmlImportPlan*>{&m_plan.plan}; }, m_pManager, this);
-    connect(pFindPanel, &NmlFindMissingPanel::changed, pKeepReplace, &NmlKeepReplacePanel::refresh);
-    pLayout->addWidget(pKeepReplace);
+    connect(pPanels, &NmlReviewPanels::changed, this, &DlgNmlReread::refreshRows);
+    pLayout->addWidget(pPanels);
     refreshRows();
 
     auto* pButtons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
@@ -75,15 +70,29 @@ NmlRereadMode DlgNmlReread::mode() const {
 }
 
 void DlgNmlReread::refreshRows() {
+    m_refreshing = true;
     const auto& tracks = m_plan.plan.tracks;
     m_pTable->setRowCount(tracks.size());
     for (int row = 0; row < tracks.size(); ++row) {
         const NmlPlanTrack& t = tracks.at(row);
         m_pTable->setItem(row, 0, new QTableWidgetItem(t.title.isEmpty() ? t.primaryKey : t.title));
         m_pTable->setItem(row, 1, new QTableWidgetItem(t.artist));
-        m_pTable->setItem(row, 2, new QTableWidgetItem(DlgNmlImport::statusText(t.status)));
+        m_pTable->setItem(row, 2, newNmlStatusItem(t));
     }
     m_pTable->resizeColumnsToContents();
+    m_refreshing = false;
+}
+
+void DlgNmlReread::onItemChanged(QTableWidgetItem* pItem) {
+    if (m_refreshing || pItem->column() != 2) {
+        return;
+    }
+    applyNmlStatusTick(&m_plan.plan, pItem->row(), pItem->checkState() == Qt::Checked);
+    if (pItem->row() < m_plan.plan.tracks.size()) {
+        m_refreshing = true;
+        pItem->setText(nmlRowStatusText(m_plan.plan.tracks.at(pItem->row())));
+        m_refreshing = false;
+    }
 }
 
 } // namespace nml

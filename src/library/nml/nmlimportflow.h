@@ -10,7 +10,7 @@ class TrackCollectionManager;
 namespace mixxx {
 namespace nml {
 
-/// DJNote: the interactive import flow behind "Import Traktor Playlist (.nml)...":
+/// DJNote: the interactive flow that imports the playlists of an NML:
 /// file dialog (remembered folder) -> Plan -> review dialog -> Apply -> summary.
 /// Returns the id of the created Playlist, or kInvalidPlaylistId if the DJ
 /// cancelled or nothing was created. Cancel writes nothing.
@@ -23,9 +23,8 @@ QString nmlImportSummary(const QString& playlistName, int tracksInPlaylist,
         int newLibraryTracks, const QStringList& skipped,
         const QStringList& missingTracks = {},
         const QStringList& matchedLibraryTracks = {}, int droppedCues = 0,
-        const QStringList& lockedGridTracks = {}, // #109
-        const QStringList& reusedTracks = {},     // #112
-        const QStringList& keptSeparateTracks = {}); // #112
-
+        const QStringList& lockedGridTracks = {},
+        const QStringList& reusedTracks = {},
+        const QStringList& keptSeparateTracks = {});
 } // namespace nml
 } // namespace mixxx

@@ -24,6 +24,9 @@ const QString kLoadName = QStringLiteral("Load");
 const QString kFadeInName = QStringLiteral("Fade-In");
 const QString kFadeOutName = QStringLiteral("Fade-Out");
 
+// Two consecutive grid sections closer than this are one tempo.
+constexpr double kSameTempoBpm = 0.05;
+
 int buttonOf(int hotCueIndex) {
     return (hotCueIndex >= 0 && hotCueIndex < kNmlHotcueButtons) ? hotCueIndex : -1;
 }
@@ -77,6 +80,11 @@ std::optional<int> nmlRankingFromStars(int stars) {
 QList<NmlCue> nmlGridCuesFromBeats(const Beats& beats, const NmlPositionConverter& converter) {
     QList<NmlCue> grid;
     const auto addMarker = [&](audio::FramePos position, double bpm) {
+        // One marker per tempo CHANGE: the closing marker the import appends
+        // (and frame-rounding splits after a database reload) repeat the tempo.
+        if (!grid.isEmpty() && std::abs(*grid.last().gridBpm - bpm) < kSameTempoBpm) {
+            return;
+        }
         NmlCue cue = markerCue(NmlCueType::Grid, kGridName, converter.toMillis(position));
         cue.gridBpm = bpm;
         grid.append(cue);

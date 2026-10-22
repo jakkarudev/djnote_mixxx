@@ -1,5 +1,7 @@
 #include "library/nml/nmlfindmissing.h"
 
+#include "library/nml/nmlsupport.h"
+
 #include <QDir>
 #include <QFileInfo>
 #include <QSqlQuery>
@@ -47,7 +49,7 @@ int browseNmlMissingInFolder(NmlImportPlan* pPlan, const QString& folder) {
 
 QList<NmlLibraryCandidate> nmlLibraryCandidates(TrackCollectionManager* pManager) {
     QList<NmlLibraryCandidate> candidates;
-    QSqlQuery query(pManager->internalCollection()->database());
+    QSqlQuery query(nmlDatabase(pManager));
     if (!query.exec(QStringLiteral(
                 "SELECT library.id, track_locations.filename, library.artist, "
                 "library.title, library.duration FROM library "

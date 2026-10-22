@@ -1,6 +1,5 @@
 #include "library/nml/nmlrereadflow.h"
 
-#include <QCoreApplication>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QMessageBox>
@@ -9,17 +8,12 @@
 #include "library/nml/dlgnmlreread.h"
 #include "library/nml/nmlreread.h"
 #include "library/nml/nmlsettings.h"
+#include "library/nml/nmlsupport.h"
 #include "library/trackcollection.h"
 #include "library/trackcollectionmanager.h"
 
 namespace mixxx {
 namespace nml {
-
-namespace {
-QString tr(const char* text) {
-    return QCoreApplication::translate("NmlRereadFlow", text);
-}
-} // namespace
 
 bool runNmlRereadFlow(QWidget* pParent,
         TrackCollectionManager* pTrackCollectionManager,
@@ -30,7 +24,7 @@ bool runNmlRereadFlow(QWidget* pParent,
         // The .nml moved: ask where it is now; Apply remembers the new path.
         const QString browsed = QFileDialog::getOpenFileName(pParent,
                 tr("Where is the .nml now?"),
-                QFileInfo(plan.link.nmlPath).absolutePath(),
+                QFileInfo(plan.sourceNml.nmlPath).absolutePath(),
                 tr("Traktor Collection (*.nml)"));
         if (browsed.isEmpty()) {
             return false;

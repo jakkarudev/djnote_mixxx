@@ -4,7 +4,7 @@ DJNote's NML export writes `<NML VERSION="20">` with `PROGRAM="Traktor Pro 4"`, 
 
 ## Considered Options
 
-- **VERSION 19, as in the maintainer's 2025 Traktor playlist export**: rejected. It has one tempo per track, so changing grids would have to be simplified to the first beat plus an average BPM. It puts the grid marker itself on hotcue button 1 and has no cue colours. A playlist export made with the installed Traktor Pro 4.0.2 on 2026-10-22 is VERSION 20, so the version 19 file must have come from an older Traktor.
+- **VERSION 19, as in the maintainer's 2025 NML export from Traktor**: rejected. It has one tempo per track, so changing grids would have to be simplified to the first beat plus an average BPM. It puts the grid marker itself on hotcue button 1 and has no cue colours. A playlist export made with the installed Traktor Pro 4.0.2 on 2026-10-22 is VERSION 20, so the version 19 file must have come from an older Traktor.
 - **Several markers in VERSION 19 without `GRID`**: rejected. Nothing shows Traktor reading per-marker tempos from such a file.
 
 ## Consequences

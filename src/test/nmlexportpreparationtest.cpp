@@ -19,7 +19,7 @@
 #include "track/track.h"
 #include "util/color/predefinedcolorpalettes.h"
 
-// DJNote: NML export preparation (#116). Seams: the pure Track -> NmlWriteEntry
+// DJNote: NML export preparation. Seams: the pure Track -> NmlWriteEntry
 // step (nmlWriteEntryFromTrackPreparation and the small mappings), the written
 // bytes, and the round trip export -> import into a fresh library.
 
@@ -145,6 +145,24 @@ TEST_F(NmlExportPreparationTest, ThreeSectionGridExportsThreeMarkersWithTheirBpm
     // TEMPO@BPM is the first marker's (ADR 0010).
     ASSERT_TRUE(entry.bpm.has_value());
     EXPECT_NEAR(*grid[0].gridBpm, *entry.bpm, 1e-6);
+}
+
+TEST_F(NmlExportPreparationTest, TrailingSameTempoMarkerIsNotAnExtraNmlMarker) {
+    const TrackPointer pTrack = newTrack(QStringLiteral("cover-test.flac"));
+    const audio::SampleRate sr = pTrack->getSampleRate();
+    // The import appends a marker at the end of the last section so that the
+    // tempo survives a database reload: 90 BPM = 8 beats in 5333.3 ms.
+    const std::vector<BeatMarker> markers = {
+            BeatMarker(frameAtMillis(pTrack, 1000.0), 8),
+            BeatMarker(frameAtMillis(pTrack, 5000.0), 10),
+            BeatMarker(frameAtMillis(pTrack, 9000.0), 8)};
+    pTrack->trySetBeats(Beats::fromBeatMarkers(
+            sr, markers, frameAtMillis(pTrack, 14333.333), Bpm(90.0)));
+
+    const QList<NmlCue> grid = cuesOfType(exportEntry(pTrack).cues, NmlCueType::Grid);
+    ASSERT_EQ(3, grid.size());
+    EXPECT_NEAR(9000.0, grid[2].startMillis, kFrameToleranceMillis);
+    EXPECT_NEAR(90.0, *grid[2].gridBpm, 0.01);
 }
 
 TEST_F(NmlExportPreparationTest, KeyIsWrittenAsMusicalKeyAndKeyText) {

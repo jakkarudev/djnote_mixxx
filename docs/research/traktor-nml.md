@@ -1,6 +1,6 @@
 # The Traktor NML format, for playlist import and export
 
-Research notes for a later design session on **NML import/export in DJNote**. Written 2026-10-21 against a real Traktor playlist export on the user's machine, Native Instruments' Traktor Pro 4 manual, third-party NML readers and writers on GitHub, and this repo at branch `djnote` (upstream checked at `upstream/main` 300bd8967c). Nothing here is a design. It collects facts and says where each one comes from.
+Research notes for a later design session on **NML import/export in DJNote**. Written 2026-10-21 against a real NML export from Traktor on the user's machine, Native Instruments' Traktor Pro 4 manual, third-party NML readers and writers on GitHub, and this repo at branch `djnote` (upstream checked at `upstream/main` 300bd8967c). Nothing here is a design. It collects facts and says where each one comes from.
 
 NI does not publish an NML schema. Every claim is tagged with its evidence class:
 
@@ -203,7 +203,7 @@ The `INFO KEY` text uses whatever notation the source used. Traktor's "Displayed
 - **Entries.** Each `ENTRY` holds one `PRIMARYKEY TYPE="TRACK"`. `TYPE="STEM"` appears for stem files in the VERSION 20 fixture [RE]. Order is playlist order [O]. Playlists can repeat a track [?].
 - **KEY format.** `KEY = VOLUME + DIR + FILE`, with no separator between `VOLUME` and `DIR` because `DIR` already starts with `/:`. That gives `C:/:Users/:…/:file.flac` on Windows, and presumably `Macintosh HD/:Users/:…` on macOS (Segolene `nml_to_rekord.py:67-78`) [O, RE]. `VOLUMEID` is not part of the key [O].
 - **Joining to the collection.** The match is a string compare with the `LOCATION` of a `COLLECTION/ENTRY`. All 23 keys match exactly [O]. Mixxx converts both sides to a filesystem path and looks the track up by path (`traktorfeature.cpp:547-569`) [M]. The export's `COLLECTION` is written in the same order as the playlist [O].
-- **Name.** `NODE@NAME` keeps the Traktor playlist name (`4skotina extended psyland (2)`). The `.nml` file name (`TheLastOneProject Final`) and the folder come from what the user typed in the export dialog (manual p. 99: "Enter a name for the Playlist to be exported … Enter a destination path") [O, D]. Whether Traktor created the folder itself is unclear [?].
+- **Name.** `NODE@NAME` keeps the playlist name (`4skotina extended psyland (2)`). The `.nml` file name (`TheLastOneProject Final`) and the folder come from what the user typed in the export dialog (manual p. 99: "Enter a name for the Playlist to be exported … Enter a destination path") [O, D]. Whether Traktor created the folder itself is unclear [?].
 
 ---
 

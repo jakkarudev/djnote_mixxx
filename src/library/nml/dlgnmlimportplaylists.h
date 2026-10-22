@@ -13,7 +13,7 @@ class TrackCollectionManager;
 namespace mixxx {
 namespace nml {
 
-/// DJNote: review dialog for an .nml with several playlists (#113). One row per
+/// DJNote: review dialog for an .nml with several playlists. One row per
 /// importable playlist: tick box (ticked), editable name, track count.
 class DlgNmlImportPlaylists : public QDialog {
     Q_OBJECT
@@ -21,8 +21,8 @@ class DlgNmlImportPlaylists : public QDialog {
     DlgNmlImportPlaylists(const QList<NmlPlaylistChoice>& choices,
             QWidget* parent = nullptr);
 
-    /// #111: with the plan of the file the dialog also offers "Browse for the
-    /// moved folder…" / "Find in library" for the ticked playlists' missing
+    /// with the plan of the file the dialog also offers "Browse for the
+    /// moved folder..." / "Find in library" for the ticked playlists' missing
     /// rows (pManager null: no library button). Read the result with plans().
     DlgNmlImportPlaylists(const QList<NmlPlaylistChoice>& choices,
             const NmlImportPlan& plan,
@@ -44,6 +44,7 @@ class DlgNmlImportPlaylists : public QDialog {
     void onRowChanged(QTableWidgetItem* pItem);
 
   private:
+    QList<NmlImportPlan*> tickedPlans();
     QList<NmlPlaylistChoice> m_choices;
     void init(TrackCollectionManager* pManager);
 
@@ -52,8 +53,8 @@ class DlgNmlImportPlaylists : public QDialog {
         int track;
     };
     QList<RowRef> m_rowRefs; // m_pRows row -> plan/track
-    QList<NmlImportPlan> m_plans; // #111
-    QTableWidget* m_pRows = nullptr; // #111: missing / matched rows of ticked playlists
+    QList<NmlImportPlan> m_plans;
+    QTableWidget* m_pRows = nullptr; // missing / matched rows of ticked playlists
     bool m_refreshing = false;
     QTableWidget* m_pTable;
     QLabel* m_pWarning;
