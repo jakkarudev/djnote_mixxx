@@ -1000,6 +1000,8 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/library/nml/nmldocument.cpp
   src/library/nml/nmlexport.cpp
   src/library/nml/nmlexportflow.cpp
+  src/library/nml/nmlfindmissing.cpp
+  src/library/nml/nmlfindmissingpanel.cpp
   src/library/nml/nmlimport.cpp
   src/library/nml/nmlimportflow.cpp
   src/library/nml/nmlwriter.cpp
@@ -2263,6 +2265,7 @@ if(BUILD_TESTING)
     src/test/keymatchliststest.cpp
     src/test/nmldocumenttest.cpp
     src/test/nmlexporttest.cpp
+    src/test/nmlfindmissingtest.cpp
     src/test/nmlimporttest.cpp
     src/test/nmlpreparationtest.cpp
     src/test/nmlmultiplaylisttest.cpp

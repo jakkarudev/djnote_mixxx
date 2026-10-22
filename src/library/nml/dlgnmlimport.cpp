@@ -8,7 +8,13 @@
 #include <QTableWidget>
 #include <QVBoxLayout>
 
+#include <QFileDialog>
+#include <QFileInfo>
+#include <QHBoxLayout>
+
 #include "library/dao/playlistdao.h"
+#include "library/nml/nmlfindmissing.h"
+#include "library/nml/nmlfindmissingpanel.h"
 
 namespace mixxx {
 namespace nml {
@@ -19,16 +25,24 @@ QString DlgNmlImport::statusText(NmlTrackStatus status) {
         return tr("found");
     case NmlTrackStatus::FoundNextToNml:
         return tr("found next to the .nml");
+    case NmlTrackStatus::FoundInBrowsedFolder:
+        return tr("found in browsed folder");
+    case NmlTrackStatus::MatchedInLibrary:
+        return tr("matched in library");
     case NmlTrackStatus::NotFound:
         break;
     }
     return tr("missing");
 }
 
-DlgNmlImport::DlgNmlImport(
-        const NmlImportPlan& plan, const PlaylistDAO& dao, QWidget* parent)
+DlgNmlImport::DlgNmlImport(const NmlImportPlan& plan,
+        const PlaylistDAO& dao,
+        QWidget* parent,
+        TrackCollectionManager* pManager)
         : QDialog(parent),
-          m_dao(dao) {
+          m_plan(plan),
+          m_dao(dao),
+          m_pManager(pManager) {
     setWindowTitle(tr("Import Traktor Playlist"));
     setMinimumSize(560, 420);
 
@@ -40,20 +54,24 @@ DlgNmlImport::DlgNmlImport(
     m_pNameWarning = new QLabel(this);
     pLayout->addWidget(m_pNameWarning);
 
-    auto* pTable = new QTableWidget(plan.tracks.size(), 3, this);
-    pTable->setHorizontalHeaderLabels({tr("Title"), tr("Artist"), tr("Status")});
-    pTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    pTable->setSelectionMode(QAbstractItemView::NoSelection);
-    pTable->verticalHeader()->setVisible(false);
-    pTable->horizontalHeader()->setStretchLastSection(true);
-    for (int row = 0; row < plan.tracks.size(); ++row) {
-        const NmlPlanTrack& t = plan.tracks.at(row);
-        pTable->setItem(row, 0, new QTableWidgetItem(t.title.isEmpty() ? t.primaryKey : t.title));
-        pTable->setItem(row, 1, new QTableWidgetItem(t.artist));
-        pTable->setItem(row, 2, new QTableWidgetItem(statusText(t.status)));
-    }
-    pTable->resizeColumnsToContents();
-    pLayout->addWidget(pTable, 1);
+    m_pTable = new QTableWidget(0, 3, this);
+    m_pTable->setHorizontalHeaderLabels({tr("Title"), tr("Artist"), tr("Status")});
+    m_pTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    m_pTable->setSelectionMode(QAbstractItemView::NoSelection);
+    m_pTable->verticalHeader()->setVisible(false);
+    m_pTable->horizontalHeader()->setStretchLastSection(true);
+    connect(m_pTable, &QTableWidget::itemChanged, this, &DlgNmlImport::onItemChanged);
+    pLayout->addWidget(m_pTable, 1);
+
+    // DJNote (#111): act on the rows marked missing, updating them in place.
+    auto* pFindPanel = new NmlFindMissingPanel(
+            [this]() { return QList<NmlImportPlan*>{&m_plan}; },
+            m_pManager,
+            QFileInfo(m_plan.nmlPath).absolutePath(),
+            this);
+    connect(pFindPanel, &NmlFindMissingPanel::changed, this, &DlgNmlImport::refreshRows);
+    pLayout->addWidget(pFindPanel);
+    refreshRows();
 
     m_pButtons = new QDialogButtonBox(
             QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
@@ -68,6 +86,31 @@ DlgNmlImport::DlgNmlImport(
 
 QString DlgNmlImport::playlistName() const {
     return m_pNameEdit->text().trimmed();
+}
+
+void DlgNmlImport::refreshRows() {
+    m_refreshing = true;
+    m_pTable->setRowCount(m_plan.tracks.size());
+    for (int row = 0; row < m_plan.tracks.size(); ++row) {
+        const NmlPlanTrack& t = m_plan.tracks.at(row);
+        m_pTable->setItem(row, 0, new QTableWidgetItem(t.title.isEmpty() ? t.primaryKey : t.title));
+        m_pTable->setItem(row, 1, new QTableWidgetItem(t.artist));
+        auto* pStatus = new QTableWidgetItem(statusText(t.status));
+        if (t.status == NmlTrackStatus::MatchedInLibrary) {
+            pStatus->setFlags(pStatus->flags() | Qt::ItemIsUserCheckable);
+            pStatus->setCheckState(t.accepted ? Qt::Checked : Qt::Unchecked);
+        }
+        m_pTable->setItem(row, 2, pStatus);
+    }
+    m_pTable->resizeColumnsToContents();
+    m_refreshing = false;
+}
+
+void DlgNmlImport::onItemChanged(QTableWidgetItem* pItem) {
+    if (m_refreshing || pItem->column() != 2) {
+        return;
+    }
+    setNmlMatchAccepted(&m_plan, pItem->row(), pItem->checkState() == Qt::Checked);
 }
 
 void DlgNmlImport::updateOkEnabled() {
