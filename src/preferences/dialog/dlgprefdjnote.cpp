@@ -77,6 +77,7 @@ DlgPrefDJNote::DlgPrefDJNote(QWidget* pParent, UserSettingsPointer pConfig)
           m_pKnobReadoutStyleLabel(nullptr),
           m_pKnobReadoutStyle(nullptr),
           m_pKeyMatchingHighlight(nullptr),
+          m_pKeyMatchingShiftedKey(nullptr),
           m_pKeyMatchingColumns(nullptr),
           m_pKeyMatchingBold(nullptr) {
     auto* pPageLayout = new QVBoxLayout(this);
@@ -238,6 +239,15 @@ void DlgPrefDJNote::createKeyMatchingGroup() {
     pGrid->addWidget(m_pKeyMatchingHighlight, row, 1, Qt::AlignLeft);
     pGrid->setColumnStretch(1, 1);
 
+    m_pKeyMatchingShiftedKey = new QCheckBox(
+            tr("Also match the shifted key of the reference deck"), pGroup);
+    m_pKeyMatchingShiftedKey->setObjectName(QStringLiteral("keyMatchingShiftedKeyCheckBox"));
+    m_pKeyMatchingShiftedKey->setToolTip(
+            tr("When the reference deck plays in a different key than the one "
+               "stored for its track (key lock off with a tempo change, or a "
+               "key shift), also colour tracks that fit that key purple."));
+    pGrid->addWidget(m_pKeyMatchingShiftedKey, pGrid->rowCount(), 0, 1, 2);
+
     // Colour these columns: Whole row first, then the text columns.
     m_pKeyMatchingColumns = new QListWidget(pGroup);
     m_pKeyMatchingColumns->setObjectName(QStringLiteral("keyMatchingColumnsList"));
@@ -273,6 +283,10 @@ void DlgPrefDJNote::createKeyMatchingGroup() {
             &DlgPrefDJNote::slotKeyMatchingControlChanged);
 
     // Every change applies live.
+    connect(m_pKeyMatchingShiftedKey,
+            &QCheckBox::toggled,
+            this,
+            &DlgPrefDJNote::slotKeyMatchingControlChanged);
     connect(m_pKeyMatchingHighlight,
             QOverload<int>::of(&QComboBox::currentIndexChanged),
             this,
@@ -329,6 +343,7 @@ void DlgPrefDJNote::showKeyMatchingSettings(const mixxx::keymatch::Settings& set
         pItem->setCheckState(ticked ? Qt::Checked : Qt::Unchecked);
     }
     m_pKeyMatchingBold->setChecked(settings.boldMatchedText);
+    m_pKeyMatchingShiftedKey->setChecked(settings.matchShiftedKey);
     m_showingKeyMatchingSettings = false;
     updateKeyMatchingEnabled();
 }
@@ -349,5 +364,6 @@ mixxx::keymatch::Settings DlgPrefDJNote::keyMatchingSettingsFromControls() const
         }
     }
     settings.boldMatchedText = m_pKeyMatchingBold->isChecked();
+    settings.matchShiftedKey = m_pKeyMatchingShiftedKey->isChecked();
     return settings;
 }

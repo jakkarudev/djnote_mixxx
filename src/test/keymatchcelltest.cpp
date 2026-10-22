@@ -34,6 +34,8 @@ const QColor kYellow(QStringLiteral("#facc15"));
 // Each tier colour mixed 50/50 with the default played colour #555555.
 const QColor kPlayedGreen(80, 154, 107);
 const QColor kPlayedYellow(168, 145, 53);
+const QColor kPurple(QStringLiteral("#c084fc"));
+const QColor kLightPurple(QStringLiteral("#e9d5ff"));
 
 class KeyMatchCellTest : public LibraryTest {
   protected:
@@ -165,6 +167,13 @@ class KeyMatchCellTest : public LibraryTest {
         m_pMatcher->reloadSettings();
     }
 
+    void setMatchShiftedKey(bool match) {
+        mixxx::keymatch::Settings settings = mixxx::keymatch::loadSettings(config());
+        settings.matchShiftedKey = match;
+        mixxx::keymatch::saveSettings(config(), settings);
+        m_pMatcher->reloadSettings();
+    }
+
     QVariant fontOf(ColumnCache::Column column) const {
         return cell(column).data(Qt::FontRole);
     }
@@ -172,6 +181,12 @@ class KeyMatchCellTest : public LibraryTest {
     bool keyIsBold() const {
         const QVariant font = fontOf(ColumnCache::COLUMN_LIBRARYTABLE_KEY);
         return font.isValid() && font.value<QFont>().bold();
+    }
+
+    // The reference deck plays in `stored` at the shifted key `shifted`.
+    void referenceIsShifted(const QString& stored, const QString& shifted) {
+        referenceIs(stored);
+        m_key.set(KeyUtils::keyToNumericValue(KeyUtils::guessKeyFromText(shifted)));
     }
 
     ControlObject m_numDecks;
@@ -215,7 +230,7 @@ TEST_F(KeyMatchCellTest, MajorReferenceAndTheWrapAroundTheWheel) {
     EXPECT_EQ(QVariant::fromValue(kGreen), keyColorFor(QStringLiteral("12A")));
     EXPECT_EQ(QVariant::fromValue(kYellow), keyColorFor(QStringLiteral("2B")));
     EXPECT_EQ(QVariant::fromValue(kYellow), keyColorFor(QStringLiteral("10B")));
-    EXPECT_FALSE(keyColorFor(QStringLiteral("1A")).isValid());
+    EXPECT_FALSE(keyColorFor(QStringLiteral("5A")).isValid());
 }
 
 TEST_F(KeyMatchCellTest, TracksWithoutAKeyKeepTheNormalColour) {
@@ -466,3 +481,60 @@ TEST_F(KeyMatchCellTest, AMissingTrackIsNeverBold) {
             0, missingModel.fieldIndex(ColumnCache::COLUMN_LIBRARYTABLE_KEY));
     EXPECT_FALSE(missingKey.data(Qt::FontRole).isValid());
 }
+
+TEST_F(KeyMatchCellTest, ShiftedKeyMatchesArePurple) {
+    referenceIsShifted(QStringLiteral("8A"), QStringLiteral("3A"));
+    for (const char* key : {"2A", "3B", "4A"}) {
+        EXPECT_EQ(QVariant::fromValue(kPurple), keyColorFor(QString::fromLatin1(key))) << key;
+    }
+    // 8A, 10A and 1A match the stored key (green, yellow) and keep that colour.
+    for (const char* key : {"5A"}) {
+        EXPECT_EQ(QVariant::fromValue(kLightPurple), keyColorFor(QString::fromLatin1(key))) << key;
+    }
+}
+
+TEST_F(KeyMatchCellTest, StoredKeyMatchesKeepTheirColourAgainstTheShiftedKey) {
+    referenceIsShifted(QStringLiteral("8A"), QStringLiteral("3A"));
+    EXPECT_EQ(QVariant::fromValue(kGreen), keyColorFor(QStringLiteral("8A")));
+    EXPECT_EQ(QVariant::fromValue(kGreen), keyColorFor(QStringLiteral("9A")));
+    // 3A is fuzzy to 8A and strict to 3A: yellow stays.
+    EXPECT_EQ(QVariant::fromValue(kYellow), keyColorFor(QStringLiteral("3A")));
+}
+
+TEST_F(KeyMatchCellTest, NoPurpleWhenTheShiftedKeyEqualsTheStoredKey) {
+    referenceIs(QStringLiteral("8A"));
+    EXPECT_FALSE(keyColorFor(QStringLiteral("2A")).isValid());
+}
+
+TEST_F(KeyMatchCellTest, StrictOnlyDropsLightPurple) {
+    referenceIsShifted(QStringLiteral("8A"), QStringLiteral("3A"));
+    setHighlight(Highlight::StrictOnly);
+    EXPECT_EQ(QVariant::fromValue(kPurple), keyColorFor(QStringLiteral("2A")));
+    EXPECT_FALSE(keyColorFor(QStringLiteral("5A")).isValid());
+}
+
+TEST_F(KeyMatchCellTest, HighlightOffDropsPurple) {
+    referenceIsShifted(QStringLiteral("8A"), QStringLiteral("3A"));
+    setHighlight(Highlight::Off);
+    EXPECT_FALSE(keyColorFor(QStringLiteral("2A")).isValid());
+}
+
+TEST_F(KeyMatchCellTest, TurningShiftedMatchingOffDropsPurpleAndRepaints) {
+    referenceIsShifted(QStringLiteral("8A"), QStringLiteral("3A"));
+    ASSERT_EQ(QVariant::fromValue(kPurple), keyColorFor(QStringLiteral("2A")));
+    QSignalSpy repainted(m_pModel.get(), &QAbstractItemModel::dataChanged);
+    setMatchShiftedKey(false);
+    EXPECT_GE(repainted.count(), 1);
+    EXPECT_FALSE(keyColor().isValid());
+}
+
+TEST_F(KeyMatchCellTest, ChangingTheShiftedKeyRepaints) {
+    referenceIs(QStringLiteral("8A"));
+    trackKeyIs(QStringLiteral("2A"));
+    ASSERT_FALSE(keyColor().isValid());
+    QSignalSpy repainted(m_pModel.get(), &QAbstractItemModel::dataChanged);
+    m_key.set(KeyUtils::keyToNumericValue(KeyUtils::guessKeyFromText(QStringLiteral("3A"))));
+    EXPECT_GE(repainted.count(), 1);
+    EXPECT_EQ(QVariant::fromValue(kPurple), keyColor());
+}
+

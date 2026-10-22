@@ -41,6 +41,7 @@ const QList<QPair<ColumnIdentity, QString>>& columnNames() {
     };
     return names;
 }
+const ConfigKey kShiftedKeyCfgKey(kDJNoteGroup, QStringLiteral("KeyMatchingShiftedKey"));
 
 // Stored as names, so the values stay readable and reorder-safe; unknown names
 // read as the default.
@@ -104,6 +105,7 @@ Settings loadSettings(const UserSettingsPointer& pConfig) {
     } else if (bold == QLatin1String("false")) {
         settings.boldMatchedText = false;
     }
+    settings.matchShiftedKey = pConfig->getValue<bool>(kShiftedKeyCfgKey, settings.matchShiftedKey);
     return settings;
 }
 
@@ -121,6 +123,7 @@ void saveSettings(const UserSettingsPointer& pConfig, const Settings& settings) 
     pConfig->setValue(kWholeRowCfgKey, settings.wholeRow);
     pConfig->setValue(kBoldMatchedTextCfgKey,
             settings.boldMatchedText ? QStringLiteral("true") : QStringLiteral("false"));
+    pConfig->setValue(kShiftedKeyCfgKey, settings.matchShiftedKey);
 }
 
 } // namespace keymatch
