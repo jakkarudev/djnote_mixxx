@@ -7,6 +7,7 @@
 #include <QSet>
 
 #include "library/dao/playlistdao.h"
+#include "library/nml/nmlcues.h"
 #include "library/nml/nmlpreparation.h"
 #include "library/trackcollection.h"
 #include "library/trackcollectionmanager.h"
@@ -254,7 +255,11 @@ NmlImportResult applyNmlImport(const NmlImportPlan& plan,
             // Preparation (grid, key, lock) applies to tracks new to the
             // library only; existing ones belong to the keep/replace ticket.
             if (item.entryIndex >= 0) {
-                applyNmlPreparation(pTrack.get(), plan.document.entries.at(item.entryIndex));
+                const NmlEntry& entry = plan.document.entries.at(item.entryIndex);
+                applyNmlPreparation(pTrack.get(), entry);
+                // DJNote #108: cues, colour, rating (one step per part for #109).
+                result.droppedCues += applyNmlCues(pTrack.get(), entry);
+                applyNmlColorAndRating(pTrack.get(), entry);
             }
         }
         ids.append(pTrack->getId());

@@ -53,6 +53,8 @@ struct NmlImportResult {
     QStringList skipped; // one human-readable line per skipped playlist item
     // One line per playlist item that came in as a missing track (no preparation).
     QStringList missingTracks;
+    // #108: buttonless cues beyond the main cue and buttonless loops, not imported.
+    int droppedCues = 0;
 };
 
 /// First free Playlist name: `base`, then `base 1`, `base 2` (upstream's
