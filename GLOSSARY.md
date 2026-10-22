@@ -144,3 +144,25 @@ _Avoid_: cover art (on its own), thumbnail column, artwork column
 **Cover panel**:
 The cover art of the selected track, shown under the library sidebar. Skin settings can hide it.
 _Avoid_: cover art (on its own), sidebar cover, cover widget, artwork preview
+
+## Key matching
+
+**Reference deck**:
+The deck whose track the library's key matches are judged against: the sync leader if it is a playing deck, otherwise the loudest playing deck, otherwise (nothing playing) the sync leader even though it is stopped. Samplers and the preview deck are never the reference deck.
+_Avoid_: master deck, leader (on its own), current deck
+
+**Key match**:
+How well a track's key fits the reference deck's key: strict, fuzzy or none. Track lists show it by colouring the track's text; it never filters, sorts or hides tracks.
+_Avoid_: harmonic match, compatible key, key suggestion
+
+**Strict match** / **Fuzzy match**:
+A strict match is the same key, one hour around the Camelot wheel in the same mode, or the relative major/minor. A fuzzy match is two hours around the wheel, or one semitone up or down, in the same mode. A diagonal move (one hour and the other mode) is neither.
+_Avoid_: green/yellow match, perfect match, loose match
+
+**Shifted key**:
+The reference deck's key as heard, after tempo or pitch changes, when it differs from the track's stored key. With key lock on, only a deliberate key change shifts it.
+_Avoid_: pitched key, effective key, current key
+
+**Shifted key match**:
+A strict or fuzzy match against the shifted key rather than the stored key. A track that matches the stored key counts as an ordinary key match, even if it also matches the shifted key.
+_Avoid_: purple match, pitch match
