@@ -90,6 +90,34 @@ TEST_F(NmlPreparationTest, SixMarkerGridImportsSixTempoSectionsShiftedByMp3Decod
     }
 }
 
+TEST_F(NmlPreparationTest, EverySectionTempoSurvivesReloadFromDatabase) {
+    auto tracks = importFixture("traktor-v20-grid.nml", kGridAudio);
+    const TrackId trackId = tracks.at(0)->getId();
+    ASSERT_TRUE(trackId.isValid());
+    ASSERT_NE(TrackCollectionManager::SaveTrackResult::Failed,
+            trackCollectionManager()->saveTrack(tracks.at(0)));
+    tracks.clear(); // drop the cache entry so the next fetch reads the database
+
+    const TrackPointer pTrack = trackCollectionManager()->getTrackById(trackId);
+    ASSERT_TRUE(pTrack);
+    const mixxx::BeatsPointer pBeats = pTrack->getBeats();
+    ASSERT_TRUE(pBeats);
+    const double offsetMillis = mixxx::SeratoTags::guessTimingOffsetMillis(
+            pTrack->getLocation(),
+            pTrack->getType(),
+            mixxx::audio::SignalInfo(mixxx::audio::ChannelCount(pTrack->getChannels()),
+                    pTrack->getSampleRate()));
+    const double positionsMillis[] = {
+            53.759780, 28082.122397, 44083.673033, 79119.455225, 95119.904427, 129718.069594};
+    const double bpms[] = {137.004074, 119.988373, 137.002792, 119.996628, 137.001480, 136.971420};
+    for (int i = 0; i < 6; ++i) {
+        const auto marker = mixxx::audio::FramePos(
+                frameOfMillis(pTrack, positionsMillis[i] + offsetMillis));
+        const auto inside = pBeats->findNthBeat(pBeats->findClosestBeat(marker) + 1, 8);
+        EXPECT_NEAR(bpms[i], pBeats->getBpmAroundPosition(inside, 4).value(), 0.015) << i;
+    }
+}
+
 TEST_F(NmlPreparationTest, SingleMarkerGridIsConstantTempoAtMarkerWithoutOffsetOnLosslessFiles) {
     const auto tracks = importFixture("traktor-v20-grid.nml", kGridAudio);
     const TrackPointer pTrack = tracks.at(1); // flac

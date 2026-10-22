@@ -108,15 +108,12 @@ class NmlRoundTripTest : public LibraryTest {
         ASSERT_TRUE(ba && bb);
         audio::FramePos pos = ba->findNextBeat(audio::FramePos(0));
         ASSERT_TRUE(pos.isValid());
-        // Mixxx persists a non-constant grid as beat positions up to the last
-        // marker only, so the tempo AFTER the last marker is not restored when
-        // a track is re-read from the database (upstream behaviour, also for
-        // the Serato/Rekordbox imports). The last-section tempo is checked in
-        // the export tests instead; here we compare up to the last marker.
+        // Compare past the last marker too: the tempo of the last section
+        // must come back, not only the positions up to the last marker.
         const bool constant = ba->hasConstantTempo() && bb->hasConstantTempo();
         const audio::FramePos lastMarker = constant
                 ? ba->findNthBeat(pos, 60)
-                : std::min(ba->getLastMarkerPosition(), bb->getLastMarkerPosition());
+                : ba->findNthBeat(ba->getLastMarkerPosition(), 16);
         int compared = 0;
         while (pos.isValid() && pos <= lastMarker) {
             const audio::FramePos other = bb->findClosestBeat(pos);
@@ -174,6 +171,25 @@ TEST_F(NmlRoundTripTest, PreparedFlexibleGridTrackComesBackIdentical) {
     ASSERT_EQ(1, back.size());
     ASSERT_TRUE(back.first());
     expectSamePreparation(pTrack, back.first());
+}
+
+TEST_F(NmlRoundTripTest, LastSectionTempoSurvivesReloadFromDatabase) {
+    const TrackPointer pTrack = addTrack(QStringLiteral("cover-test.flac"));
+    prepare(pTrack);
+    QList<TrackPointer> back = roundTrip({pTrack});
+    ASSERT_EQ(1, back.size());
+    ASSERT_TRUE(back.first());
+    const TrackId id = back.first()->getId();
+    ASSERT_NE(TrackCollectionManager::SaveTrackResult::Failed,
+            trackCollectionManager()->saveTrack(back.first()));
+    back.clear(); // drop the cache entry so the next fetch reads the database
+    const TrackPointer reloaded = trackCollectionManager()->getTrackById(id);
+    ASSERT_TRUE(reloaded);
+    expectSameGrid(pTrack, reloaded);
+    // 90 BPM after the last marker, 150 BPM before it.
+    const BeatsPointer pBeats = reloaded->getBeats();
+    const audio::FramePos inLast = pBeats->findNthBeat(frameAtMillis(pTrack, 9000), 8);
+    EXPECT_NEAR(90.0, pBeats->getBpmAroundPosition(inLast, 4).value(), 0.05);
 }
 
 TEST_F(NmlRoundTripTest, Mp3WithDecoderDelayComesBackIdentical) {

@@ -18,7 +18,7 @@ NmlPositionConverter NmlPositionConverter::forTrack(const Track& track) {
             audio::ChannelCount(track.getChannels()), track.getSampleRate());
     const double offset = SeratoTags::guessTimingOffsetMillis(
             track.getLocation(), track.getType(), signalInfo);
-    return NmlPositionConverter(signalInfo, offset);
+    return NmlPositionConverter(signalInfo, offset, track.getDuration() * 1000.0);
 }
 
 audio::FramePos NmlPositionConverter::toFrame(double nmlMillis) const {
@@ -28,6 +28,11 @@ audio::FramePos NmlPositionConverter::toFrame(double nmlMillis) const {
 double NmlPositionConverter::toMillis(audio::FramePos frame) const {
     return m_signalInfo.frames2secsFractional(frame.value()) * 1000.0 - m_timingOffsetMillis;
 }
+
+namespace {
+// A section needs a few beats for its tempo to be recoverable from positions.
+constexpr int kMinLastSectionBeats = 16;
+} // namespace
 
 BeatsPointer beatsFromNmlEntry(const NmlEntry& entry, const NmlPositionConverter& converter) {
     const audio::SampleRate sampleRate = converter.signalInfo().getSampleRate();
@@ -63,6 +68,16 @@ BeatsPointer beatsFromNmlEntry(const NmlEntry& entry, const NmlPositionConverter
                 kBeatsSubVersion);
     }
 
+    // The last section needs a closing marker, else Mixxx loses its tempo when
+    // the grid is saved (it persists beat positions up to the last marker only).
+    const Marker& last = markers.back();
+    const double endMillis = std::max(converter.trackEndMillis(), last.startMillis);
+    const int lastSectionBeats = std::max(kMinLastSectionBeats,
+            static_cast<int>(std::lround((endMillis - last.startMillis) * last.bpm / 60000.0)));
+    const audio::FramePos lastStart = converter.toFrame(last.startMillis).toLowerFrameBoundary();
+    const audio::FramePos closingMarker = lastStart +
+            lastSectionBeats * 60.0 * sampleRate / last.bpm;
+
     std::vector<BeatMarker> beatMarkers;
     for (size_t i = 0; i + 1 < markers.size(); ++i) {
         const double sectionMillis = markers[i + 1].startMillis - markers[i].startMillis;
@@ -73,10 +88,11 @@ BeatsPointer beatsFromNmlEntry(const NmlEntry& entry, const NmlPositionConverter
         beatMarkers.push_back(BeatMarker{
                 converter.toFrame(markers[i].startMillis).toLowerFrameBoundary(), beats});
     }
+    beatMarkers.push_back(BeatMarker{lastStart, lastSectionBeats});
     return Beats::fromBeatMarkers(sampleRate,
             beatMarkers,
-            converter.toFrame(markers.back().startMillis).toLowerFrameBoundary(),
-            Bpm(markers.back().bpm),
+            closingMarker.toLowerFrameBoundary(),
+            Bpm(last.bpm),
             kBeatsSubVersion);
 }
 

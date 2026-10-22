@@ -19,9 +19,12 @@ namespace nml {
 /// the MP3/AAC decoder-delay correction (the same one the Serato import uses).
 class NmlPositionConverter {
   public:
-    NmlPositionConverter(const audio::SignalInfo& signalInfo, double timingOffsetMillis)
+    NmlPositionConverter(const audio::SignalInfo& signalInfo,
+            double timingOffsetMillis,
+            double trackEndMillis = 0.0)
             : m_signalInfo(signalInfo),
-              m_timingOffsetMillis(timingOffsetMillis) {
+              m_timingOffsetMillis(timingOffsetMillis),
+              m_trackEndMillis(trackEndMillis) {
     }
 
     /// Uses the track's sample rate/channels and guesses the decoder delay
@@ -37,15 +40,22 @@ class NmlPositionConverter {
     const audio::SignalInfo& signalInfo() const {
         return m_signalInfo;
     }
+    /// Length of the track in NML milliseconds, 0 if unknown.
+    double trackEndMillis() const {
+        return m_trackEndMillis;
+    }
 
   private:
     audio::SignalInfo m_signalInfo;
     double m_timingOffsetMillis;
+    double m_trackEndMillis;
 };
 
 /// Grid markers (Grid cues) of the entry as a Beats object, or null if the
 /// entry has none or the converter's sample rate is unknown. One marker ->
-/// constant tempo; several -> beat markers with every tempo. Markers without
+/// constant tempo; several -> beat markers with every tempo, plus a closing
+/// marker at the end of the track: Mixxx saves a flexible grid only up to its
+/// last marker, so without it the last section's tempo is lost on reload. Markers without
 /// GRID@BPM (VERSION 19) use TEMPO@BPM. The result carries kBeatsSubVersion.
 BeatsPointer beatsFromNmlEntry(const NmlEntry& entry, const NmlPositionConverter& converter);
 

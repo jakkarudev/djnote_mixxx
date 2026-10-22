@@ -147,6 +147,24 @@ TEST_F(NmlExportPreparationTest, ThreeSectionGridExportsThreeMarkersWithTheirBpm
     EXPECT_NEAR(*grid[0].gridBpm, *entry.bpm, 1e-6);
 }
 
+TEST_F(NmlExportPreparationTest, TrailingSameTempoMarkerIsNotAnExtraNmlMarker) {
+    const TrackPointer pTrack = newTrack(QStringLiteral("cover-test.flac"));
+    const audio::SampleRate sr = pTrack->getSampleRate();
+    // The import appends a marker at the end of the last section so that the
+    // tempo survives a database reload: 90 BPM = 8 beats in 5333.3 ms.
+    const std::vector<BeatMarker> markers = {
+            BeatMarker(frameAtMillis(pTrack, 1000.0), 8),
+            BeatMarker(frameAtMillis(pTrack, 5000.0), 10),
+            BeatMarker(frameAtMillis(pTrack, 9000.0), 8)};
+    pTrack->trySetBeats(Beats::fromBeatMarkers(
+            sr, markers, frameAtMillis(pTrack, 14333.333), Bpm(90.0)));
+
+    const QList<NmlCue> grid = cuesOfType(exportEntry(pTrack).cues, NmlCueType::Grid);
+    ASSERT_EQ(3, grid.size());
+    EXPECT_NEAR(9000.0, grid[2].startMillis, kFrameToleranceMillis);
+    EXPECT_NEAR(90.0, *grid[2].gridBpm, 0.01);
+}
+
 TEST_F(NmlExportPreparationTest, KeyIsWrittenAsMusicalKeyAndKeyText) {
     const TrackPointer pTrack = newTrack(QStringLiteral("cover-test.flac"));
     pTrack->setKey(track::io::key::F_SHARP_MINOR, track::io::key::USER);
