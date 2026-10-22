@@ -150,5 +150,22 @@ void setNmlMatchAccepted(NmlImportPlan* pPlan, int row, bool accepted) {
     }
 }
 
+int browseNmlMissingInFolder(const QList<NmlImportPlan*>& plans, const QString& folder) {
+    int found = 0;
+    for (NmlImportPlan* pPlan : plans) {
+        found += browseNmlMissingInFolder(pPlan, folder);
+    }
+    return found;
+}
+
+int findNmlMissingInLibrary(const QList<NmlImportPlan*>& plans, TrackCollectionManager* pManager) {
+    const QList<NmlLibraryCandidate> candidates = nmlLibraryCandidates(pManager);
+    int proposed = 0;
+    for (NmlImportPlan* pPlan : plans) {
+        proposed += findNmlMissingInLibrary(pPlan, candidates);
+    }
+    return proposed;
+}
+
 } // namespace nml
 } // namespace mixxx

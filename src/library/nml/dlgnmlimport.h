@@ -37,12 +37,10 @@ class DlgNmlImport : public QDialog {
 
   private slots:
     void updateOkEnabled();
-    void browseForMovedFolder(); // #111
-    void findInLibrary();        // #111
+    void refreshRows(); // #111: rows from m_plan
     void onItemChanged(QTableWidgetItem* pItem);
 
   private:
-    void refreshRows(); // #111: rows from m_plan
     NmlImportPlan m_plan;
     const PlaylistDAO& m_dao;
     TrackCollectionManager* m_pManager;

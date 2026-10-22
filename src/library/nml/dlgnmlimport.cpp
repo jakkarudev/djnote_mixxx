@@ -14,6 +14,7 @@
 
 #include "library/dao/playlistdao.h"
 #include "library/nml/nmlfindmissing.h"
+#include "library/nml/nmlfindmissingpanel.h"
 
 namespace mixxx {
 namespace nml {
@@ -63,17 +64,13 @@ DlgNmlImport::DlgNmlImport(const NmlImportPlan& plan,
     pLayout->addWidget(m_pTable, 1);
 
     // DJNote (#111): act on the rows marked missing, updating them in place.
-    auto* pFindRow = new QHBoxLayout();
-    auto* pBrowse = new QPushButton(tr("Browse for the moved folder…"), this);
-    connect(pBrowse, &QPushButton::clicked, this, &DlgNmlImport::browseForMovedFolder);
-    pFindRow->addWidget(pBrowse);
-    if (m_pManager) {
-        auto* pFind = new QPushButton(tr("Find in library"), this);
-        connect(pFind, &QPushButton::clicked, this, &DlgNmlImport::findInLibrary);
-        pFindRow->addWidget(pFind);
-    }
-    pFindRow->addStretch(1);
-    pLayout->addLayout(pFindRow);
+    auto* pFindPanel = new NmlFindMissingPanel(
+            [this]() { return QList<NmlImportPlan*>{&m_plan}; },
+            m_pManager,
+            QFileInfo(m_plan.nmlPath).absolutePath(),
+            this);
+    connect(pFindPanel, &NmlFindMissingPanel::changed, this, &DlgNmlImport::refreshRows);
+    pLayout->addWidget(pFindPanel);
     refreshRows();
 
     m_pButtons = new QDialogButtonBox(
@@ -107,21 +104,6 @@ void DlgNmlImport::refreshRows() {
     }
     m_pTable->resizeColumnsToContents();
     m_refreshing = false;
-}
-
-void DlgNmlImport::browseForMovedFolder() {
-    const QString folder = QFileDialog::getExistingDirectory(
-            this, tr("Folder the tracks were moved to"), QFileInfo(m_plan.nmlPath).absolutePath());
-    if (folder.isEmpty()) {
-        return;
-    }
-    browseNmlMissingInFolder(&m_plan, folder);
-    refreshRows();
-}
-
-void DlgNmlImport::findInLibrary() {
-    findNmlMissingInLibrary(&m_plan, m_pManager);
-    refreshRows();
 }
 
 void DlgNmlImport::onItemChanged(QTableWidgetItem* pItem) {

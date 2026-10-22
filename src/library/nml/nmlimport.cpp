@@ -185,16 +185,22 @@ QList<NmlPlaylistChoice> nmlPlaylistChoices(const NmlImportPlan& plan, const Pla
     return choices;
 }
 
-NmlMultiImportResult applyNmlImportPlaylists(const NmlImportPlan& plan,
+QList<NmlImportPlan> nmlPlansForChoices(
+        const NmlImportPlan& plan, const QList<NmlPlaylistChoice>& choices) {
+    QList<NmlImportPlan> plans;
+    for (const NmlPlaylistChoice& choice : choices) {
+        plans.append(selectNmlPlaylist(plan, choice.playlistIndex));
+    }
+    return plans;
+}
+
+NmlMultiImportResult applyNmlImportPlaylists(const QList<NmlImportPlan>& plans,
         const QList<NmlPlaylistChoice>& choices,
         TrackCollectionManager* pTrackCollectionManager) {
     NmlMultiImportResult multi;
-    if (!plan.error.isEmpty()) {
-        multi.error = plan.error;
-        return multi;
-    }
     const PlaylistDAO& dao = pTrackCollectionManager->internalCollection()->getPlaylistDAO();
-    for (const NmlPlaylistChoice& choice : choices) {
+    for (int i = 0; i < choices.size() && i < plans.size(); ++i) {
+        const NmlPlaylistChoice& choice = choices.at(i);
         if (!choice.selected) {
             continue;
         }
@@ -202,10 +208,21 @@ NmlMultiImportResult applyNmlImportPlaylists(const NmlImportPlan& plan,
         const QString base = choice.name.trimmed();
         const QString name = base.isEmpty() ? base : nextFreePlaylistName(dao, base);
         multi.playlistNames.append(name);
-        multi.results.append(applyNmlImport(
-                selectNmlPlaylist(plan, choice.playlistIndex), name, pTrackCollectionManager));
+        multi.results.append(applyNmlImport(plans.at(i), name, pTrackCollectionManager));
     }
     return multi;
+}
+
+NmlMultiImportResult applyNmlImportPlaylists(const NmlImportPlan& plan,
+        const QList<NmlPlaylistChoice>& choices,
+        TrackCollectionManager* pTrackCollectionManager) {
+    if (!plan.error.isEmpty()) {
+        NmlMultiImportResult multi;
+        multi.error = plan.error;
+        return multi;
+    }
+    return applyNmlImportPlaylists(
+            nmlPlansForChoices(plan, choices), choices, pTrackCollectionManager);
 }
 
 NmlImportResult applyNmlImport(const NmlImportPlan& plan,
@@ -239,6 +256,7 @@ NmlImportResult applyNmlImport(const NmlImportPlan& plan,
                 pTrackCollectionManager->getTrackById(item.libraryTrackId)) {
             ids.append(item.libraryTrackId);
             ++result.matchedLibraryTracks;
+            result.matchedLibraryLabels.append(label);
             continue;
         }
         if (item.status == NmlTrackStatus::NotFound ||

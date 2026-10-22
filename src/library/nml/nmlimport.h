@@ -61,6 +61,7 @@ struct NmlImportResult {
     QStringList skipped; // one human-readable line per skipped playlist item
     // One line per playlist item that came in as a missing track (no preparation).
     QStringList missingTracks;
+    QStringList matchedLibraryLabels; // #111: one line per accepted library match
     int matchedLibraryTracks = 0; // #111: accepted library matches put into the Playlist
 };
 
@@ -113,6 +114,16 @@ struct NmlMultiImportResult {
     QList<NmlImportResult> results;
     QStringList playlistNames; // final names, parallel to results
 };
+
+/// #111: one plan per choice (parallel to `choices`), so the find-missing
+/// operations can update each playlist's rows before Apply.
+QList<NmlImportPlan> nmlPlansForChoices(
+        const NmlImportPlan& plan, const QList<NmlPlaylistChoice>& choices);
+
+/// Like the overload below but applies the given (edited) per-choice plans.
+NmlMultiImportResult applyNmlImportPlaylists(const QList<NmlImportPlan>& plans,
+        const QList<NmlPlaylistChoice>& choices,
+        TrackCollectionManager* pTrackCollectionManager);
 
 NmlMultiImportResult applyNmlImportPlaylists(const NmlImportPlan& plan,
         const QList<NmlPlaylistChoice>& choices,

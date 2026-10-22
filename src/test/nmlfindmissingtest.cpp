@@ -7,6 +7,7 @@
 #include "library/dao/playlistdao.h"
 #include "library/nml/nmlfindmissing.h"
 #include "library/nml/nmlimport.h"
+#include "library/nml/nmlimportflow.h"
 #include "test/librarytest.h"
 #include "test/nmltestutils.h"
 #include "track/track.h"
@@ -196,6 +197,71 @@ TEST_F(NmlFindMissingTest, MissingAndHiddenLibraryTracksAreNotProposed) {
     QSqlQuery query(internalCollection()->database());
     ASSERT_TRUE(query.exec(QStringLiteral("UPDATE track_locations SET fs_deleted=1")));
     EXPECT_EQ(0, findNmlMissingInLibrary(&plan, trackCollectionManager()));
+}
+
+// ---- Several playlists in one file (#111 on top of #113) ----
+
+TEST_F(NmlFindMissingTest, BrowseActsOnMissingRowsAcrossAllPlaylists) {
+    const QString nml = nmltest::writeFixture(getTestDir(),
+            QStringLiteral("traktor-multi-playlist.nml"),
+            m_nmlDir,
+            QStringLiteral("collection.nml"));
+    const NmlImportPlan plan = planNmlImport(nml, playlistDao());
+    const QList<NmlPlaylistChoice> choices = nmlPlaylistChoices(plan, playlistDao());
+    QList<NmlImportPlan> plans = nmlPlansForChoices(plan, choices);
+    ASSERT_EQ(2, plans.size()); // Warmup (vbr, flac), Peak (ogg, flac, vbr)
+    nmltest::copyAudio(getTestDir(), QStringLiteral("cover-test.flac"), m_otherDir);
+    nmltest::copyAudio(getTestDir(), QStringLiteral("cover-test.ogg"), m_otherDir);
+
+    EXPECT_EQ(3, browseNmlMissingInFolder({&plans[0], &plans[1]}, m_otherDir.path()));
+    EXPECT_EQ(NmlTrackStatus::FoundInBrowsedFolder, plans[0].tracks.at(1).status);
+    EXPECT_EQ(NmlTrackStatus::NotFound, plans[0].tracks.at(0).status);
+    EXPECT_EQ(NmlTrackStatus::FoundInBrowsedFolder, plans[1].tracks.at(0).status);
+    EXPECT_EQ(NmlTrackStatus::FoundInBrowsedFolder, plans[1].tracks.at(1).status);
+}
+
+TEST_F(NmlFindMissingTest, MultiApplyUsesTheEditedPlansAndCountsMatches) {
+    const QString nml = nmltest::writeFixture(getTestDir(),
+            QStringLiteral("traktor-multi-playlist.nml"),
+            m_nmlDir,
+            QStringLiteral("collection.nml"));
+    const NmlImportPlan plan = planNmlImport(nml, playlistDao());
+    const QList<NmlPlaylistChoice> choices = nmlPlaylistChoices(plan, playlistDao());
+    QList<NmlImportPlan> plans = nmlPlansForChoices(plan, choices);
+    const TrackPointer pFlac = addLibraryTrack(QStringLiteral("cover-test.flac"));
+    for (NmlImportPlan& p : plans) {
+        for (const NmlPlanTrack& t : p.tracks) {
+            if (t.entryIndex >= 0 &&
+                    p.document.entries[t.entryIndex].location.file ==
+                            QStringLiteral("cover-test.flac")) {
+                p.document.entries[t.entryIndex].playtimeSeconds = pFlac->getDuration();
+            }
+        }
+    }
+    EXPECT_EQ(2, findNmlMissingInLibrary({&plans[0], &plans[1]}, trackCollectionManager()));
+    setNmlMatchAccepted(&plans[1], 1, false); // Peak's flac
+
+    const NmlMultiImportResult multi =
+            applyNmlImportPlaylists(plans, choices, trackCollectionManager());
+    ASSERT_EQ(2, multi.results.size());
+    EXPECT_EQ(1, multi.results.at(0).matchedLibraryTracks);
+    EXPECT_EQ(QStringList{QStringLiteral("Bumpin Flava - Bumpy")},
+            multi.results.at(0).matchedLibraryLabels);
+    EXPECT_EQ(0, multi.results.at(1).matchedLibraryTracks);
+    EXPECT_EQ(3, multi.results.at(1).missingTracks.size());
+}
+
+TEST_F(NmlFindMissingTest, SummaryListsLibraryMatches) {
+    const QString text = nmlImportSummary(QStringLiteral("Set"),
+            3,
+            0,
+            {},
+            {},
+            {QStringLiteral("Artist - Matched")});
+    EXPECT_TRUE(text.contains(QStringLiteral("Artist - Matched")));
+    EXPECT_TRUE(text.contains(QStringLiteral("already in the library")));
+    EXPECT_FALSE(nmlImportSummary(QStringLiteral("Set"), 3, 0, {})
+                    .contains(QStringLiteral("already in the library")));
 }
 
 } // namespace

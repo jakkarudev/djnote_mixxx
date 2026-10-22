@@ -64,5 +64,11 @@ int findNmlMissingInLibrary(NmlImportPlan* pPlan, TrackCollectionManager* pManag
 /// The tick box of a MatchedInLibrary row. Unticked rows stay missing on Apply.
 void setNmlMatchAccepted(NmlImportPlan* pPlan, int row, bool accepted);
 
+// ---- Several playlists in one file: the same operations over all plans ----
+// `plans` are the per-playlist plans of the ticked playlists (nmlPlansForChoices).
+
+int browseNmlMissingInFolder(const QList<NmlImportPlan*>& plans, const QString& folder);
+int findNmlMissingInLibrary(const QList<NmlImportPlan*>& plans, TrackCollectionManager* pManager);
+
 } // namespace nml
 } // namespace mixxx

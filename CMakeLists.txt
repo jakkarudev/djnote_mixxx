@@ -1001,6 +1001,7 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/library/nml/nmlexport.cpp
   src/library/nml/nmlexportflow.cpp
   src/library/nml/nmlfindmissing.cpp
+  src/library/nml/nmlfindmissingpanel.cpp
   src/library/nml/nmlimport.cpp
   src/library/nml/nmlimportflow.cpp
   src/library/nml/nmlwriter.cpp
