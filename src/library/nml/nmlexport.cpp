@@ -61,11 +61,15 @@ QString nmlDefaultExportPath(const QString& lastFolder, const QString& playlistN
 
 QString nmlFolderToRemember(const QString& nmlPath, const QString& playlistName) {
     const QFileInfo info(nmlPath);
-    QDir dir = info.absoluteDir();
-    if (dir.dirName() == safeFileName(playlistName) && dir.cdUp()) {
-        return dir.absolutePath();
+    const QString dir = info.absolutePath();
+    const QString dirName = dir.mid(dir.lastIndexOf(QLatin1Char('/')) + 1);
+    if (dirName == safeFileName(playlistName)) {
+        const QString parent = QFileInfo(dir).path(); // string-based: the folder may not exist yet
+        if (parent != dir) {
+            return parent;
+        }
     }
-    return info.absolutePath();
+    return dir;
 }
 
 QString nmlNumberedFileName(const QString& fileName, int n) {

@@ -183,11 +183,11 @@ TEST(NmlExportPathTest, DefaultPathAndRememberedFolder) {
             nmlDefaultExportPath(QStringLiteral("/exports"), QStringLiteral("Warm Up")));
     EXPECT_EQ(QStringLiteral("/exports/a_b/a_b.nml"),
             nmlDefaultExportPath(QStringLiteral("/exports"), QStringLiteral("a/b")));
-    EXPECT_EQ(QStringLiteral("/exports"),
-            nmlFolderToRemember(QStringLiteral("/exports/Warm Up/Warm Up.nml"),
+    EXPECT_EQ(QStringLiteral("C:/exports"),
+            nmlFolderToRemember(QStringLiteral("C:/exports/Warm Up/Warm Up.nml"),
                     QStringLiteral("Warm Up")));
-    EXPECT_EQ(QStringLiteral("/somewhere/else"),
-            nmlFolderToRemember(QStringLiteral("/somewhere/else/x.nml"),
+    EXPECT_EQ(QStringLiteral("C:/somewhere/else"),
+            nmlFolderToRemember(QStringLiteral("C:/somewhere/else/x.nml"),
                     QStringLiteral("Warm Up")));
     EXPECT_EQ(QStringLiteral("01 - Intro 1.flac"),
             nmlNumberedFileName(QStringLiteral("01 - Intro.flac"), 1));
