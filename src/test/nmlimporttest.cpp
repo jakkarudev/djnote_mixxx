@@ -55,6 +55,17 @@ class NmlImportTest : public LibraryTest {
         return ids;
     }
 
+    bool isFlaggedMissing(TrackId id) const {
+        QSqlQuery query(internalCollection()->database());
+        query.prepare(QStringLiteral(
+                "SELECT track_locations.fs_deleted FROM library "
+                "JOIN track_locations ON track_locations.id = library.location "
+                "WHERE library.id = :id"));
+        query.bindValue(":id", id.toVariant());
+        EXPECT_TRUE(query.exec());
+        return query.next() && query.value(0).toInt() == 1;
+    }
+
     QString locationOf(TrackId id) const {
         return trackCollectionManager()->getTrackById(id)->getLocation();
     }
@@ -145,15 +156,32 @@ TEST_F(NmlImportTest, AppliesV19) {
     EXPECT_TRUE(locationOf(ids.at(1)).endsWith(QStringLiteral("empty.mp3")));
 }
 
-TEST_F(NmlImportTest, SkipsNotFoundAndListsThem) {
+TEST_F(NmlImportTest, NotFoundBecomesMissingTrackAtItsPosition) {
     const QString nml = v20NextToNml();
     QFile::remove(m_nmlDir.filePath(QStringLiteral("cover-test.flac")));
     const NmlImportPlan plan = planNmlImport(nml, playlistDao());
     const NmlImportResult result =
             applyNmlImport(plan, plan.defaultName, trackCollectionManager());
-    EXPECT_EQ(3, tracksInOrder(result.playlistId).size());
-    ASSERT_EQ(1, result.skipped.size());
-    EXPECT_TRUE(result.skipped.at(0).contains(QStringLiteral("Bumpy")));
+    ASSERT_TRUE(result.error.isEmpty()) << result.error.toStdString();
+    const QList<TrackId> ids = tracksInOrder(result.playlistId);
+    ASSERT_EQ(4, ids.size());
+    EXPECT_EQ(4, result.tracksInPlaylist);
+    EXPECT_EQ(2, result.newLibraryTracks); // missing track not counted
+    // The missing track keeps position 2 and is titled from the NML.
+    const TrackPointer pMissing = trackCollectionManager()->getTrackById(ids.at(1));
+    ASSERT_TRUE(pMissing);
+    EXPECT_EQ(QStringLiteral("Bumpy"), pMissing->getTitle());
+    EXPECT_TRUE(isFlaggedMissing(ids.at(1)));
+    EXPECT_FALSE(isFlaggedMissing(ids.at(0)));
+    EXPECT_FALSE(isFlaggedMissing(ids.at(2)));
+    // No preparation: no beat grid, no key, no cues.
+    EXPECT_FALSE(pMissing->getBeats());
+    EXPECT_EQ(mixxx::track::io::key::INVALID, pMissing->getKeys().getGlobalKey());
+    EXPECT_TRUE(pMissing->getCuePoints().isEmpty());
+    // Listed in the result as missing, not as skipped.
+    EXPECT_TRUE(result.skipped.isEmpty());
+    ASSERT_EQ(1, result.missingTracks.size());
+    EXPECT_TRUE(result.missingTracks.at(0).contains(QStringLiteral("Bumpy")));
 }
 
 TEST_F(NmlImportTest, NewTracksTakeTagsFromAudioNotNml) {
@@ -231,6 +259,10 @@ TEST_F(NmlImportTest, ReviewDialogStatusTexts) {
             DlgNmlImport::statusText(NmlTrackStatus::FoundNextToNml));
 }
 
+TEST_F(NmlImportTest, ReviewDialogSaysMissingForNotFound) {
+    EXPECT_EQ(QStringLiteral("missing"), DlgNmlImport::statusText(NmlTrackStatus::NotFound));
+}
+
 TEST_F(NmlImportTest, SummaryListsSkippedTracks) {
     const QString text = nmlImportSummary(
             QStringLiteral("Set"), 3, 2, {QStringLiteral("A - B")});
@@ -238,6 +270,19 @@ TEST_F(NmlImportTest, SummaryListsSkippedTracks) {
     EXPECT_TRUE(text.contains(QStringLiteral("A - B")));
     EXPECT_FALSE(nmlImportSummary(QStringLiteral("Set"), 3, 2, {})
                     .contains(QStringLiteral("skipped")));
+}
+
+TEST_F(NmlImportTest, SummaryListsMissingTracksWithoutPreparationNote) {
+    const QString text = nmlImportSummary(QStringLiteral("Set"),
+            3,
+            2,
+            {},
+            {QStringLiteral("Artist - Gone")});
+    EXPECT_TRUE(text.contains(QStringLiteral("Artist - Gone")));
+    EXPECT_TRUE(text.contains(QStringLiteral("missing")));
+    EXPECT_TRUE(text.contains(QStringLiteral("without preparation")));
+    EXPECT_FALSE(nmlImportSummary(QStringLiteral("Set"), 3, 2, {})
+                    .contains(QStringLiteral("without preparation")));
 }
 
 } // namespace

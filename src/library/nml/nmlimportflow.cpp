@@ -26,11 +26,19 @@ QString tr(const char* text) {
 QString nmlImportSummary(const QString& playlistName,
         int tracksInPlaylist,
         int newLibraryTracks,
-        const QStringList& skipped) {
+        const QStringList& skipped,
+        const QStringList& missingTracks) {
     QString text = tr("Imported %1 tracks into the playlist \"%2\" (%3 new in the library).")
                            .arg(QString::number(tracksInPlaylist),
                                    playlistName,
                                    QString::number(newLibraryTracks));
+    if (!missingTracks.isEmpty()) {
+        text += QStringLiteral("\n\n") +
+                tr("%1 tracks are missing and came in without preparation "
+                   "(re-read the .nml once the files are back):")
+                        .arg(QString::number(missingTracks.size())) +
+                QStringLiteral("\n") + missingTracks.join(QLatin1Char('\n'));
+    }
     if (!skipped.isEmpty()) {
         text += QStringLiteral("\n\n") +
                 tr("%1 tracks could not be found and were skipped:")
@@ -108,7 +116,8 @@ int runNmlImportFlow(QWidget* pParent,
             nmlImportSummary(dialog.playlistName(),
                     result.tracksInPlaylist,
                     result.newLibraryTracks,
-                    result.skipped));
+                    result.skipped,
+                    result.missingTracks));
     return result.playlistId;
 }
 

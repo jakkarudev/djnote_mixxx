@@ -32,6 +32,7 @@ struct NmlPlanTrack {
     QString title;
     QString artist;
     QString resolvedPath; // empty when NotFound
+    QString recordedPath; // where the NML says the file was (used for missing tracks)
     NmlTrackStatus status = NmlTrackStatus::NotFound;
 };
 
@@ -50,6 +51,8 @@ struct NmlImportResult {
     int tracksInPlaylist = 0;
     int newLibraryTracks = 0;
     QStringList skipped; // one human-readable line per skipped playlist item
+    // One line per playlist item that came in as a missing track (no preparation).
+    QStringList missingTracks;
 };
 
 /// First free Playlist name: `base`, then `base 1`, `base 2` (upstream's
@@ -60,8 +63,9 @@ NmlImportPlan planNmlImport(const QString& nmlPath,
         const PlaylistDAO& dao,
         int playlistIndex = -1); // -1: the first importable playlist
 
-/// Creates the Playlist `playlistName` and fills it. Not-found items (and
-/// files the library refuses) are skipped and listed in `skipped`.
+/// Creates the Playlist `playlistName` and fills it. Not-found items become
+/// library tracks flagged missing (titled from the NML, no preparation) and are
+/// listed in `missingTracks`; files the library refuses are listed in `skipped`.
 NmlImportResult applyNmlImport(const NmlImportPlan& plan,
         const QString& playlistName,
         TrackCollectionManager* pTrackCollectionManager);
