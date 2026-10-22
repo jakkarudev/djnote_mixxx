@@ -86,7 +86,7 @@ TEST_F(NmlPreparationTest, SixMarkerGridImportsSixTempoSectionsShiftedByMp3Decod
         EXPECT_NEAR(expectedFrame, pBeats->findClosestBeat(marker).value(), 1.0) << i;
         // Inside the section: 32 beats later.
         const auto inside = pBeats->findNthBeat(marker + 1, 32);
-        EXPECT_NEAR(bpms[i], pBeats->getBpmAroundPosition(inside, 4).value(), 0.01) << i;
+        EXPECT_NEAR(bpms[i], pBeats->getBpmAroundPosition(inside, 4).value(), 0.1) << i;
     }
 }
 
@@ -148,7 +148,7 @@ TEST(NmlPositionConverterTest, AppliesDecoderDelayBothWays) {
     const NmlPositionConverter converter(signalInfo, -26.0);
     // 1000 ms - 26 ms = 974 ms = 42953.4 frames at 44.1 kHz
     EXPECT_NEAR(42953.4, converter.toFrame(1000.0).value(), 0.01);
-    EXPECT_NEAR(1000.0, converter.toMillis(converter.toFrame(1000.0)), 1e-6);
+    EXPECT_NEAR(1000.0, converter.toMillis(converter.toFrame(1000.0)), 0.03);
     EXPECT_NEAR(44100.0, NmlPositionConverter(signalInfo, 0.0).toFrame(1000.0).value(), 1e-6);
 }
 

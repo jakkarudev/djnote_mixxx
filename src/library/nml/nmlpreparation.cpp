@@ -26,7 +26,7 @@ audio::FramePos NmlPositionConverter::toFrame(double nmlMillis) const {
 }
 
 double NmlPositionConverter::toMillis(audio::FramePos frame) const {
-    return m_signalInfo.frames2millis(frame.value()) - m_timingOffsetMillis;
+    return m_signalInfo.frames2secsFractional(frame.value()) * 1000.0 - m_timingOffsetMillis;
 }
 
 BeatsPointer beatsFromNmlEntry(const NmlEntry& entry, const NmlPositionConverter& converter) {
