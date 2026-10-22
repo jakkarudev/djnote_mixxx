@@ -316,6 +316,7 @@ void DlgPrefDJNote::updateKeyMatchingEnabled() {
     m_showingKeyMatchingSettings = true; // changing flags emits itemChanged
     const auto highlight = static_cast<mixxx::keymatch::Highlight>(
             m_pKeyMatchingHighlight->currentData().toInt());
+    m_pKeyMatchingShiftedKey->setEnabled(highlight != mixxx::keymatch::Highlight::Off);
     m_pKeyMatchingColumns->setEnabled(highlight != mixxx::keymatch::Highlight::Off);
     m_pKeyMatchingBold->setEnabled(highlight != mixxx::keymatch::Highlight::Off);
     const bool wholeRow =
