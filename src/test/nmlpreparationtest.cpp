@@ -70,8 +70,8 @@ TEST_F(NmlPreparationTest, SixMarkerGridImportsSixTempoSectionsShiftedByMp3Decod
 
     // Independent source of truth: the NML's literal values.
     const double positionsMillis[] = {
-            53.759780, 28082.123375, 60085.224208, 88113.807524, 120114.607544, 148143.600033};
-    const double bpms[] = {137.004074, 119.988373, 137.003, 119.997, 137.001, 136.971};
+            53.759780, 28082.122397, 44083.673033, 79119.455225, 95119.904427, 129718.069594};
+    const double bpms[] = {137.004074, 119.988373, 137.002792, 119.996628, 137.001480, 136.971420};
 
     const double offsetMillis = mixxx::SeratoTags::guessTimingOffsetMillis(
             pTrack->getLocation(),
@@ -84,8 +84,8 @@ TEST_F(NmlPreparationTest, SixMarkerGridImportsSixTempoSectionsShiftedByMp3Decod
         const auto marker = mixxx::audio::FramePos(expectedFrame);
         // The offset is whatever the Serato import would apply on this platform.
         EXPECT_NEAR(expectedFrame, pBeats->findClosestBeat(marker).value(), 1.0) << i;
-        // Inside the section: 32 beats later.
-        const auto inside = pBeats->findNthBeat(marker + 1, 32);
+        // Inside the section: 8 beats later (the shortest section has 32 beats).
+        const auto inside = pBeats->findNthBeat(marker + 1, 8);
         EXPECT_NEAR(bpms[i], pBeats->getBpmAroundPosition(inside, 4).value(), 0.1) << i;
     }
 }
