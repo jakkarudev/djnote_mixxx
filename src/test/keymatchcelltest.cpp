@@ -199,7 +199,7 @@ TEST_F(KeyMatchCellTest, MajorReferenceAndTheWrapAroundTheWheel) {
     EXPECT_EQ(QVariant::fromValue(kGreen), keyColorFor(QStringLiteral("12A")));
     EXPECT_EQ(QVariant::fromValue(kYellow), keyColorFor(QStringLiteral("2B")));
     EXPECT_EQ(QVariant::fromValue(kYellow), keyColorFor(QStringLiteral("10B")));
-    EXPECT_FALSE(keyColorFor(QStringLiteral("1A")).isValid());
+    EXPECT_FALSE(keyColorFor(QStringLiteral("5A")).isValid());
 }
 
 TEST_F(KeyMatchCellTest, TracksWithoutAKeyKeepTheNormalColour) {
@@ -289,8 +289,8 @@ TEST_F(KeyMatchCellTest, ShiftedKeyMatchesArePurple) {
     for (const char* key : {"2A", "3B", "4A"}) {
         EXPECT_EQ(QVariant::fromValue(kPurple), keyColorFor(QString::fromLatin1(key))) << key;
     }
-    // 8A and 10A match the stored key (green, yellow) and keep that colour.
-    for (const char* key : {"1A", "5A"}) {
+    // 8A, 10A and 1A match the stored key (green, yellow) and keep that colour.
+    for (const char* key : {"5A"}) {
         EXPECT_EQ(QVariant::fromValue(kLightPurple), keyColorFor(QString::fromLatin1(key))) << key;
     }
 }
@@ -312,7 +312,7 @@ TEST_F(KeyMatchCellTest, StrictOnlyDropsLightPurple) {
     referenceIsShifted(QStringLiteral("8A"), QStringLiteral("3A"));
     setHighlight(Highlight::StrictOnly);
     EXPECT_EQ(QVariant::fromValue(kPurple), keyColorFor(QStringLiteral("2A")));
-    EXPECT_FALSE(keyColorFor(QStringLiteral("1A")).isValid());
+    EXPECT_FALSE(keyColorFor(QStringLiteral("5A")).isValid());
 }
 
 TEST_F(KeyMatchCellTest, HighlightOffDropsPurple) {
