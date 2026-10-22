@@ -72,6 +72,19 @@ CellStyle cellStyle(const CellInput& input) {
     return style;
 }
 
+QVariant roleData(const CellStyle& style, int role) {
+    if (role == Qt::ForegroundRole) {
+        return style.color ? QVariant::fromValue(*style.color) : QVariant();
+    }
+    if (role == Qt::FontRole && style.bold) {
+        // Only bold is set, so the view's own font is kept otherwise.
+        QFont font;
+        font.setBold(true);
+        return font;
+    }
+    return QVariant();
+}
+
 QVariant cellData(ColumnCache::Column column,
         int role,
         const std::function<QVariant(ColumnCache::Column)>& siblingValue) {
@@ -87,17 +100,7 @@ QVariant cellData(ColumnCache::Column column,
     const QVariant played = siblingValue(ColumnCache::COLUMN_LIBRARYTABLE_PLAYED);
     input.played = !played.isNull() && played.toBool();
 
-    const CellStyle style = cellStyle(input);
-    if (role == Qt::ForegroundRole) {
-        return style.color ? QVariant::fromValue(*style.color) : QVariant();
-    }
-    if (role == Qt::FontRole && style.bold) {
-        // Only bold is set, so the view's own font is kept otherwise.
-        QFont font;
-        font.setBold(true);
-        return font;
-    }
-    return QVariant();
+    return roleData(cellStyle(input), role);
 }
 
 void repaintOnChange(QAbstractItemModel* pModel) {

@@ -9,6 +9,7 @@
 #include "library/browse/browsetablemodel.h"
 #include "library/browse/browsethread.h"
 #include "library/dao/trackschema.h" // DJNote
+#include "library/keymatch/keymatchbrowse.h" // DJNote
 #include "library/tabledelegates/previewbuttondelegate.h"
 #include "library/trackcollection.h"
 #include "library/trackcollectionmanager.h"
@@ -165,6 +166,7 @@ BrowseTableModel::BrowseTableModel(QObject* parent,
 
     setHorizontalHeaderLabels(headerLabels);
     m_pCoverColumn->addToHeader(); // DJNote
+    mixxx::keymatch::repaintOnChange(this); // DJNote
     // register the QList<T> as a metatype since we use QueuedConnection below
     qRegisterMetaType<QList<QList<QStandardItem*>>>(
             "QList< QList<QStandardItem*>>");
@@ -412,6 +414,20 @@ int BrowseTableModel::fieldIndex(const QString& fieldName) const {
         return COLUMN_COVERART;
     }
     return TrackModel::fieldIndex(fieldName);
+}
+
+// DJNote: key matching colour. The row's key is its tag text.
+QVariant BrowseTableModel::data(const QModelIndex& index, int role) const {
+    if (index.isValid() && (role == Qt::ForegroundRole || role == Qt::FontRole)) {
+        const QVariant keyMatch = mixxx::keymatch::browseCellData(index.column(),
+                QStandardItemModel::data(index.siblingAtColumn(COLUMN_KEY), Qt::DisplayRole)
+                        .toString(),
+                role);
+        if (keyMatch.isValid()) {
+            return keyMatch;
+        }
+    }
+    return QStandardItemModel::data(index, role);
 }
 
 Qt::ItemFlags BrowseTableModel::flags(const QModelIndex& index) const {

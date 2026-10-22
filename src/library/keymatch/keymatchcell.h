@@ -43,6 +43,10 @@ struct CellStyle {
 
 CellStyle cellStyle(const CellInput& input);
 
+// The QVariant a model's data() returns for `role` (Qt::ForegroundRole or
+// Qt::FontRole) given the cell's style; invalid means Mixxx's normal look.
+QVariant roleData(const CellStyle& style, int role);
+
 // The same for a track list model's cell, reading the row's raw values through
 // `siblingValue` (the model's rawSiblingValue) only when the column can be
 // coloured. The role is Qt::ForegroundRole (a QColor) or Qt::FontRole (a QFont

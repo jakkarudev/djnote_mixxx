@@ -102,6 +102,8 @@ class BrowseTableModel final : public QStandardItemModel, public virtual TrackMo
     int columnIndexFromSortColumnId(TrackModel::SortColumnId sortColumn) const override;
     QString modelKey(bool noSearch) const override;
     int fieldIndex(const QString& fieldName) const override; // DJNote
+    // DJNote: key matching colour of the Key column.
+    QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override;
     // DJNote: the cover column first reads the covers not known yet.
     bool prepareProxySort(QSortFilterProxyModel* pProxy,
             int column,
