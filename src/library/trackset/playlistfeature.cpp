@@ -5,6 +5,7 @@
 #include <QtDebug>
 
 #include "library/library.h"
+#include "library/nml/nmlexportflow.h" // DJNote
 #include "library/nml/nmlimportflow.h" // DJNote
 #include "library/parser.h"
 #include "library/playlisttablemodel.h"
@@ -98,6 +99,13 @@ void PlaylistFeature::onRightClickChild(
     menu.addAction(m_pImportPlaylistAction);
     menu.addAction(m_pExportPlaylistAction);
     menu.addAction(m_pExportTrackFilesAction);
+    // DJNote: Traktor NML export (src/library/nml/)
+    menu.addAction(tr("Export as Traktor Playlist (.nml)..."), this, [this, playlistId]() {
+        mixxx::nml::runNmlExportFlow(m_pSidebarWidget,
+                m_pLibrary->trackCollectionManager(),
+                m_pConfig,
+                playlistId);
+    });
     menu.exec(globalPos);
 }
 

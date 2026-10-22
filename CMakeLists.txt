@@ -997,8 +997,11 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/library/keymatch/keymatchsettings.cpp
   src/library/nml/dlgnmlimport.cpp
   src/library/nml/nmldocument.cpp
+  src/library/nml/nmlexport.cpp
+  src/library/nml/nmlexportflow.cpp
   src/library/nml/nmlimport.cpp
   src/library/nml/nmlimportflow.cpp
+  src/library/nml/nmlwriter.cpp
   src/library/library_prefs.cpp
   src/library/library.cpp
   src/library/librarycontrol.cpp
@@ -2257,6 +2260,7 @@ if(BUILD_TESTING)
     src/test/keymatchertest.cpp
     src/test/keymatchliststest.cpp
     src/test/nmldocumenttest.cpp
+    src/test/nmlexporttest.cpp
     src/test/nmlimporttest.cpp
     src/test/keyutilstest.cpp
     src/test/knobreadoutcompacttexttest.cpp
